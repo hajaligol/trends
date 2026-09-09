@@ -1,0 +1,1565 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ترندز | فروشگاه پوشاک</title>
+<style>
+  :root{
+    --color-bg:#FBF9F5;
+    --color-header-bg:#F6F3EE;
+    --color-ink:#182630;
+    --color-text-secondary:#566066;
+    --color-hero-beige:#F1E9DF;
+    --color-blue:#AAD0E2;
+    --color-pink:#EFC8CA;
+    --color-sage:#D2D9BF;
+    --color-blush:#FADBD8;
+    --color-lavender:#E2D4EC;
+    --color-aqua:#B5D6CF;
+    --color-yellow:#FBE1B4;
+    --color-benefit-bg:#F1F3EC;
+    --color-card-image:#F1ECE3;
+    --color-line: rgba(24,38,48,0.08);
+    --radius-sm:8px;
+    --radius-md:14px;
+    --radius-lg:22px;
+    --radius-pill:999px;
+    --font-base:"Vazirmatn","Tahoma","Segoe UI",Arial,sans-serif;
+    --gutter:clamp(20px, 4.5vw, 55px);
+    --max-width:1240px;
+  }
+
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0;
+    font-family:var(--font-base);
+    background:var(--color-bg);
+    color:var(--color-ink);
+    -webkit-font-smoothing:antialiased;
+  }
+  img,svg{max-width:100%;display:block;}
+  a{color:inherit;text-decoration:none;}
+  button{font-family:inherit;}
+  ul{list-style:none;margin:0;padding:0;}
+
+  .container{
+    max-width:var(--max-width);
+    margin-inline:auto;
+    padding-inline:var(--gutter);
+  }
+
+  :focus-visible{
+    outline:2px solid var(--color-ink);
+    outline-offset:3px;
+  }
+
+  /* generic asset placeholder */
+  .asset-slot{
+    background:rgba(24,38,48,0.055);
+    border-radius:var(--radius-md);
+    flex-shrink:0;
+  }
+  .asset-slot--icon{
+    border-radius:6px;
+    background:rgba(24,38,48,0.08);
+  }
+  .asset-slot--circle{
+    border-radius:50%;
+  }
+
+  /* =====================================================
+     HEADER
+  ===================================================== */
+  .site-header{
+    background:var(--color-header-bg);
+    border-bottom:1px solid var(--color-line);
+    position:sticky;
+    top:0;
+    z-index:40;
+  }
+  .header-inner{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    min-height:68px;
+    gap:16px;
+  }
+  .logo{
+    font-size:1.55rem;
+    font-weight:700;
+    letter-spacing:0.5px;
+    color:var(--color-ink);
+    white-space:nowrap;
+  }
+  .main-nav{
+    display:flex;
+    align-items:center;
+    gap:30px;
+  }
+  .main-nav a{
+    font-size:0.93rem;
+    color:var(--color-ink);
+    padding-block:6px;
+    position:relative;
+    white-space:nowrap;
+  }
+  .main-nav a::after{
+    content:"";
+    position:absolute;
+    right:0;
+    left:0;
+    bottom:0;
+    height:2px;
+    background:var(--color-ink);
+    border-radius:2px;
+    transform:scaleX(0);
+    transition:transform 200ms ease;
+  }
+  .main-nav a.active::after,
+  .main-nav a:hover::after{
+    transform:scaleX(1);
+  }
+  .header-icons{
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  .icon-btn{
+    width:46px;
+    height:46px;
+    border-radius:50%;
+    border:none;
+    background:transparent;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    position:relative;
+    transition:background 200ms ease;
+  }
+  .icon-btn:hover{background:rgba(24,38,48,0.06);}
+  .icon-btn .icon-svg{width:30px;height:30px;display:block;color:var(--color-ink);}
+  .wishlist-btn .icon-svg{
+    width:22px;
+    height:22px;
+    display:block;
+    color:rgba(24,38,48,0.45);
+    transition:color 200ms ease;
+  }
+  .wishlist-btn .icon-svg path{
+    transition:fill 200ms ease;
+  }
+  .wishlist-btn.active .icon-svg{color:#E0483C;}
+  .wishlist-btn.active .icon-svg path{fill:currentColor;}
+  .cart-badge{
+    position:absolute;
+    top:2px;
+    left:2px;
+    min-width:16px;
+    height:16px;
+    padding-inline:2px;
+    border-radius:50%;
+    background:var(--color-ink);
+    color:#fff;
+    font-size:0.62rem;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    line-height:1;
+  }
+  .nav-toggle{
+    display:none;
+    width:38px;
+    height:38px;
+    border-radius:50%;
+    border:none;
+    background:transparent;
+    cursor:pointer;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:4px;
+  }
+  .nav-toggle span{
+    width:18px;
+    height:2px;
+    background:var(--color-ink);
+    border-radius:2px;
+    transition:transform 200ms ease, opacity 200ms ease;
+  }
+  .nav-toggle[aria-expanded="true"] span:nth-child(1){transform:translateY(6px) rotate(45deg);}
+  .nav-toggle[aria-expanded="true"] span:nth-child(2){opacity:0;}
+  .nav-toggle[aria-expanded="true"] span:nth-child(3){transform:translateY(-6px) rotate(-45deg);}
+
+  /* =====================================================
+     HERO
+  ===================================================== */
+  .hero{
+    background:var(--color-hero-beige);
+    padding-block:clamp(20px,3vw,32px);
+    overflow:hidden;
+  }
+  .eyebrow{
+    font-size:0.88rem;
+    color:var(--color-text-secondary);
+    margin-bottom:14px;
+  }
+  .btn-primary{
+    display:inline-flex;
+    align-items:center;
+    gap:10px;
+    background:var(--color-ink);
+    color:#fff;
+    padding:15px 30px;
+    border-radius:var(--radius-pill);
+    font-size:0.95rem;
+    border:none;
+    cursor:pointer;
+    transition:transform 200ms ease, opacity 200ms ease;
+  }
+  .btn-primary:hover{opacity:0.88;}
+  .btn-primary .arrow{font-size:1rem;}
+  .btn-ghost{
+    display:inline-flex;
+    align-items:center;
+    gap:10px;
+    background:#fff;
+    color:var(--color-ink);
+    padding:13px 26px;
+    border-radius:var(--radius-pill);
+    font-size:0.92rem;
+    border:none;
+    cursor:pointer;
+    transition:opacity 200ms ease;
+  }
+  .btn-ghost:hover{opacity:0.85;}
+
+  /* -- Hero banner carousel (image-only, swipeable) -- */
+  .hero-carousel-wrap{
+    position:relative;
+    width:100%;
+    aspect-ratio:21/8;
+    border-radius:var(--radius-lg);
+    overflow:hidden;
+    background:linear-gradient(160deg, #E7DFD2 0%, #DED4C4 100%);
+    touch-action:pan-y;
+    cursor:grab;
+  }
+  .hero-carousel-wrap:active{cursor:grabbing;}
+  .hero-track{
+    display:flex;
+    width:100%;
+    height:100%;
+    direction:ltr;
+    transition:transform 320ms ease;
+    will-change:transform;
+  }
+  .hero-slide{
+    flex:0 0 100%;
+    width:100%;
+    height:100%;
+  }
+  .asset-slot--hero-full{
+    width:100%;
+    height:100%;
+    border-radius:0;
+  }
+  .hero-slide-image{
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    display:block;
+  }
+  .hero-nav-btn{
+    position:absolute;
+    top:50%;
+    transform:translateY(-50%);
+    width:42px;
+    height:42px;
+    border-radius:50%;
+    border:none;
+    background:rgba(251,249,245,0.88);
+    color:var(--color-ink);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:1.05rem;
+    cursor:pointer;
+    z-index:2;
+    transition:background 200ms ease;
+  }
+  .hero-nav-btn:hover{background:#fff;}
+  .hero-nav-prev{right:16px;}
+  .hero-nav-next{left:16px;}
+  .hero-dots{
+    position:absolute;
+    bottom:16px;
+    left:50%;
+    transform:translateX(-50%);
+    display:flex;
+    align-items:center;
+    gap:6px;
+    z-index:2;
+  }
+  .hero-dot{
+    width:8px;
+    height:8px;
+    padding:0;
+    border:1.5px solid var(--color-ink);
+    border-radius:50%;
+    background:rgba(251,249,245,0.6);
+    cursor:pointer;
+    transition:width 200ms ease, background 200ms ease, border-radius 200ms ease;
+  }
+  .hero-dot.active{
+    background:var(--color-ink);
+    width:22px;
+    border-radius:4px;
+  }
+  @media (max-width:640px){
+    .hero-carousel-wrap{aspect-ratio:4/3.4;}
+  }
+
+  /* =====================================================
+     CATEGORY NAV
+  ===================================================== */
+  .category-nav{
+    padding-block:clamp(34px,5vw,54px);
+  }
+  .category-grid{
+    display:flex;
+    justify-content:space-between;
+    gap:14px;
+    flex-wrap:wrap;
+  }
+  .category-item{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    text-align:center;
+    gap:12px;
+    flex:1 1 130px;
+    background:none;
+    border:none;
+    cursor:pointer;
+    padding:4px;
+  }
+  .category-circle{
+    width:150px;
+    height:150px;
+    border-radius:50%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    transition:transform 200ms ease;
+  }
+  .category-item:hover .category-circle{transform:translateY(-3px);}
+  .category-circle-img{
+    width:72%;
+    height:72%;
+    object-fit: cover;
+    display:block;
+  }
+  .category-title{
+    font-weight:600;
+    font-size:0.95rem;
+    color:var(--color-ink);
+  }
+  .category-cta{
+    font-size:0.78rem;
+    color:var(--color-text-secondary);
+    display:flex;
+    align-items:center;
+    gap:4px;
+  }
+
+  /* =====================================================
+     SECTION HEAD (shared)
+  ===================================================== */
+  .section-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    gap:16px;
+    margin-bottom:34px;
+    flex-wrap:wrap;
+  }
+  .section-head h2{
+    font-size:clamp(1.4rem,2.6vw,1.95rem);
+    margin:6px 0 0;
+    font-weight:700;
+  }
+  .view-all{
+    font-size:0.9rem;
+    display:flex;
+    align-items:center;
+    gap:6px;
+    white-space:nowrap;
+  }
+
+  /* =====================================================
+     FEATURED PRODUCTS
+  ===================================================== */
+  .featured-products{
+    padding-block:clamp(30px,5vw,54px);
+  }
+  .product-grid{
+    display:grid;
+    grid-template-columns:repeat(5,1fr);
+    gap:20px;
+  }
+  .product-card{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+  .product-image-wrap{
+    position:relative;
+    border-radius:var(--radius-md);
+    overflow:hidden;
+    background:var(--color-card-image);
+    aspect-ratio:3/4;
+  }
+  .wishlist-btn{
+    position:absolute;
+    top:10px;
+    left:10px;
+    width:38px;
+    height:38px;
+    border-radius:50%;
+    background:rgba(251,249,245,0.9);
+    border:none;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    transition:background 200ms ease;
+  }
+  .wishlist-btn .asset-slot--icon{
+    width:14px;
+    height:14px;
+    background:rgba(24,38,48,0.35);
+    border-radius:3px;
+    transition:background 200ms ease;
+  }
+  .wishlist-btn.active .asset-slot--icon{
+    background:var(--color-ink);
+  }
+  .product-info .name{
+    font-size:0.95rem;
+    font-weight:600;
+    margin-bottom:4px;
+  }
+  .product-info .price{
+    font-size:0.9rem;
+    color:var(--color-text-secondary);
+    margin-bottom:6px;
+  }
+  .product-rating{
+    font-size:0.82rem;
+    color:var(--color-text-secondary);
+    display:flex;
+    align-items:center;
+    gap:6px;
+  }
+  .product-rating .stars{
+    color:#D9A441;
+    letter-spacing:1px;
+  }
+
+  /* =====================================================
+     PROMO BANNERS
+  ===================================================== */
+  .promo-banners{
+    padding-block:clamp(10px,3vw,20px) clamp(30px,5vw,54px);
+  }
+  .banner-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:20px;
+  }
+  .banner-card{
+    display:flex;
+    align-items:center;
+    border-radius:var(--radius-lg);
+    overflow:hidden;
+    min-height:260px;
+  }
+  .banner-card--pink{background:var(--color-pink);}
+  .banner-card--blue{background:var(--color-blue);}
+  .banner-text{
+    flex:1 1 50%;
+    padding:clamp(20px,3vw,40px);
+  }
+  .banner-text h3{
+    font-size:clamp(1.3rem,2.4vw,1.7rem);
+    margin:0 0 10px;
+    font-weight:700;
+  }
+  .banner-text p{
+    font-size:0.92rem;
+    color:rgba(24,38,48,0.75);
+    line-height:1.7;
+    margin:0 0 22px;
+    max-width:260px;
+  }
+  .banner-image-wrap{
+    flex:1 1 50%;
+    align-self:stretch;
+  }
+  .asset-slot--banner{
+    width:100%;
+    height:100%;
+    min-height:260px;
+    border-radius:0;
+    background:rgba(24,38,48,0.08);
+  }
+
+  /* =====================================================
+     NEW ARRIVALS
+  ===================================================== */
+  .new-arrivals{
+    padding-block:clamp(30px,5vw,54px);
+  }
+  .arrivals-grid{
+    display:grid;
+    grid-template-columns:repeat(6,1fr);
+    gap:16px;
+  }
+  .arrival-card{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+  }
+  .arrival-image-wrap{
+    position:relative;
+    border-radius:var(--radius-md);
+    overflow:hidden;
+    background:var(--color-card-image);
+    aspect-ratio:1/1;
+  }
+  .arrival-card .name{
+    font-size:0.87rem;
+    font-weight:600;
+  }
+  .arrival-card .price{
+    font-size:0.83rem;
+    color:var(--color-text-secondary);
+  }
+  .swatches{
+    display:flex;
+    gap:6px;
+    margin-top:4px;
+  }
+  .swatch{
+    width:12px;
+    height:12px;
+    border-radius:50%;
+    border:1px solid rgba(24,38,48,0.15);
+  }
+
+  /* =====================================================
+     BENEFITS STRIP
+  ===================================================== */
+  .benefits-strip{
+    background:var(--color-benefit-bg);
+    padding-block:clamp(24px,3.5vw,34px);
+  }
+  .benefits-grid{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+  }
+  .benefit-item{
+    display:flex;
+    align-items:center;
+    gap:14px;
+    padding-inline:18px;
+    border-left:1px solid rgba(24,38,48,0.1);
+  }
+  .benefit-item:first-child{
+    padding-inline-start:0;
+  }
+  .benefit-item:last-child{
+    border-left:none;
+  }
+  .benefit-icon{
+    width:38px;
+    height:38px;
+    border-radius:50%;
+    flex-shrink:0;
+    background:rgba(24,38,48,0.07);
+  }
+  .benefit-item h4{
+    font-size:0.9rem;
+    margin:0 0 3px;
+    font-weight:600;
+  }
+  .benefit-item p{
+    font-size:0.78rem;
+    color:var(--color-text-secondary);
+    margin:0;
+  }
+
+  /* =====================================================
+     FOOTER
+  ===================================================== */
+  .site-footer{
+    background:#FFFFFF;
+    border-top:1px solid var(--color-line);
+    padding-block:clamp(30px,4vw,46px) 24px;
+  }
+  .footer-newsletter{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:24px;
+    flex-wrap:wrap;
+    padding-bottom:clamp(26px,4vw,38px);
+    border-bottom:1px solid var(--color-line);
+    margin-bottom:24px;
+  }
+  .newsletter-copy h3{
+    font-size:1.1rem;
+    margin:0 0 6px;
+    font-weight:700;
+  }
+  .newsletter-copy p{
+    font-size:0.85rem;
+    color:var(--color-text-secondary);
+    margin:0;
+  }
+  .newsletter-form{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+  }
+  .newsletter-form input{
+    font-family:inherit;
+    padding:12px 18px;
+    border-radius:var(--radius-pill);
+    border:1px solid var(--color-line);
+    background:var(--color-bg);
+    font-size:0.88rem;
+    min-width:220px;
+  }
+  .newsletter-form input:focus{outline:2px solid var(--color-ink);outline-offset:2px;}
+  .newsletter-form button{
+    padding:12px 26px;
+    border-radius:var(--radius-pill);
+    border:none;
+    background:var(--color-ink);
+    color:#fff;
+    font-size:0.88rem;
+    cursor:pointer;
+  }
+  .newsletter-success{
+    font-size:0.85rem;
+    color:#3E6B4F;
+    display:none;
+  }
+  .newsletter-success.visible{display:block;}
+  .footer-social{
+    display:flex;
+    gap:10px;
+  }
+  .social-icon{
+    width:34px;
+    height:34px;
+    border-radius:50%;
+    background:rgba(24,38,48,0.06);
+  }
+  .footer-bottom{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:16px;
+    flex-wrap:wrap;
+  }
+  .footer-logo{
+    font-size:1.2rem;
+    font-weight:700;
+  }
+  .footer-links{
+    display:flex;
+    gap:22px;
+    flex-wrap:wrap;
+    font-size:0.85rem;
+    color:var(--color-text-secondary);
+  }
+  .footer-copy{
+    font-size:0.8rem;
+    color:var(--color-text-secondary);
+  }
+
+  /* =====================================================
+     SEARCH OVERLAY
+  ===================================================== */
+  .search-overlay{
+    position:fixed;
+    inset:0;
+    background:rgba(24,38,48,0.35);
+    z-index:100;
+    display:flex;
+    align-items:flex-start;
+    justify-content:center;
+    padding-top:min(12vh,120px);
+  }
+  .search-overlay[hidden]{display:none;}
+  .search-panel{
+    background:var(--color-bg);
+    width:min(560px,90vw);
+    border-radius:var(--radius-lg);
+    padding:26px;
+  }
+  .search-panel-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:16px;
+  }
+  .search-panel-head h3{margin:0;font-size:1rem;}
+  .close-btn{
+    width:32px;
+    height:32px;
+    border-radius:50%;
+    border:none;
+    background:rgba(24,38,48,0.06);
+    cursor:pointer;
+    font-size:1rem;
+    color:var(--color-ink);
+  }
+  .search-panel input{
+    width:100%;
+    padding:14px 18px;
+    border-radius:var(--radius-pill);
+    border:1px solid var(--color-line);
+    font-family:inherit;
+    font-size:0.95rem;
+    background:#fff;
+  }
+  .search-panel input:focus{outline:2px solid var(--color-ink);outline-offset:2px;}
+  .search-hint{
+    margin-top:14px;
+    font-size:0.8rem;
+    color:var(--color-text-secondary);
+  }
+
+  /* =====================================================
+     CART PANEL
+  ===================================================== */
+  .cart-panel{
+    position:fixed;
+    top:0;
+    bottom:0;
+    right:0;
+    width:min(360px,88vw);
+    background:var(--color-bg);
+    box-shadow:-8px 0 30px rgba(24,38,48,0.12);
+    z-index:100;
+    padding:24px;
+    display:flex;
+    flex-direction:column;
+    transform:translateX(100%);
+    transition:transform 250ms ease;
+  }
+  .cart-panel.open{transform:translateX(0);}
+  .cart-panel[hidden]{display:none;}
+  .cart-panel-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:20px;
+  }
+  .cart-panel-head h3{margin:0;font-size:1.05rem;}
+  .cart-items{
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+    overflow-y:auto;
+    flex:1;
+  }
+  .cart-item{
+    display:flex;
+    gap:12px;
+    align-items:center;
+  }
+  .cart-item-image{
+    width:56px;
+    height:64px;
+    border-radius:var(--radius-sm);
+    background:var(--color-card-image);
+    flex-shrink:0;
+  }
+  .cart-item-info .name{font-size:0.88rem;font-weight:600;margin-bottom:4px;}
+  .cart-item-info .price{font-size:0.82rem;color:var(--color-text-secondary);}
+  .cart-footer{
+    border-top:1px solid var(--color-line);
+    padding-top:16px;
+    margin-top:16px;
+  }
+  .cart-total{
+    display:flex;
+    justify-content:space-between;
+    font-size:0.92rem;
+    margin-bottom:14px;
+  }
+  .cart-footer .btn-primary{width:100%;justify-content:center;}
+  .overlay-backdrop{
+    position:fixed;
+    inset:0;
+    background:rgba(24,38,48,0.3);
+    z-index:90;
+  }
+  .overlay-backdrop[hidden]{display:none;}
+
+  /* =====================================================
+     MOBILE NAV DRAWER
+  ===================================================== */
+  .mobile-nav{
+    display:none;
+    position:fixed;
+    top:68px;
+    right:0;
+    left:0;
+    background:var(--color-header-bg);
+    border-bottom:1px solid var(--color-line);
+    z-index:39;
+    padding:18px var(--gutter) 24px;
+    flex-direction:column;
+    gap:16px;
+  }
+  .mobile-nav.open{display:flex;}
+  .mobile-nav a{font-size:0.95rem;}
+
+  /* =====================================================
+     RESPONSIVE
+  ===================================================== */
+  @media (max-width:1024px){
+    .product-grid{grid-template-columns:repeat(3,1fr);}
+    .arrivals-grid{grid-template-columns:repeat(3,1fr);}
+    .benefits-grid{grid-template-columns:repeat(2,1fr);row-gap:20px;}
+    .benefit-item:nth-child(2n+1){border-left:1px solid rgba(24,38,48,0.1);}
+    .benefit-item:nth-child(2n){border-left:none;padding-inline-start:18px;}
+  }
+
+  @media (max-width:860px){
+    .main-nav{display:none;}
+    .nav-toggle{display:flex;}
+    .banner-grid{grid-template-columns:1fr;}
+    .banner-card{flex-direction:column;min-height:auto;}
+    .banner-text{text-align:center;}
+    .banner-text p{margin-inline:auto;}
+    .banner-image-wrap{width:100%;}
+    .asset-slot--banner{min-height:200px;}
+  }
+
+  @media (max-width:640px){
+    .category-grid{flex-wrap:nowrap;overflow-x:auto;justify-content:flex-start;padding-bottom:6px;scrollbar-width:none;}
+    .category-grid::-webkit-scrollbar{display:none;}
+    .category-item{flex:0 0 92px;}
+    .category-circle{width:76px;height:76px;}
+    .product-grid{grid-template-columns:repeat(2,1fr);}
+    .arrivals-grid{grid-template-columns:repeat(2,1fr);}
+    .benefits-grid{grid-template-columns:1fr;}
+    .benefit-item{border-left:none !important;padding-inline-start:0 !important;}
+    .footer-bottom{flex-direction:column;align-items:flex-start;}
+    .footer-newsletter{flex-direction:column;align-items:flex-start;}
+  }
+</style>
+</head>
+<body>
+
+<!-- =====================================================
+     HEADER
+===================================================== -->
+<header class="site-header" id="site-header">
+  <div class="container header-inner">
+    <span class="logo">ترندز</span>
+
+    <nav class="main-nav" aria-label="ناوبری اصلی">
+      <a href="#hero" class="active">صفحه اصلی</a>
+      <a href="#featured">فروشگاه</a>
+      <a href="#categories">مردان</a>
+      <a href="#collections">زنان</a>
+      <a href="#categories">اکسسوری‌ها</a>
+      <a href="#site-footer">درباره ما</a>
+    </nav>
+
+    <div class="header-icons">
+      <button class="icon-btn" id="cartBtn" aria-label="سبد خرید" aria-haspopup="true">
+        <svg class="icon-svg" data-asset="cart-icon" viewBox="0 0 1024 1024" fill="none" aria-hidden="true">
+          <g transform="translate(15.5 -27.5)" fill="none" stroke="currentColor" stroke-width="34" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M214 302h82l45 353c5 39 38 68 78 68h316"/>
+            <path d="M307 382h472l-45 214H334"/>
+            <path d="M372 468h358"/>
+            <path d="M382 556h330"/>
+            <path d="M424 723a27 27 0 1 0 0 54 27 27 0 1 0 0-54Z"/>
+            <path d="M680 723a27 27 0 1 0 0 54 27 27 0 1 0 0-54Z"/>
+          </g>
+        </svg>
+        <span class="cart-badge" id="cartCount">۲</span>
+      </button>
+      <button class="icon-btn" aria-label="حساب کاربری">
+        <svg class="icon-svg" data-asset="account-icon" viewBox="0 0 1024 1024" fill="none" aria-hidden="true">
+          <g transform="translate(0 5)" fill="none" stroke="currentColor" stroke-width="34" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="512" cy="350" r="126"/>
+            <path d="M230 790c22-148 125-238 282-238s260 90 282 238"/>
+          </g>
+        </svg>
+      </button>
+      <button class="icon-btn" id="searchBtn" aria-label="جستجو" aria-haspopup="true">
+        <svg class="icon-svg" data-asset="search-icon" viewBox="0 0 1024 1024" fill="none" aria-hidden="true">
+          <g transform="translate(-4 -4)" fill="none" stroke="currentColor" stroke-width="34" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M690 486c0 124-100 224-224 224S242 610 242 486s100-224 224-224 224 100 224 224Z"/>
+            <path d="M636 650l154 154"/>
+          </g>
+        </svg>
+      </button>
+      <button class="nav-toggle" id="navToggle" aria-label="باز کردن منو" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </div>
+
+  <nav class="mobile-nav" id="mobileNav" aria-label="ناوبری موبایل">
+    <a href="#hero">صفحه اصلی</a>
+    <a href="#featured">فروشگاه</a>
+    <a href="#categories">مردان</a>
+    <a href="#collections">زنان</a>
+    <a href="#categories">اکسسوری‌ها</a>
+    <a href="#site-footer">درباره ما</a>
+  </nav>
+</header>
+
+<main>
+
+  <!-- =====================================================
+       HERO
+  ===================================================== -->
+  <section class="hero" id="hero">
+    <div class="container">
+      <div class="hero-carousel-wrap" id="heroCarousel" role="region" aria-roledescription="carousel" aria-label="بنرهای تبلیغاتی">
+        <div class="hero-track" id="heroTrack">
+          <div class="hero-slide" role="group" aria-roledescription="اسلاید" aria-label="۱ از ۲">
+            <img class="hero-slide-image" src="banner-1.webp" alt="استایل خاص برای آدم‌های خاص - مشاهده محصولات">
+          </div>
+          <div class="hero-slide" role="group" aria-roledescription="اسلاید" aria-label="۲ از ۲">
+            <img class="hero-slide-image" src="banner-2.webp" alt="پوشاک اصیل ایرانی - ترکیب سنت و زیبایی در استایل شما">
+          </div>
+        </div>
+
+        <button class="hero-nav-btn hero-nav-prev" type="button" aria-label="اسلاید قبلی">→</button>
+        <button class="hero-nav-btn hero-nav-next" type="button" aria-label="اسلاید بعدی">←</button>
+
+        <div class="hero-dots" id="heroDots">
+          <button class="hero-dot active" type="button" data-index="0" aria-label="رفتن به اسلاید ۱"></button>
+          <button class="hero-dot" type="button" data-index="1" aria-label="رفتن به اسلاید ۲"></button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =====================================================
+       CATEGORY NAVIGATION
+  ===================================================== -->
+  <section class="category-nav" id="categories">
+    <div class="container category-grid">
+      <button class="category-item" type="button">
+        <span class="category-circle" style="background:var(--color-sage);">
+          <img class="category-circle-img" src="category-men.webp" alt="مردان">
+        </span>
+        <span class="category-title">مردان</span>
+      </button>
+
+      <button class="category-item" type="button">
+        <span class="category-circle" style="background:var(--color-blush);">
+          <img class="category-circle-img" src="category-women.webp" alt="زنان">
+        </span>
+        <span class="category-title">زنان</span>
+      </button>
+
+      <button class="category-item" type="button">
+        <span class="category-circle" style="background:var(--color-blue);">
+          <img class="category-circle-img" src="category-shoes.webp" alt="کفش‌ها">
+        </span>
+        <span class="category-title">کفش‌ها</span>
+      </button>
+
+      <button class="category-item" type="button">
+        <span class="category-circle" style="background:var(--color-yellow);">
+          <img class="category-circle-img" src="category-accessories.webp" alt="اکسسوری‌ها">
+        </span>
+        <span class="category-title">اکسسوری‌ها</span>
+      </button>
+
+      <button class="category-item" type="button">
+        <span class="category-circle" style="background:var(--color-lavender);">
+          <img class="category-circle-img" src="category-hats.webp" alt="کلاه">
+        </span>
+        <span class="category-title">کلاه</span>
+      </button>
+
+      <button class="category-item" type="button">
+        <span class="category-circle" style="background:var(--color-aqua);">
+          <img class="category-circle-img" src="category-sunglasses.webp" alt="عینک آفتابی">
+        </span>
+        <span class="category-title">عینک آفتابی</span>
+      </button>
+    </div>
+  </section>
+
+  <!-- =====================================================
+       FEATURED PRODUCTS
+  ===================================================== -->
+  <section class="featured-products" id="featured">
+    <div class="container">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">مجموعه‌های ویژه</p>
+          <h2>پیشنهادهای برتر برای شما</h2>
+        </div>
+        <a href="#featured" class="view-all">مشاهده همه <span aria-hidden="true">←</span></a>
+      </div>
+
+      <div class="product-grid">
+        <article class="product-card">
+          <div class="product-image-wrap">
+            <div class="asset-slot" data-asset="product-classic-shirt" style="width:100%;height:100%;border-radius:0;"></div>
+            <button class="wishlist-btn" aria-label="افزودن به علاقه‌مندی‌ها" aria-pressed="false">
+              <svg class="icon-svg" data-asset="wishlist-icon" viewBox="0 0 1024 1024" fill="none" aria-hidden="true">
+                <path d="M512 824C487 802 244 602 218 438C195 292 286 210 386 210C445 210 490 239 512 292C534 239 579 210 638 210C738 210 829 292 806 438C780 602 537 802 512 824Z" fill="none" stroke="currentColor" stroke-width="32" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+          </div>
+          <div class="product-info">
+            <p class="name">پیراهن کلاسیک</p>
+            <p class="price">۵۹۰,۰۰۰ تومان</p>
+            <p class="product-rating"><span class="stars">★★★★★</span> (۱۲۴)</p>
+          </div>
+        </article>
+
+        <article class="product-card">
+          <div class="product-image-wrap">
+            <div class="asset-slot" data-asset="product-womens-knit" style="width:100%;height:100%;border-radius:0;"></div>
+            <button class="wishlist-btn" aria-label="افزودن به علاقه‌مندی‌ها" aria-pressed="false">
+              <svg class="icon-svg" data-asset="wishlist-icon" viewBox="0 0 1024 1024" fill="none" aria-hidden="true">
+                <path d="M512 824C487 802 244 602 218 438C195 292 286 210 386 210C445 210 490 239 512 292C534 239 579 210 638 210C738 210 829 292 806 438C780 602 537 802 512 824Z" fill="none" stroke="currentColor" stroke-width="32" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+          </div>
+          <div class="product-info">
+            <p class="name">بافت زنانه</p>
+            <p class="price">۴۹۰,۰۰۰ تومان</p>
+            <p class="product-rating"><span class="stars">★★★★★</span> (۹۸)</p>
+          </div>
+        </article>
+
+        <article class="product-card">
+          <div class="product-image-wrap">
+            <div class="asset-slot" data-asset="product-minimal-sneaker" style="width:100%;height:100%;border-radius:0;"></div>
+            <button class="wishlist-btn" aria-label="افزودن به علاقه‌مندی‌ها" aria-pressed="false">
+              <svg class="icon-svg" data-asset="wishlist-icon" viewBox="0 0 1024 1024" fill="none" aria-hidden="true">
+                <path d="M512 824C487 802 244 602 218 438C195 292 286 210 386 210C445 210 490 239 512 292C534 239 579 210 638 210C738 210 829 292 806 438C780 602 537 802 512 824Z" fill="none" stroke="currentColor" stroke-width="32" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+          </div>
+          <div class="product-info">
+            <p class="name">کتانی مینیمال</p>
+            <p class="price">۷۹۰,۰۰۰ تومان</p>
+            <p class="product-rating"><span class="stars">★★★★★</span> (۲۱۰)</p>
+          </div>
+        </article>
+
+        <article class="product-card">
+          <div class="product-image-wrap">
+            <div class="asset-slot" data-asset="product-daily-hoodie" style="width:100%;height:100%;border-radius:0;"></div>
+            <button class="wishlist-btn" aria-label="افزودن به علاقه‌مندی‌ها" aria-pressed="false">
+              <svg class="icon-svg" data-asset="wishlist-icon" viewBox="0 0 1024 1024" fill="none" aria-hidden="true">
+                <path d="M512 824C487 802 244 602 218 438C195 292 286 210 386 210C445 210 490 239 512 292C534 239 579 210 638 210C738 210 829 292 806 438C780 602 537 802 512 824Z" fill="none" stroke="currentColor" stroke-width="32" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+          </div>
+          <div class="product-info">
+            <p class="name">هودی روزانه</p>
+            <p class="price">۶۹۰,۰۰۰ تومان</p>
+            <p class="product-rating"><span class="stars">★★★★★</span> (۱۶۷)</p>
+          </div>
+        </article>
+
+        <article class="product-card">
+          <div class="product-image-wrap">
+            <div class="asset-slot" data-asset="product-trench-coat" style="width:100%;height:100%;border-radius:0;"></div>
+            <button class="wishlist-btn" aria-label="افزودن به علاقه‌مندی‌ها" aria-pressed="false">
+              <svg class="icon-svg" data-asset="wishlist-icon" viewBox="0 0 1024 1024" fill="none" aria-hidden="true">
+                <path d="M512 824C487 802 244 602 218 438C195 292 286 210 386 210C445 210 490 239 512 292C534 239 579 210 638 210C738 210 829 292 806 438C780 602 537 802 512 824Z" fill="none" stroke="currentColor" stroke-width="32" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+          </div>
+          <div class="product-info">
+            <p class="name">پالتو ترنج</p>
+            <p class="price">۱,۲۹۰,۰۰۰ تومان</p>
+            <p class="product-rating"><span class="stars">★★★★★</span> (۹۳)</p>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- =====================================================
+       PROMOTIONAL COLLECTION BANNERS
+  ===================================================== -->
+  <section class="promo-banners" id="collections">
+    <div class="container banner-grid">
+      <div class="banner-card banner-card--pink">
+        <div class="banner-text">
+          <h3>مجموعه زنانه</h3>
+          <p>استایل بدون مرز، برای تمام روز.</p>
+          <button class="btn-ghost" type="button">
+            <span>خرید زنانه</span>
+            <span aria-hidden="true">←</span>
+          </button>
+        </div>
+        <div class="banner-image-wrap">
+          <div class="asset-slot asset-slot--banner" data-asset="womens-banner-image"></div>
+        </div>
+      </div>
+
+      <div class="banner-card banner-card--blue">
+        <div class="banner-text">
+          <h3>مجموعه مردانه</h3>
+          <p>استایل مدرن برای هر موقعیت.</p>
+          <button class="btn-ghost" type="button">
+            <span>خرید مردانه</span>
+            <span aria-hidden="true">←</span>
+          </button>
+        </div>
+        <div class="banner-image-wrap">
+          <div class="asset-slot asset-slot--banner" data-asset="mens-banner-image"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =====================================================
+       NEW ARRIVALS
+  ===================================================== -->
+  <section class="new-arrivals" id="new-arrivals">
+    <div class="container">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">تازه‌ترین‌ها</p>
+          <h2>جدیدترین محصولات</h2>
+        </div>
+        <a href="#new-arrivals" class="view-all">مشاهده همه <span aria-hidden="true">←</span></a>
+      </div>
+
+      <div class="arrivals-grid">
+        <article class="arrival-card">
+          <div class="arrival-image-wrap">
+            <div class="asset-slot" data-asset="product-backpack" style="width:100%;height:100%;border-radius:0;"></div>
+          </div>
+          <p class="name">کوله پشتی</p>
+          <p class="price">۷۹۰,۰۰۰ تومان</p>
+          <div class="swatches">
+            <span class="swatch" style="background:#182630;"></span>
+          </div>
+        </article>
+
+        <article class="arrival-card">
+          <div class="arrival-image-wrap">
+            <div class="asset-slot" data-asset="product-classic-cap" style="width:100%;height:100%;border-radius:0;"></div>
+          </div>
+          <p class="name">کلاه کلاسیک</p>
+          <p class="price">۲۵۰,۰۰۰ تومان</p>
+          <div class="swatches">
+            <span class="swatch" style="background:#7C6A54;"></span>
+            <span class="swatch" style="background:#182630;"></span>
+            <span class="swatch" style="background:#D9C9A8;"></span>
+          </div>
+        </article>
+
+        <article class="arrival-card">
+          <div class="arrival-image-wrap">
+            <div class="asset-slot" data-asset="product-fabric-pants" style="width:100%;height:100%;border-radius:0;"></div>
+          </div>
+          <p class="name">شلوار پارچه‌ای</p>
+          <p class="price">۵۹۰,۰۰۰ تومان</p>
+          <div class="swatches">
+            <span class="swatch" style="background:#5A6B63;"></span>
+            <span class="swatch" style="background:#182630;"></span>
+          </div>
+        </article>
+
+        <article class="arrival-card">
+          <div class="arrival-image-wrap">
+            <div class="asset-slot" data-asset="product-hoodie" style="width:100%;height:100%;border-radius:0;"></div>
+          </div>
+          <p class="name">هودی</p>
+          <p class="price">۶۹۰,۰۰۰ تومان</p>
+          <div class="swatches">
+            <span class="swatch" style="background:#E7DFD2;"></span>
+            <span class="swatch" style="background:#8B8F87;"></span>
+            <span class="swatch" style="background:#182630;"></span>
+          </div>
+        </article>
+
+        <article class="arrival-card">
+          <div class="arrival-image-wrap">
+            <div class="asset-slot" data-asset="product-denim-jacket" style="width:100%;height:100%;border-radius:0;"></div>
+          </div>
+          <p class="name">کت جین</p>
+          <p class="price">۸۹۰,۰۰۰ تومان</p>
+          <div class="swatches">
+            <span class="swatch" style="background:#5C7A93;"></span>
+            <span class="swatch" style="background:#182630;"></span>
+          </div>
+        </article>
+
+        <article class="arrival-card">
+          <div class="arrival-image-wrap">
+            <div class="asset-slot" data-asset="product-plain-tshirt" style="width:100%;height:100%;border-radius:0;"></div>
+          </div>
+          <p class="name">تیشرت ساده</p>
+          <p class="price">۲۹۵,۰۰۰ تومان</p>
+          <div class="swatches">
+            <span class="swatch" style="background:#5A6B53;"></span>
+            <span class="swatch" style="background:#182630;"></span>
+            <span class="swatch" style="background:#AAD0E2;"></span>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- =====================================================
+       SERVICE / TRUST STRIP
+  ===================================================== -->
+  <section class="benefits-strip" id="benefits">
+    <div class="container benefits-grid">
+      <div class="benefit-item">
+        <span class="benefit-icon" data-asset="icon-support"></span>
+        <div>
+          <h4>پشتیبانی ۲۴/۷</h4>
+          <p>همیشه در کنار شما</p>
+        </div>
+      </div>
+      <div class="benefit-item">
+        <span class="benefit-icon" data-asset="icon-secure-payment"></span>
+        <div>
+          <h4>پرداخت امن</h4>
+          <p>با درگاه‌های مطمئن</p>
+        </div>
+      </div>
+      <div class="benefit-item">
+        <span class="benefit-icon" data-asset="icon-easy-return"></span>
+        <div>
+          <h4>بازگشت آسان</h4>
+          <p>تا ۳۰ روز</p>
+        </div>
+      </div>
+      <div class="benefit-item">
+        <span class="benefit-icon" data-asset="icon-free-shipping"></span>
+        <div>
+          <h4>ارسال رایگان</h4>
+          <p>برای سفارش‌های بالای ۵۰۰ هزار تومان</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- =====================================================
+     FOOTER
+===================================================== -->
+<footer class="site-footer" id="site-footer">
+  <div class="container">
+    <div class="footer-newsletter">
+      <div class="newsletter-copy">
+        <h3>عضویت در خبرنامه</h3>
+        <p>از جدیدترین تخفیف‌ها و محصولات باخبر شوید.</p>
+      </div>
+      <form class="newsletter-form" id="newsletterForm">
+        <label for="newsletterEmail" class="visually-hidden" style="position:absolute;width:1px;height:1px;overflow:hidden;">ایمیل</label>
+        <input type="email" id="newsletterEmail" placeholder="آدرس ایمیل شما" required>
+        <button type="submit">عضویت</button>
+        <span class="newsletter-success" id="newsletterSuccess">با تشکر! عضویت شما ثبت شد.</span>
+      </form>
+      <div class="footer-social">
+        <span class="social-icon" data-asset="social-instagram"></span>
+        <span class="social-icon" data-asset="social-telegram"></span>
+        <span class="social-icon" data-asset="social-facebook"></span>
+        <span class="social-icon" data-asset="social-x"></span>
+      </div>
+    </div>
+
+    <div class="footer-bottom">
+      <span class="footer-logo">ترندز</span>
+      <nav class="footer-links" aria-label="لینک‌های فوتر">
+        <a href="#hero">صفحه اصلی</a>
+        <a href="#site-footer">درباره ما</a>
+        <a href="#site-footer">تماس با ما</a>
+        <a href="#site-footer">سوالات متداول</a>
+      </nav>
+      <span class="footer-copy">© ۱۴۰۴ ترندز. تمامی حقوق محفوظ است.</span>
+    </div>
+  </div>
+</footer>
+
+<!-- =====================================================
+     SEARCH OVERLAY
+===================================================== -->
+<div class="search-overlay" id="searchOverlay" hidden>
+  <div class="search-panel" role="dialog" aria-modal="true" aria-labelledby="searchTitle">
+    <div class="search-panel-head">
+      <h3 id="searchTitle">جستجو در ترندز</h3>
+      <button class="close-btn" id="searchClose" aria-label="بستن جستجو">✕</button>
+    </div>
+    <input type="text" placeholder="نام محصول را جستجو کنید..." id="searchInput">
+    <p class="search-hint">مثال: هودی، کتانی، پالتو، اکسسوری</p>
+  </div>
+</div>
+
+<!-- =====================================================
+     CART PANEL
+===================================================== -->
+<div class="overlay-backdrop" id="cartBackdrop" hidden></div>
+<aside class="cart-panel" id="cartPanel" hidden aria-label="سبد خرید">
+  <div class="cart-panel-head">
+    <h3>سبد خرید شما</h3>
+    <button class="close-btn" id="cartClose" aria-label="بستن سبد خرید">✕</button>
+  </div>
+  <div class="cart-items">
+    <div class="cart-item">
+      <div class="cart-item-image" data-asset="cart-product-1"></div>
+      <div class="cart-item-info">
+        <p class="name">هودی روزانه</p>
+        <p class="price">۶۹۰,۰۰۰ تومان</p>
+      </div>
+    </div>
+    <div class="cart-item">
+      <div class="cart-item-image" data-asset="cart-product-2"></div>
+      <div class="cart-item-info">
+        <p class="name">کتانی مینیمال</p>
+        <p class="price">۷۹۰,۰۰۰ تومان</p>
+      </div>
+    </div>
+  </div>
+  <div class="cart-footer">
+    <div class="cart-total">
+      <span>جمع کل</span>
+      <span>۱,۴۸۰,۰۰۰ تومان</span>
+    </div>
+    <button class="btn-primary" type="button">تسویه حساب</button>
+  </div>
+</aside>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------- Mobile nav toggle ---------- */
+  var navToggle = document.getElementById('navToggle');
+  var mobileNav = document.getElementById('mobileNav');
+  navToggle.addEventListener('click', function(){
+    var isOpen = mobileNav.classList.toggle('open');
+    navToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+  });
+  mobileNav.querySelectorAll('a').forEach(function(link){
+    link.addEventListener('click', function(){
+      mobileNav.classList.remove('open');
+      navToggle.setAttribute('aria-expanded', 'false');
+    });
+  });
+
+  /* ---------- Wishlist toggle ---------- */
+  document.querySelectorAll('.wishlist-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var active = btn.classList.toggle('active');
+      btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
+  });
+
+  /* ---------- Search overlay ---------- */
+  var searchBtn = document.getElementById('searchBtn');
+  var searchOverlay = document.getElementById('searchOverlay');
+  var searchClose = document.getElementById('searchClose');
+  var searchInput = document.getElementById('searchInput');
+
+  function openSearch(){
+    searchOverlay.hidden = false;
+    setTimeout(function(){ searchInput.focus(); }, 30);
+    document.addEventListener('keydown', onSearchKeydown);
+  }
+  function closeSearch(){
+    searchOverlay.hidden = true;
+    document.removeEventListener('keydown', onSearchKeydown);
+    searchBtn.focus();
+  }
+  function onSearchKeydown(e){
+    if(e.key === 'Escape'){ closeSearch(); }
+  }
+  searchBtn.addEventListener('click', openSearch);
+  searchClose.addEventListener('click', closeSearch);
+  searchOverlay.addEventListener('click', function(e){
+    if(e.target === searchOverlay){ closeSearch(); }
+  });
+
+  /* ---------- Cart panel ---------- */
+  var cartBtn = document.getElementById('cartBtn');
+  var cartPanel = document.getElementById('cartPanel');
+  var cartBackdrop = document.getElementById('cartBackdrop');
+  var cartClose = document.getElementById('cartClose');
+
+  function openCart(){
+    cartPanel.hidden = false;
+    cartBackdrop.hidden = false;
+    requestAnimationFrame(function(){ cartPanel.classList.add('open'); });
+    document.addEventListener('keydown', onCartKeydown);
+  }
+  function closeCart(){
+    cartPanel.classList.remove('open');
+    document.removeEventListener('keydown', onCartKeydown);
+    setTimeout(function(){
+      cartPanel.hidden = true;
+      cartBackdrop.hidden = true;
+    }, 250);
+    cartBtn.focus();
+  }
+  function onCartKeydown(e){
+    if(e.key === 'Escape'){ closeCart(); }
+  }
+  cartBtn.addEventListener('click', openCart);
+  cartClose.addEventListener('click', closeCart);
+  cartBackdrop.addEventListener('click', closeCart);
+
+  /* ---------- Newsletter form ---------- */
+  var newsletterForm = document.getElementById('newsletterForm');
+  var newsletterSuccess = document.getElementById('newsletterSuccess');
+  newsletterForm.addEventListener('submit', function(e){
+    e.preventDefault();
+    newsletterSuccess.classList.add('visible');
+    newsletterForm.reset();
+    setTimeout(function(){
+      newsletterSuccess.classList.remove('visible');
+    }, 4000);
+  });
+
+  /* ---------- Hero banner carousel (swipeable) ---------- */
+  var heroWrap = document.getElementById('heroCarousel');
+  if(heroWrap){
+    var heroTrack = document.getElementById('heroTrack');
+    var heroSlides = heroTrack.querySelectorAll('.hero-slide');
+    var heroDots = heroWrap.querySelectorAll('.hero-dot');
+    var prevBtn = heroWrap.querySelector('.hero-nav-prev');
+    var nextBtn = heroWrap.querySelector('.hero-nav-next');
+    var slideCount = heroSlides.length;
+    var currentIndex = 0;
+    var autoplayTimer = null;
+    var autoplayDelay = 5000;
+    var prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    function renderSlide(){
+      heroTrack.style.transform = 'translateX(' + (-currentIndex * 100) + '%)';
+      heroDots.forEach(function(dot, idx){
+        dot.classList.toggle('active', idx === currentIndex);
+      });
+    }
+    function goTo(index){
+      currentIndex = (index + slideCount) % slideCount;
+      renderSlide();
+    }
+    function next(){ goTo(currentIndex + 1); }
+    function prev(){ goTo(currentIndex - 1); }
+
+    function startAutoplay(){
+      if(prefersReducedMotion) return;
+      stopAutoplay();
+      autoplayTimer = setInterval(next, autoplayDelay);
+    }
+    function stopAutoplay(){
+      if(autoplayTimer){ clearInterval(autoplayTimer); autoplayTimer = null; }
+    }
+
+    prevBtn.addEventListener('click', function(){ prev(); startAutoplay(); });
+    nextBtn.addEventListener('click', function(){ next(); startAutoplay(); });
+    heroDots.forEach(function(dot){
+      dot.addEventListener('click', function(){
+        goTo(parseInt(dot.getAttribute('data-index'), 10));
+        startAutoplay();
+      });
+    });
+
+    heroWrap.addEventListener('mouseenter', stopAutoplay);
+    heroWrap.addEventListener('mouseleave', startAutoplay);
+
+    /* drag / touch swipe */
+    var pointerDown = false;
+    var startX = 0;
+    var deltaX = 0;
+
+    function onPointerDown(e){
+      pointerDown = true;
+      startX = (e.touches ? e.touches[0].clientX : e.clientX);
+      deltaX = 0;
+      stopAutoplay();
+      heroTrack.style.transition = 'none';
+    }
+    function onPointerMove(e){
+      if(!pointerDown) return;
+      var currentX = (e.touches ? e.touches[0].clientX : e.clientX);
+      deltaX = currentX - startX;
+      var percent = (deltaX / heroWrap.offsetWidth) * 100;
+      heroTrack.style.transform = 'translateX(' + (-currentIndex * 100 + percent) + '%)';
+    }
+    function onPointerUp(){
+      if(!pointerDown) return;
+      pointerDown = false;
+      heroTrack.style.transition = '';
+      var threshold = heroWrap.offsetWidth * 0.15;
+      if(deltaX > threshold){
+        prev();
+      } else if(deltaX < -threshold){
+        next();
+      } else {
+        renderSlide();
+      }
+      startAutoplay();
+    }
+
+    heroWrap.addEventListener('mousedown', onPointerDown);
+    window.addEventListener('mousemove', onPointerMove);
+    window.addEventListener('mouseup', onPointerUp);
+    heroWrap.addEventListener('touchstart', onPointerDown, { passive:true });
+    heroWrap.addEventListener('touchmove', onPointerMove, { passive:true });
+    heroWrap.addEventListener('touchend', onPointerUp);
+
+    renderSlide();
+    startAutoplay();
+  }
+
+  /* ---------- Active nav link on scroll ---------- */
+  var sections = ['hero','categories','featured','collections','new-arrivals'].map(function(id){
+    return document.getElementById(id);
+  }).filter(Boolean);
+  var navLinks = document.querySelectorAll('.main-nav a');
+
+  function onScroll(){
+    var scrollPos = window.scrollY + 120;
+    var currentId = sections[0] ? sections[0].id : null;
+    sections.forEach(function(sec){
+      if(sec.offsetTop <= scrollPos){ currentId = sec.id; }
+    });
+    navLinks.forEach(function(link){
+      var href = link.getAttribute('href').replace('#','');
+      link.classList.toggle('active', href === currentId);
+    });
+  }
+  window.addEventListener('scroll', onScroll, { passive:true });
+})();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,91 @@
+@import "tailwindcss";
+
+/* =====================================================
+   TRENDS DESIGN TOKENS
+   Ported verbatim from reference/prototype.html :root block.
+   See PROGRESS.md "Design tokens" for the audit that confirmed
+   these match TRENDS_PROJECT_CONTEXT.md §2 exactly.
+   ===================================================== */
+@theme {
+  --color-bg: #fbf9f5;
+  --color-header-bg: #f6f3ee;
+  --color-ink: #182630;
+  --color-text-secondary: #566066;
+  --color-hero-beige: #f1e9df;
+  --color-blue: #aad0e2;
+  --color-pink: #efc8ca;
+  --color-sage: #d2d9bf;
+  --color-blush: #fadbd8;
+  --color-lavender: #e2d4ec;
+  --color-aqua: #b5d6cf;
+  --color-yellow: #fbe1b4;
+  --color-benefit-bg: #f1f3ec;
+  --color-card-image: #f1ece3;
+  --color-line: rgba(24, 38, 48, 0.08);
+
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 22px;
+  --radius-pill: 999px;
+
+  /*
+   * Vazirmatn is the prototype's intended Persian display/body font.
+   * No font files were supplied with the prototype (see PROGRESS.md
+   * "Known limitations"), and this environment cannot fetch Google
+   * Fonts at build time. Falling back to the same system stack the
+   * prototype itself ships with. ASSUMPTION: self-host Vazirmatn
+   * (next/font/local with real .woff2 files under public/fonts) as
+   * soon as font files are available — swap the --font-base value
+   * and add the @font-face there, no other change needed.
+   */
+  --font-base: "Vazirmatn", Tahoma, "Segoe UI", Arial, sans-serif;
+
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1240px;
+}
+
+/* Container width + fluid gutter, matching .container in the prototype.
+   Kept as a small utility class since Tailwind v4's built-in `container`
+   is deliberately not configured the same way. */
+:root {
+  --gutter: clamp(20px, 4.5vw, 55px);
+  --max-width: 1240px;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-base);
+  -webkit-font-smoothing: antialiased;
+}
+
+.container {
+  max-width: var(--max-width);
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-ink);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
