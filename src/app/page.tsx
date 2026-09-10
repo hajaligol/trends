@@ -1,57 +1,41 @@
+import { HeroCarousel } from "@/components/home/HeroCarousel";
+import { CategoryNav } from "@/components/home/CategoryNav";
+import { FeaturedProducts } from "@/components/home/FeaturedProducts";
+import { PromoBanners } from "@/components/home/PromoBanners";
+import { NewArrivals } from "@/components/home/NewArrivals";
+import { BenefitsStrip } from "@/components/home/BenefitsStrip";
 import { Container } from "@/components/ui/Container";
-import { ButtonLink } from "@/components/ui/Button";
+import {
+  demoBanners,
+  demoBenefits,
+  demoCategories,
+  demoFeaturedProducts,
+  demoHeroSlides,
+  demoNewArrivals,
+} from "@/domains/catalog/demo-data";
 
-// This is a Phase 1 placeholder page: it exists to prove the design-system
-// shell (tokens, header, footer, RTL, container) renders correctly end to
-// end. The real homepage sections (hero carousel, categories, featured
-// products, promo banners, new arrivals, benefits strip, search overlay,
-// cart drawer) are rebuilt as components in Phase 2 per
-// CLAUDE_BUILD_INSTRUCTIONS.txt.
+/**
+ * Real homepage sections rebuilt as components (Phase 2), replacing the
+ * Phase 1 placeholder. All content below comes from
+ * src/domains/catalog/demo-data.ts -- Phase 3 swaps these fixtures for
+ * real catalog queries; component props are already shaped like the
+ * eventual database read models, so that swap should need minimal
+ * changes to the components themselves.
+ */
 export default function HomePage() {
   return (
     <main>
-      <section id="hero" className="bg-hero-beige py-[clamp(20px,3vw,32px)]">
+      <section id="hero" className="overflow-hidden bg-hero-beige py-[clamp(20px,3vw,32px)]">
         <Container>
-          <p className="mb-3.5 text-[0.88rem] text-text-secondary">
-            کالکشن جدید
-          </p>
-          <h1 className="m-0 max-w-xl text-[clamp(1.8rem,4vw,2.6rem)] font-bold text-ink">
-            پوشاکی که با سبک زندگی شما همراه می‌شود
-          </h1>
-          <p className="mt-4 max-w-md text-[0.95rem] text-text-secondary">
-            بنیاد فنی سایت آماده است — بخش‌های اصلی صفحه اصلی (اسلایدر، دسته‌بندی‌ها،
-            محصولات ویژه و ...) در فاز بعدی ساخته می‌شوند.
-          </p>
-          <ButtonLink href="#featured" className="mt-6">
-            مشاهده فروشگاه
-            <span aria-hidden="true">←</span>
-          </ButtonLink>
+          <HeroCarousel slides={demoHeroSlides} />
         </Container>
       </section>
 
-      <section id="categories" aria-label="دسته‌بندی‌ها" className="py-[clamp(34px,5vw,54px)]">
-        <Container>
-          <p className="text-sm text-text-secondary">
-            بخش دسته‌بندی‌ها — فاز ۲
-          </p>
-        </Container>
-      </section>
-
-      <section id="featured" aria-label="محصولات ویژه" className="py-[clamp(34px,5vw,54px)]">
-        <Container>
-          <p className="text-sm text-text-secondary">
-            بخش محصولات ویژه — فاز ۲
-          </p>
-        </Container>
-      </section>
-
-      <section id="collections" aria-label="کالکشن‌ها" className="py-[clamp(34px,5vw,54px)]">
-        <Container>
-          <p className="text-sm text-text-secondary">
-            بخش بنرهای تبلیغاتی — فاز ۲
-          </p>
-        </Container>
-      </section>
+      <CategoryNav categories={demoCategories} />
+      <FeaturedProducts products={demoFeaturedProducts} />
+      <PromoBanners banners={demoBanners} />
+      <NewArrivals arrivals={demoNewArrivals} />
+      <BenefitsStrip benefits={demoBenefits} />
     </main>
   );
 }

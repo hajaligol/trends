@@ -1,13 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Container } from "@/components/ui/Container";
 import { CartIcon, AccountIcon, SearchIcon } from "@/components/ui/icons";
+import { useUIOverlay } from "@/components/overlays/UIOverlayProvider";
+import { demoCartItems } from "@/domains/cart/demo-data";
+import { toPersianDigits } from "@/lib/utils/persian-digits";
 
-// Nav links mirror reference/prototype.html .main-nav / .mobile-nav exactly.
-// These point at homepage anchors for now (Phase 2 homepage sections); once
-// category/product pages exist as real routes (Phase 4) "مردان" / "زنان" /
-// "اکسسوری‌ها" should point at those routes instead of #categories/#collections.
+// Nav links mirror reference/prototype.html .main-nav / .mobile-nav exactly,
+// including its (slightly odd) repeated anchors -- "مردان" and "اکسسوری‌ها"
+// both point at #categories in the prototype too. These point at homepage
+// anchors for now; once category/product pages exist as real routes
+// (Phase 4) "مردان" / "زنان" / "اکسسوری‌ها" should point at those routes
+// instead of #categories/#collections.
 const NAV_LINKS = [
   { href: "#hero", label: "صفحه اصلی" },
   { href: "#featured", label: "فروشگاه" },
@@ -19,27 +24,55 @@ const NAV_LINKS = [
 
 export function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [activeId, setActiveId] = useState("hero");
+  const { openSearch, openCart } = useUIOverlay();
+  const cartCount = demoCartItems.length;
+
+  // Highlights the nav link for the section currently in view, mirroring
+  // the prototype's scroll listener -- reimplemented with
+  // IntersectionObserver instead of a window "scroll" handler. Only the
+  // homepage currently has these section ids; on other routes this
+  // simply finds nothing to observe.
+  useEffect(() => {
+    const sectionIds = Array.from(new Set(NAV_LINKS.map((link) => link.href.replace("#", ""))));
+    const sections = sectionIds
+      .map((id) => document.getElementById(id))
+      .filter((el): el is HTMLElement => el !== null);
+    if (sections.length === 0) return undefined;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries.find((entry) => entry.isIntersecting);
+        if (visible) setActiveId(visible.target.id);
+      },
+      { rootMargin: "-45% 0px -50% 0px", threshold: 0 },
+    );
+    sections.forEach((section) => observer.observe(section));
+    return () => observer.disconnect();
+  }, []);
 
   return (
-    <header className="sticky top-0 z-40 bg-header-bg border-b border-line">
+    <header className="sticky top-0 z-40 border-b border-line bg-header-bg">
       <Container className="flex min-h-[68px] items-center justify-between gap-4">
-        <span className="text-[1.55rem] font-bold tracking-wide text-ink whitespace-nowrap">
+        <span className="text-[1.55rem] font-bold tracking-wide whitespace-nowrap text-ink">
           ترندز
         </span>
 
-        <nav
-          aria-label="ناوبری اصلی"
-          className="hidden lg:flex items-center gap-[30px]"
-        >
-          {NAV_LINKS.map((link, i) => (
-            <a
-              key={`${link.href}-${i}`}
-              href={link.href}
-              className="relative py-1.5 text-[0.93rem] text-ink after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:origin-center after:scale-x-0 after:rounded-sm after:bg-ink after:transition-transform after:duration-200 hover:after:scale-x-100 first:after:scale-x-100"
-            >
-              {link.label}
-            </a>
-          ))}
+        <nav aria-label="ناوبری اصلی" className="hidden items-center gap-[30px] lg:flex">
+          {NAV_LINKS.map((link, i) => {
+            const isActive = activeId === link.href.replace("#", "");
+            return (
+              <a
+                key={`${link.href}-${i}`}
+                href={link.href}
+                className={`relative py-1.5 text-[0.93rem] text-ink after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:origin-center after:rounded-sm after:bg-ink after:transition-transform after:duration-200 hover:after:scale-x-100 ${
+                  isActive ? "after:scale-x-100" : "after:scale-x-0"
+                }`}
+              >
+                {link.label}
+              </a>
+            );
+          })}
         </nav>
 
         <div className="flex items-center gap-2.5">
@@ -47,11 +80,12 @@ export function Header() {
             type="button"
             aria-label="سبد خرید"
             aria-haspopup="true"
+            onClick={openCart}
             className="relative flex h-[46px] w-[46px] items-center justify-center rounded-full bg-transparent transition-colors duration-200 hover:bg-ink/6"
           >
             <CartIcon className="h-[30px] w-[30px] text-ink" />
-            <span className="absolute left-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-ink px-0.5 text-[0.62rem] leading-none text-white">
-              ۰
+            <span className="absolute top-0.5 left-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-ink px-0.5 text-[0.62rem] leading-none text-white">
+              {toPersianDigits(cartCount)}
             </span>
           </button>
           <button
@@ -65,6 +99,7 @@ export function Header() {
             type="button"
             aria-label="جستجو"
             aria-haspopup="true"
+            onClick={openSearch}
             className="flex h-[46px] w-[46px] items-center justify-center rounded-full bg-transparent transition-colors duration-200 hover:bg-ink/6"
           >
             <SearchIcon className="h-[30px] w-[30px] text-ink" />
@@ -97,7 +132,7 @@ export function Header() {
 
       <nav
         aria-label="ناوبری موبایل"
-        className={`lg:hidden flex-col gap-1 border-t border-line bg-header-bg px-(--gutter) py-2 ${
+        className={`flex-col gap-1 border-t border-line bg-header-bg px-(--gutter) py-2 lg:hidden ${
           menuOpen ? "flex" : "hidden"
         }`}
       >

@@ -1,249 +1,359 @@
 # Trends Progress Report
 
 ## Current Status
-- Overall status: Foundation shell running; no database/backend yet.
-- Current phase: PHASE 1 — Next.js foundation + design system shell (COMPLETE)
-- Last completed phase: PHASE 1
-- Next phase: PHASE 2 — Homepage visual migration
-- Date: 2026-09-09
+- Overall status: Homepage visually rebuilt from the prototype with demo
+  data; no database/backend yet. Implementation is done but this
+  session's sandbox could not run `npm install`/build/lint/typecheck to
+  verify it (see "Known limitations" below) — treat as unverified until
+  the next session confirms.
+- Current phase: PHASE 2 — Homepage visual migration (COMPLETE WITH
+  FOLLOW-UP — code complete, automated checks not run this session)
+- Last completed phase: PHASE 1 (verified). PHASE 2 is implemented but
+  not yet build-verified.
+- Next phase: run checks for PHASE 2 first; if clean, proceed to PHASE 3
+  — Database + catalog domain.
+- Date: 2026-09-10
 
 ## Completed
 
 ### Phase 0 — Repository audit + implementation plan
-See prior report content preserved below under "Phase 0 findings" — prototype
-structure, design tokens, missing assets, and architecture decisions were
-audited and are unchanged.
+See prior report content preserved below under "Phase 0 findings" —
+prototype structure, design tokens, missing assets, and architecture
+decisions were audited and are unchanged.
 
 ### Phase 1 — Next.js foundation + design system shell
-- Initialized a real Next.js application in place of the empty skeleton:
-  App Router, TypeScript, React 19, Next.js 16 (Turbopack).
-- Installed and configured Tailwind CSS v4 using its CSS-first `@theme`
-  approach (no `tailwind.config.js` needed in v4) instead of a JS config
-  file.
-- Ported every design token from `reference/prototype.html`'s `:root` block
-  verbatim into `src/styles/globals.css` (`@theme` block): all 14 named
-  colors, the 4 radii, `--font-base`, `--max-width` (1240px), and the fluid
-  `--gutter` (`clamp(20px, 4.5vw, 55px)`). Tailwind v4 auto-generates
-  utilities from these (`bg-ink`, `text-text-secondary`, `bg-hero-beige`,
-  etc.), so component code uses those instead of re-declaring colors.
-- Added `prefers-reduced-motion` handling and `:focus-visible` styling at
-  the global CSS level (ported from the prototype), ahead of Phase 2's
-  interactive components needing it.
-- Built the root layout (`src/app/layout.tsx`) with `<html lang="fa"
-  dir="rtl">`, importing the global stylesheet, and composing `Header` +
-  `{children}` + `Footer` — RTL is applied at the document root, not
-  patched on afterward.
-- Built `Header` (`src/components/layout/Header.tsx`) as a small Client
-  Component (`"use client"`) — the only interactivity in it is the
-  mobile-nav open/close toggle, which genuinely requires client state. It
-  reproduces the prototype's `.site-header` structure: logo, desktop
-  `main-nav` links, cart/account/search icon buttons (cart badge shown,
-  not yet wired to real cart state — that's Phase 7), and the hamburger
-  toggle + mobile drawer. Icon SVGs were copied path-for-path from the
-  prototype into `src/components/ui/icons.tsx` (`CartIcon`, `AccountIcon`,
-  `SearchIcon`) so they render identically.
-- Built `Footer` (`src/components/layout/Footer.tsx`) as a Server
-  Component: newsletter section, social icon placeholders, footer link
-  columns, bottom bar with the Persian-calendar copyright line — all
-  presentational only in this phase (no submit handler; real persistence
-  is Phase 12 per project context §6 "Newsletter").
-- Added `Button` / `ButtonLink` (primary pill + ghost variants, matching
-  `.btn-primary` / `.btn-ghost`) and `Container` (matches `.container`) as
-  the first reusable UI primitives under `src/components/ui/`.
-- Added a placeholder `HomePage` (`src/app/page.tsx`) with the same section
-  anchors the header nav points at (`#hero`, `#categories`, `#featured`,
-  `#collections`) so navigation doesn't 404, each holding a short
-  "built in Phase 2" notice instead of real content — this phase's job was
-  the shell, not the homepage sections.
-- Configured ESLint 9 using `eslint-config-next`'s native flat-config
-  export directly (`import nextConfig from "eslint-config-next"`).
-  **Note for future sessions:** the more commonly-documented pattern of
-  wrapping `next/core-web-vitals` in `@eslint/eslintrc`'s `FlatCompat` broke
-  here with `TypeError: Converting circular structure to JSON` (ESLint 9 +
-  a circular `eslint-plugin-react` config reference). Importing
-  `eslint-config-next`'s already-flat array directly avoided the bug
-  entirely and is simpler; `@eslint/eslintrc` was removed again.
-- Added `next.config.ts` (typed config, empty `images.remotePatterns` for
-  now — Phase 3+ will add object-storage/CDN hosts), `.env.example`
-  (documents every env var later phases will need: `DATABASE_URL`,
-  `AUTH_SECRET`, storage keys, `PAYMENT_PROVIDER`/`PAYMENT_MERCHANT_ID` left
-  blank per rule A.17, SMS/OTP key, `NEXT_PUBLIC_SITE_URL`), and
-  `.gitignore` (excludes `node_modules`, `.next`, all `.env*` except
-  `.env.example`, build artifacts).
-- Removed the `.gitkeep` placeholders in folders that now have real files
-  (`src/app`, `src/components/*`, `src/styles`). Left `.gitkeep` in place
-  everywhere still intentionally empty (`src/domains/*`, `src/lib/*`,
-  `public/assets/*`, `drizzle/migrations`, `tests/*`) — those are Phase 3+
-  territory and were not touched.
+(Unchanged from the previous report — see git history / the version of
+this file from the Phase 1 session for the full write-up. Summary: Next.js
+App Router + TypeScript + Tailwind v4 foundation, design tokens ported
+verbatim from the prototype, Header/Footer shell, Button/Container
+primitives, ESLint/typecheck/build all verified passing at the time.)
 
-- Files changed (all new, nothing pre-existing deleted or altered other
-  than removing now-redundant `.gitkeep`s):
-  - `package.json`, `package-lock.json`
-  - `next.config.ts`, `tsconfig.json`, `postcss.config.mjs`,
-    `eslint.config.mjs`, `next-env.d.ts` (generated)
-  - `.env.example`, `.gitignore`
-  - `src/styles/globals.css`
-  - `src/app/layout.tsx`, `src/app/page.tsx`
-  - `src/components/layout/Header.tsx`, `src/components/layout/Footer.tsx`
-  - `src/components/ui/Button.tsx`, `src/components/ui/Container.tsx`,
-    `src/components/ui/icons.tsx`
-  - Removed: `src/.gitkeep`, `src/app/.gitkeep`,
-    `src/components/.gitkeep`, `src/components/layout/.gitkeep`,
-    `src/components/ui/.gitkeep`, `src/styles/.gitkeep`
+### Phase 2 — Homepage visual migration
+Rebuilt every real homepage section from `reference/prototype.html` as
+React components, replacing the Phase 1 placeholder `src/app/page.tsx`.
+All sections read from demo/fixture data rather than being hardcoded
+inline, so Phase 3 can swap in real catalog queries with minimal
+component changes.
 
+**New demo-data fixtures** (`src/domains/*` — first real files in
+previously-empty domain folders):
+- `src/domains/catalog/demo-data.ts`: categories, featured products, new
+  arrivals, promo banners, hero slides, and benefits — all copied
+  verbatim from the prototype's hardcoded markup/text (per
+  TRENDS_PROJECT_CONTEXT.md §2, this content was always documented as
+  seed/demo, not a business requirement).
+- `src/domains/cart/demo-data.ts`: two demo cart line items + a total,
+  for the cart drawer shell only. Real cart domain logic is Phase 7.
+
+**New UI primitives** (`src/components/ui/`):
+- `AssetSlot.tsx`: generic placeholder block for not-yet-supplied
+  product/banner/hero imagery, mirroring `.asset-slot` /
+  `.asset-slot--banner`. Uses `role="img"` + `aria-label` as a stand-in
+  accessible name until real images exist; the `label` prop maps
+  directly to a future `next/image` `alt` when Phase 3+ wires up object
+  storage/CDN.
+- `WishlistButton.tsx` (Client Component): per-product heart toggle,
+  local `useState` only (no persistence — Phase 7 replaces with real
+  wishlist domain state).
+- Added `HeartIcon` to `src/components/ui/icons.tsx` (path copied
+  verbatim from the prototype's wishlist SVG).
+
+**New home section components** (`src/components/home/`), each a Server
+Component except where noted:
+- `HeroCarousel.tsx` (Client Component): full reimplementation of the
+  prototype's `#heroCarousel` — autoplay (5s interval, paused on
+  hover, disabled entirely under `prefers-reduced-motion`), prev/next
+  arrows, clickable dots, and mouse/touch drag-to-swipe with a 15%-width
+  release threshold. This was the most complex piece of the phase; it
+  replaces ~140 lines of the prototype's inline `<script>` carousel
+  logic with real React state/effects (refs for drag tracking to avoid
+  stale closures, `IntersectionObserver`-free since it's not
+  scroll-based).
+- `CategoryNav.tsx`: category circle row, horizontally scrollable on
+  mobile (`overflow-x-auto`, hidden scrollbar) and evenly spaced on
+  desktop, matching the prototype's own breakpoint behavior. Category
+  buttons are inert (no real routes until Phase 4), exactly like the
+  prototype.
+- `SectionHead.tsx`: shared eyebrow/heading/"view all" pattern used by
+  both Featured Products and New Arrivals.
+- `ProductCard.tsx` + `FeaturedProducts.tsx`: 5/3/2-column responsive
+  product grid with the wishlist toggle and star rating.
+- `PromoBanners.tsx`: two pastel banner cards (women/men), stacked on
+  mobile and side-by-side on desktop. CTA buttons are inert
+  `type="button"` (no href), matching the prototype exactly — these
+  aren't real category links yet.
+- `NewArrivals.tsx`: 6/3/2-column grid with color swatches per item.
+- `BenefitsStrip.tsx`: 4/2/1-column trust strip. Note: the prototype's
+  exact per-breakpoint `nth-child` border rules were approximated with
+  Tailwind's `divide-*` utilities plus `border-e`/`nth-child(4n)` rather
+  than reproduced pixel-for-pixel — a reasonable simplification flagged
+  here rather than silently diverging.
+
+**New overlay system** (`src/components/overlays/`):
+- `UIOverlayProvider.tsx` (Client Component, React Context): shares
+  search-overlay/cart-drawer open state between the header's trigger
+  buttons and the overlay/drawer components rendered at the layout root
+  — the React equivalent of the prototype's global `openSearch()`/
+  `closeCart()` functions that directly mutated the DOM.
+- `SearchOverlay.tsx` (Client Component): focuses the input on open,
+  closes on Escape or backdrop click. Still a UI shell only — real
+  search (URL-driven, database-backed) is Phase 5.
+- `CartDrawer.tsx` (Client Component): slide-in panel reading from the
+  cart demo-data fixture. **Bug caught and fixed during this session's
+  own review:** an initial version toggled the drawer's `hidden`
+  attribute and its `translate-x-*` class in the same render, which
+  would have made it pop open instantly instead of sliding in (no frame
+  existed where it was visible-but-off-screen for the CSS transition to
+  animate from). Fixed by keeping the `<aside>` always mounted
+  (`aria-hidden` instead of `hidden`, `pointer-events-none` when closed)
+  so the transform transition has something to animate.
+
+**Wiring:**
+- `src/components/layout/Header.tsx`: cart/search icon buttons now call
+  `openCart()`/`openSearch()` from the overlay context instead of doing
+  nothing; the cart badge shows the real demo cart item count formatted
+  with `toPersianDigits()`. Added scroll-based active-nav-link
+  highlighting via `IntersectionObserver` (reimplementing the
+  prototype's `window.addEventListener('scroll', ...)` handler) —
+  gracefully finds nothing to observe on any future non-homepage route.
+- `src/app/layout.tsx`: now wraps `Header` + `{children}` + `Footer` in
+  `UIOverlayProvider` and renders `SearchOverlay`/`CartDrawer` at the
+  root, alongside the header/footer.
+- `src/app/page.tsx`: composes all six real sections in prototype order
+  (hero → categories → featured → promo banners → new arrivals →
+  benefits), each fed from the demo-data fixtures.
+- `src/lib/utils/persian-digits.ts` (new, first real file in
+  previously-empty `src/lib/utils/`): `toPersianDigits()` helper used by
+  the hero carousel's slide-count ARIA labels and the header's cart
+  badge, per TRENDS_PROJECT_CONTEXT.md §5 ("Use Persian digit formatting
+  in the UI where appropriate").
+
+**Files changed:**
+- New: `src/domains/catalog/demo-data.ts`, `src/domains/cart/demo-data.ts`,
+  `src/lib/utils/persian-digits.ts`, `src/components/ui/AssetSlot.tsx`,
+  `src/components/ui/WishlistButton.tsx`,
+  `src/components/home/HeroCarousel.tsx`,
+  `src/components/home/CategoryNav.tsx`,
+  `src/components/home/SectionHead.tsx`,
+  `src/components/home/ProductCard.tsx`,
+  `src/components/home/FeaturedProducts.tsx`,
+  `src/components/home/PromoBanners.tsx`,
+  `src/components/home/NewArrivals.tsx`,
+  `src/components/home/BenefitsStrip.tsx`,
+  `src/components/overlays/UIOverlayProvider.tsx`,
+  `src/components/overlays/SearchOverlay.tsx`,
+  `src/components/overlays/CartDrawer.tsx`
+- Modified: `src/components/ui/icons.tsx` (added `HeartIcon`),
+  `src/components/layout/Header.tsx` (overlay wiring, active-nav
+  highlighting, real cart count), `src/app/layout.tsx` (overlay
+  provider + overlays), `src/app/page.tsx` (real sections replacing the
+  placeholder)
+- Removed: `.gitkeep` in `src/domains/catalog/`, `src/domains/cart/`,
+  `src/lib/utils/` (now have real files). All other `src/domains/*` and
+  `src/lib/*` folders are still intentionally `.gitkeep`-only.
 - Database changes: none (Phase 3).
-- Environment/config changes: `.env.example` added; no real `.env.local`
-  created or committed (none needed yet — nothing reads env vars in this
-  phase).
-- Tests/checks run this session, all passing:
-  - `npx tsc --noEmit` → clean, no errors.
-  - `npx eslint .` → clean, exit code 0, no warnings.
-  - `npx next build` → compiles successfully, static homepage
-    (`/`, `/_not-found`) prerendered, no build errors.
-  - `npx next dev` smoke test → `GET /` returns HTTP 200; response HTML
-    confirmed to contain `dir="rtl"`, `lang="fa"`, and rendered Persian
-    text (`ترندز`, headings, nav labels); dev server log had zero
-    error/warning lines.
-- Known limitations:
-  - **Vazirmatn is still not self-hosted.** No `.woff2` files were
-    supplied anywhere in the inputs, and this sandboxed environment's
-    network egress does not reach Google Fonts (`fonts.gstatic.com` /
-    `fonts.googleapis.com` are not on the allowed-domains list), so
-    `next/font/google` could not be used. `--font-base` currently falls
-    back to the same `Tahoma, "Segoe UI", Arial, sans-serif` stack the
-    prototype itself ships with — this is not a regression versus the
-    prototype, but it is not the intended final typography. **Action for
-    whoever has real font files:** drop `Vazirmatn-*.woff2` into
-    `public/fonts/`, switch to `next/font/local` (or a manual
-    `@font-face` in `globals.css`) in a small dedicated commit, and update
-    `--font-base`. No other code needs to change.
-  - Header/account/search/cart icon buttons render but are not
-    functionally wired yet (no search overlay, no cart drawer, no auth) —
-    correct for this phase; that wiring is explicitly Phase 2 (overlay/
-    drawer UI shells) and later phases (real behavior).
-  - Cart badge shows a static `۰` placeholder, not real cart state
-    (Phase 7).
-  - Homepage is a placeholder, not the real migrated sections (Phase 2).
-  - This working environment's filesystem is still ephemeral between
-    sessions (same constraint noted in the Phase 0 report). The full
-    working app (including `node_modules`-excluded source) has been
-    packaged as a downloadable archive for the next session to continue
-    from. If a persistent repo/working directory becomes available, that
-    should replace this hand-off method.
+- Environment/config changes: none this phase.
+
+**Tests/checks — NOT run this session, and this is the important
+caveat:**
+- This session's sandbox had `node_modules/` completely absent (fresh
+  extraction of the handed-off archive) and its network egress fully
+  blocked at the host level — every `npm install` attempt failed with
+  `403 host_not_allowed` on `registry.npmjs.org`, and a direct `curl`
+  check confirmed the same deny reason against other hosts
+  (`cdn.jsdelivr.net`) too, i.e. this isn't a package-specific block,
+  the sandbox simply has no outbound network access this time. This is
+  a harder restriction than Phase 1's session faced (Phase 1 could
+  reach npm but not Google Fonts); it is **not** a project decision and
+  may well not apply to whichever environment runs the next session —
+  Phase 1's own session had working npm access from what its report
+  describes.
+- Because of that, **`npm run typecheck`, `npm run lint`, `npm run
+  build`, and `npm run dev` could not be executed or verified this
+  session.** In their place, the following manual verification was
+  done instead (documented here so the next session knows exactly what
+  has and hasn't been checked):
+  - Every new/changed file's braces/parens/brackets were counted
+    programmatically and confirmed balanced.
+  - A script cross-referenced every `import { X } from "@/..."` in the
+    new code against the actual `export`s of the target file — no
+    mismatches.
+  - Every new/changed `.tsx` file was read in full at least twice by
+    hand, checking JSX tag nesting, prop types against the primitives
+    they call (`Button`, `Container`, `AssetSlot`), and Tailwind
+    arbitrary-value syntax (e.g. `aspect-[21/8]`, `max-[640px]:`,
+    `z-[100]`, `duration-[250ms]` — the standard Tailwind scale doesn't
+    have `z-90`/`z-100`/`duration-250`, so bracket syntax was used
+    throughout instead of the plain numeric utilities that don't
+    exist).
+  - This manual review caught and fixed one real bug (the `CartDrawer`
+    `hidden`-attribute/transition-class conflict described above) before
+    handoff — which is exactly the kind of thing an actual `next build`
+    + manual click-through would also have caught, so it's a reasonable
+    substitute but not a full replacement for one.
+- **The next session's very first action should be `npm install && npm
+  run typecheck && npm run lint && npm run build && npm run dev`**,
+  fixing anything that surfaces, before writing any new code. Until that
+  happens this phase's status is COMPLETE WITH FOLLOW-UP, not COMPLETE.
+
+**Known limitations:**
+- Automated checks unverified this session — see above. This is the
+  main follow-up item.
+- Vazirmatn still not self-hosted (carried over from Phase 1 — no font
+  files have been supplied yet in any session).
+- The `BenefitsStrip` divider rules are a simplified approximation of
+  the prototype's exact per-breakpoint `nth-child` CSS, not a
+  pixel-for-pixel port (see component note above). Low-risk cosmetic
+  difference, worth a look during Phase 13's hardening pass if anyone
+  notices it.
+- Grid/flex breakpoints throughout the new home components use
+  Tailwind's standard `sm`/`md`/`lg` scale (640/768/1024px) to
+  approximate the prototype's custom breakpoints (640/860/1024px) —
+  same approach Phase 1's `Header` already established for the
+  desktop-nav breakpoint, continued here for consistency rather than
+  introducing custom breakpoint tokens partway through the project.
+- Search overlay and cart drawer are still UI shells with demo content
+  (Phase 5 and Phase 7 respectively give them real behavior).
+- No real product/category/hero imagery exists yet — everywhere the
+  prototype had a `.webp` reference, this phase uses `AssetSlot`
+  placeholder blocks with descriptive `aria-label`s instead of broken
+  `<img>` tags, per the Phase 2 acceptance criteria.
 
 ## Architecture Decisions
 
-(Phase 0 decisions below are unchanged; Phase 1 additions follow.)
+(Phase 0/1 decisions below are unchanged; Phase 2 additions follow.)
 
-- **Framework**: Next.js (App Router) + TypeScript + React — no deviation.
-  Installed versions: Next.js 16.3.4, React 19.2.8 (see "Commands" below
-  for exact reproduction).
-- **Modular monolith by domain**: `src/domains/<n>` per business boundary —
-  still all empty (`.gitkeep` only); first real domain code lands in
-  Phase 3 (catalog).
-- **Styling**: Tailwind CSS v4's CSS-first configuration
-  (`@import "tailwindcss";` + `@theme { ... }` in `globals.css`) rather
-  than a `tailwind.config.js`/`.ts` file — this is the framework's current
-  recommended approach and keeps all design tokens in one file instead of
-  splitting them across a JS config and CSS. Utilities are generated
-  automatically from the `--color-*` custom properties (e.g. `--color-ink`
-  → `bg-ink`/`text-ink`/`border-ink`).
-- **ESLint**: flat config (`eslint.config.mjs`) importing
-  `eslint-config-next`'s default export directly, not through
-  `FlatCompat`. See the Phase 1 completed-work note above for why.
-- **Client/Server component split**: `Header` is a Client Component
-  (mobile-nav toggle state); `Footer`, `RootLayout`, `HomePage`, and all
-  `src/components/ui/*` primitives are Server Components. This is the
-  narrowest client boundary that satisfies the actual interactivity need
-  in this phase, per rule E "Client components: default to Server
-  Components."
-- **Homepage anchors preserved**: kept the prototype's `#hero
-  #categories #featured #collections` in-page anchor IDs on the Phase 1
-  placeholder sections specifically so the header nav (built this phase)
-  has real, working targets today and doesn't need to change again when
-  Phase 2 fills those sections in.
+- **Framework**: Next.js (App Router) + TypeScript + React — no
+  deviation. See Phase 1's report for installed versions; this session
+  could not re-verify or re-pin versions since `node_modules` doesn't
+  exist here (network blocked) — `package.json`/`package-lock.json` were
+  not touched this phase.
+- **Modular monolith by domain**: `src/domains/catalog` and
+  `src/domains/cart` now have their first real files (demo-data
+  fixtures). All other domain folders remain `.gitkeep`-only until their
+  respective phases.
+- **Demo data lives in the domain it belongs to, not inline in
+  components**: `src/domains/catalog/demo-data.ts` and
+  `src/domains/cart/demo-data.ts`, both explicitly typed (`DemoProduct`,
+  `DemoCategory`, `DemoBanner`, `DemoArrival`, `DemoHeroSlide`,
+  `DemoBenefit`, `DemoCartItem`) so Phase 3/7 can swap the fixture
+  constants for real repository/query functions returning the same
+  shapes with minimal changes to the components that consume them.
+- **Client/Server component split**: `HeroCarousel`, `WishlistButton`,
+  `UIOverlayProvider`, `SearchOverlay`, `CartDrawer`, and `Header`
+  (already a Client Component from Phase 1, now also consuming the
+  overlay context) are Client Components — each has a genuine
+  interactivity requirement (drag/autoplay state, local toggle state,
+  shared open/close state, focus management, keyboard handling).
+  Everything else added this phase (`CategoryNav`, `SectionHead`,
+  `ProductCard`, `FeaturedProducts`, `PromoBanners`, `NewArrivals`,
+  `BenefitsStrip`, `AssetSlot`) is a Server Component — no client JS
+  ships for them beyond what their client children need.
+- **Shared open/close state via React Context, not prop drilling or a
+  global store**: `UIOverlayProvider` wraps the whole body in the root
+  layout. This was chosen over prop-drilling (the trigger buttons in
+  `Header` and the overlay components in `layout.tsx` are siblings, not
+  parent/child) and over a heavier state-management library (not
+  justified for two booleans + four callbacks — consistent with rule F.6
+  "prefer fewer dependencies").
+- **Active-nav-link highlighting via `IntersectionObserver`, not a
+  scroll event listener**: reimplements the prototype's
+  `window.addEventListener('scroll', ...)` behavior with a more modern,
+  passive-by-default browser API instead of a literal port of the
+  polling-style scroll handler.
+- **Hero carousel drag state uses refs for the mutable per-frame values
+  (`startX`, `deltaX`, a `draggingRef` boolean) and React state only for
+  what actually needs to trigger a re-render** (`currentIndex`,
+  `isDragging` for the transition-class toggle, `dragOffsetPercent` for
+  the live transform) — avoids stale-closure bugs in the
+  mousemove/touchmove handlers without over-using refs for things that
+  do need to repaint.
 
 ## Important Assumptions
 
-(Phase 0 assumptions below are unchanged; Phase 1 additions follow.)
+(Phase 0/1 assumptions below are unchanged; Phase 2 additions follow.)
 
-- The supplied prototype is the full and final visual reference.
-- Missing `.webp` assets are expected later; Phase 2 will use clearly
-  temporary placeholders.
-- The ۵۰۰,۰۰۰ تومان free-shipping figure is UI copy only, to be treated as
-  a configurable default once Phase 8 implements shipping.
-- **Node/Next toolchain versions** (per Phase 0's note that these were
-  unspecified): Node 22.x, npm 10.x were used in this sandbox; Next.js
-  16.3.4, React 19.2.8, Tailwind CSS 4.3.3, ESLint 9.39.5,
-  eslint-config-next 16.3.4 were installed as "latest" at the time of this
-  session. These are recorded here so a future session can reproduce the
-  same major versions rather than silently drifting; if the next session's
-  environment has different toolchain versions available, that is fine —
-  just note the actual versions used in that session's report.
-- **Font strategy is a temporary fallback, not a final decision** — see
-  "Known limitations" above. Treated as acceptable for this phase because
-  Phase 1's acceptance criteria only require the header/footer to
-  *resemble* the prototype and RTL to work, not pixel-perfect typography.
-- Continuing to treat this sandbox's inability to persist the filesystem
-  across sessions as an environment constraint, not a project decision —
-  each session hands off via a packaged archive until a persistent
-  repo/working directory is wired up.
+- All Phase 2 demo content (product names/prices/review counts, category
+  labels, banner copy, benefit text) is copied verbatim from the
+  prototype and is explicitly temporary per TRENDS_PROJECT_CONTEXT.md
+  §2 — none of it should be read as a real catalog decision.
+- Treating this session's total network blackout (see "Tests/checks"
+  above) as an environment condition specific to this sandbox
+  invocation, not a permanent project constraint — unlike the Phase 1
+  session's font-CDN-specific block, this one prevented `npm install`
+  entirely, which is a meaningfully bigger problem for the "run checks
+  and fix what you can" rule (A.19). Recording this explicitly so a
+  future session doesn't assume the codebase was ever actually compiled
+  since Phase 1.
+- Assuming the handed-off archive's `package.json`/`package-lock.json`
+  from Phase 1 are still the correct dependency set for Phase 2 — no new
+  runtime dependencies were needed (no new npm packages were added;
+  Phase 2 only uses React/Next built-ins plus the existing Tailwind
+  setup).
 
 ## Known Issues / Technical Debt
 
-- Vazirmatn not self-hosted yet (see "Known limitations").
-- `eslint-config-next` + `FlatCompat` incompatibility under ESLint 9 is a
-  documented trap — don't reintroduce `@eslint/eslintrc`/`FlatCompat` for
-  this project without first checking whether it's still broken upstream.
-- No automated tests exist yet (expected — `tests/*` is still
-  `.gitkeep`-only; Phase 14 is where the test suite is required to be
-  meaningful, though business-critical logic introduced in earlier phases
-  should get tests as it's written, per the phase plan's general guidance).
-- No CI configuration yet — not required by any phase so far, but worth
-  adding once Phase 3+ introduces something worth gating (migrations,
-  typecheck/lint/build on PR).
+(Phase 0/1 items below are unchanged; Phase 2 additions follow.)
+
+- Vazirmatn not self-hosted yet.
+- `eslint-config-next` + `FlatCompat` incompatibility under ESLint 9 —
+  don't reintroduce `@eslint/eslintrc`/`FlatCompat` without checking if
+  it's still broken upstream.
+- No automated tests exist yet (Phase 14, or sooner for business-critical
+  logic — none of Phase 2's UI code is business-critical in the sense
+  that rule matters for).
+- No CI configuration yet.
+- **This phase's code has not been run through `next build`/`next dev`
+  in any sandbox since it was written** — see "Tests/checks" above. This
+  is the most important item on this list; treat Phase 2 as unverified
+  until confirmed.
+- `BenefitsStrip`'s divider rules are a simplified approximation, not a
+  pixel-perfect port of the prototype's `nth-child` CSS (see "Known
+  limitations").
 
 ## Next Session Instructions
 
-- Exact next objective: Execute PHASE 2 — Homepage visual migration, per
-  `CLAUDE_BUILD_INSTRUCTIONS.txt` §D. Rebuild the prototype's actual
-  homepage sections as real components, replacing the Phase 1 placeholder
-  content in `src/app/page.tsx`:
-  hero carousel, category circles, featured products grid, promo banners,
-  new-arrivals grid, benefits strip, newsletter UI (already has a shell —
-  just needs to move into a `NewsletterSection` component if it's reused
-  elsewhere), search overlay UI, cart drawer UI shell, responsive
-  behavior, reduced motion, keyboard/accessibility behavior.
-- Use placeholder/demo data only (no database yet — that's Phase 3).
-  Product/category demo content should come from a local
-  constant/fixture file (e.g. `src/domains/catalog/demo-data.ts` or similar)
-  rather than being inlined repeatedly in JSX, so Phase 3 can swap it for
-  real queries with minimal component changes.
-- Files/areas to inspect first:
-  - This `PROGRESS.md`.
-  - `reference/prototype.html` — specifically the hero carousel (`
-    #heroCarousel`/`.hero-track`, autoplay/drag/dot logic, ~line 400-608
-    region and the `<script>` block near the end), categories section,
-    featured-products cards, promo-banners, new-arrivals, benefits-strip,
-    search-overlay, and cart-panel HTML/CSS/JS — all of it, not just the
-    header/footer already covered in Phase 1.
-  - `src/app/page.tsx` (the Phase 1 placeholder to replace) and
-    `src/components/ui/*` (reuse `Button`/`ButtonLink`/`Container`, add
-    new primitives like `Card` only if genuinely reusable across sections).
-- Expected acceptance criteria for Phase 2 (copied from build instructions):
-  - Homepage closely matches the prototype visually.
-  - Mobile/tablet/desktop responsive behavior works.
-  - Interactions work (carousel drag/autoplay/dots, category hover,
-    wishlist heart toggle, search overlay open/close, cart drawer shell
-    open/close).
-  - No hardcoded inline-JS architecture — behavior lives in proper
-    React components/hooks.
-  - Image handling uses production-appropriate patterns (`next/image` with
-    explicit dimensions) even though real product photography doesn't
-    exist yet — use styled placeholder blocks (matching the prototype's
-    own `.asset-slot` treatment) rather than broken `<img>` tags.
-- Do not attempt Phase 3 (database) or later phases in the same session —
-  homepage visuals only.
+- **Exact next objective, in order:**
+  1. Run `npm install && npm run typecheck && npm run lint && npm run
+     build && npm run dev` and fix whatever surfaces. Do this before
+     writing any new code. Pay particular attention to:
+     - `HeroCarousel.tsx` — the most complex new file (drag/autoplay
+       state machine); if anything in Phase 2 has a real bug, it's most
+       likely here.
+     - Tailwind arbitrary-value class strings across the new home/
+       overlay components (`aspect-[21/8]`, `max-[640px]:`, `z-[100]`,
+       `duration-[250ms]`, `[&:nth-child(4n)]:border-e-0`, etc.) — these
+       were written carefully but never run through the actual Tailwind
+       v4 JIT compiler this session.
+     - The `UIOverlayContext` — confirm `Header`'s buttons actually open/
+       close `SearchOverlay`/`CartDrawer` when clicked, and that Escape/
+       backdrop-click closing and focus return work as intended.
+  2. Do a manual click-through in the browser (or at least a careful
+     screenshot comparison against `reference/prototype.html`) covering
+     everything in the Phase 2 acceptance criteria: hero carousel drag/
+     autoplay/dots, category hover, wishlist heart toggle, search overlay
+     open/close, cart drawer open/close (confirm it actually slides in
+     now, given the bug fixed this session), mobile/tablet/desktop
+     responsive behavior, reduced-motion (disable the carousel autoplay
+     and confirm it doesn't spin up).
+  3. Once Phase 2 checks are genuinely green, update this file's
+     "Current Status"/"Completed" to mark Phase 2 COMPLETE (not COMPLETE
+     WITH FOLLOW-UP) and move on to **PHASE 3 — Database + catalog
+     domain** per `CLAUDE_BUILD_INSTRUCTIONS.txt` §D: PostgreSQL
+     connection, Drizzle setup, initial migrations for categories/
+     products/variants/images/attributes, seed data based on the demo
+     fixtures already sitting in `src/domains/catalog/demo-data.ts`
+     (these were deliberately shaped to make that swap easy), and a data
+     access layer.
+- **Do not skip straight to Phase 3 without doing step 1 above** — per
+  CLAUDE_BUILD_INSTRUCTIONS.txt §A.19 ("do not stop after writing code;
+  run checks and fix what you can") and §G ("do not claim a phase is
+  complete when checks are failing"), and this phase's checks simply
+  haven't been run yet, not "passed."
+- Files/areas to inspect first: this `PROGRESS.md`, then
+  `src/components/home/HeroCarousel.tsx` and
+  `src/components/overlays/*` (highest complexity/risk this phase),
+  then the rest of `src/components/home/*` and the demo-data fixtures.
 
 ## Commands
 
@@ -253,11 +363,14 @@ audited and are unchanged.
 - start: `npm run start` (after build)
 - lint: `npm run lint` (or `npx eslint .`)
 - typecheck: `npm run typecheck` (or `npx tsc --noEmit`)
-- test: not configured yet (Phase 14, or earlier if business-critical logic
-  needs tests sooner — see "Known Issues / Technical Debt")
+- test: not configured yet (Phase 14, or earlier if business-critical
+  logic needs tests sooner — see "Known Issues / Technical Debt")
 - db migration: not applicable yet (Phase 3)
 - seed: not applicable yet (Phase 3)
 
-Toolchain used this session: Node 22.22.2, npm 10.9.7, Next.js 16.3.4,
-React 19.2.8, Tailwind CSS 4.3.3, TypeScript (see `package.json` for pinned
-range), ESLint 9.39.5 + eslint-config-next 16.3.4.
+Toolchain recorded from the Phase 1 session (last time `npm install`
+actually succeeded): Node 22.22.2, npm 10.9.7, Next.js 16.3.4,
+React 19.2.8, Tailwind CSS 4.3.3, TypeScript per `package.json`'s pinned
+range, ESLint 9.39.5 + eslint-config-next 16.3.4. This session's sandbox
+also had Node 22.22.2 / npm 10.9.7 available but zero outbound network
+access, so none of the above could be re-verified or re-installed.

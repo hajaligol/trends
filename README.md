@@ -54,11 +54,15 @@ domains currently hold only a `.gitkeep` placeholder.
 
 ## Status
 
-Phase 1 (Next.js foundation + design system shell) is complete. The app
-runs, RTL/Persian is configured at the document root, and the header/footer
-match the prototype. Homepage sections are still placeholders — see
-`PROGRESS.md` for exactly what's implemented and what Phase 2 should do
-next.
+Phase 1 (Next.js foundation + design system shell) is complete and was
+verified with a working build. Phase 2 (homepage visual migration) has
+been implemented — hero carousel, categories, featured products, promo
+banners, new arrivals, benefits strip, search overlay, and cart drawer
+are all real components now — but could not be run through
+`npm install`/`build`/`lint`/`typecheck` in the session that wrote it
+(sandbox network restriction). **Run those checks first** before trusting
+this is bug-free; see `PROGRESS.md` for full detail on what was and
+wasn't verified.
 
 ## Getting started
 

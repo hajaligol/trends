@@ -63,3 +63,17 @@ export function SearchIcon(props: SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
+
+export function HeartIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 1024 1024" fill="none" aria-hidden="true" {...props}>
+      <path
+        d="M512 824C487 802 244 602 218 438C195 292 286 210 386 210C445 210 490 239 512 292C534 239 579 210 638 210C738 210 829 292 806 438C780 602 537 802 512 824Z"
+        stroke="currentColor"
+        strokeWidth={32}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
