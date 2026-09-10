@@ -62,7 +62,10 @@ export function HeroCarousel({ slides }: { slides: DemoHeroSlide[] }) {
     if (!wrap || slideCount < 2) return undefined;
 
     function clientXOf(event: MouseEvent | TouchEvent): number {
-      return "touches" in event ? event.touches[0].clientX : event.clientX;
+      if ("touches" in event) {
+        return event.touches[0]?.clientX ?? event.changedTouches[0]?.clientX ?? 0;
+      }
+      return event.clientX;
     }
 
     function onDown(event: MouseEvent | TouchEvent) {
