@@ -54,6 +54,25 @@ export function buildCategoryHref(slug: string, state: CategoryQueryState): stri
 }
 
 /**
+ * Search-page equivalent of `CategoryQueryState`/`buildCategoryHref` —
+ * same "omit defaults, build a shareable URL" pattern, keyed on the
+ * search query string instead of a category slug.
+ */
+export type SearchQueryState = {
+  q: string;
+  sort?: ProductSort;
+  page?: number;
+};
+
+export function buildSearchHref(state: SearchQueryState): string {
+  const params = new URLSearchParams();
+  params.set("q", state.q);
+  if (state.sort && state.sort !== "newest") params.set("sort", state.sort);
+  if (state.page && state.page > 1) params.set("page", String(state.page));
+  return `/search?${params.toString()}`;
+}
+
+/**
  * UI-only pastel swatch assignment for category circles/badges. This is
  * deliberately *not* a database column: which pastel color a category's
  * circle uses is presentation styling, not catalog data a store operator

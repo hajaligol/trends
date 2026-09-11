@@ -1,21 +1,20 @@
 # Trends Progress Report
 
 ## Current Status
-- Overall status: The full storefront browsing experience is now
-  implemented in code — homepage (real DB data), category listing pages
-  (sort/filter/pagination), and product detail pages (gallery, variant
-  picker, related products) — but **none of it has been verified by a
-  compiler, linter, or build this session**. This sandbox had zero
-  network access (see "Known Issues" and the Phase 4 write-up below for
-  proof/detail); `npm install` could not run at all, so `npm run
-  typecheck`/`lint`/`build` never ran either. Treat this phase's code as
-  "implemented, unverified" rather than "done."
-- Current phase: PHASE 4 — Storefront catalog pages (BLOCKED — see below;
-  implementation is complete, verification is not)
-- Last completed phase: PHASE 3 (verified in a prior session)
-- Next phase: finish verifying/fixing Phase 4, mark it COMPLETE, then
-  PHASE 5 — Search + SEO foundations
-- Date: 2026-09-11
+- Overall status: Storefront browsing (Phase 4) and search/SEO
+  foundations (Phase 5) are both implemented **and verified** this
+  session — full network access was available, so `npm install`,
+  `typecheck`, `lint`, `build`, a local PostgreSQL instance,
+  `db:migrate`/`db:seed`, and manual `curl` walkthroughs of every new
+  route all actually ran (see the Phase 4 and Phase 5 write-ups below
+  for the exact commands/output). Nothing in this report is
+  "implemented, unverified."
+- Current phase: none in progress — PHASE 5 is COMPLETE.
+- Last completed phase: PHASE 5 — Search + SEO foundations
+- Next phase: PHASE 6 — Authentication + customer account
+- Date: 2026-09-11 (continuation session, same date as the prior
+  unverified Phase 4 attempt — this session had network access where the
+  immediately preceding one did not)
 
 ## Completed
 
@@ -301,35 +300,58 @@ PostgreSQL instance and its own `.env.local` — see "Commands" below.
   a schema/seed phase but is not a substitute for the real integration
   tests Phase 14 will need for cart/checkout/payment logic.
 
-### Phase 4 — Storefront catalog pages (BLOCKED on verification — see below)
+### Phase 4 — Storefront catalog pages (COMPLETE — verified this session)
 
 **Goal:** turn the catalog into a browsable storefront — category
 listing pages and product detail pages — on top of Phase 3's query
 layer, per CLAUDE_BUILD_INSTRUCTIONS.txt §D Phase 4's task list.
 
-**Environment note — read this before doing anything else next session:**
-This session's sandbox had **no network access at all**, unlike the
-Phase 3 session. Confirmed multiple ways:
-- `npm install` failed: `403 Forbidden` from `registry.npmjs.org`.
-- `curl -I https://registry.npmjs.org/react` → `403`, header
-  `x-deny-reason: host_not_allowed`.
-- `apt-get update` also failed (`403 Forbidden` on every Ubuntu/Node
-  mirror).
-- `node_modules/` did not exist and could not be created; no local
-  Postgres could be installed or run.
+**This session had full network access**, unlike the immediately
+preceding session (see the old note below, kept for the record). The
+implementation from that prior session was verified as-is with no
+changes needed:
+- `npm install` — 402 packages, succeeded.
+- `npm run typecheck` — clean, no errors.
+- `npm run lint` — clean, no errors/warnings.
+- Installed PostgreSQL 16 locally (`apt-get install postgresql`),
+  created the `trends` database, pointed `.env.local` at it.
+- `npm run db:migrate` — applied cleanly.
+- `npm run db:seed` — inserted 6 categories, 11 products.
+- `npm run build` — clean production build; routes: `/` (static),
+  `/category/[slug]` (dynamic), `/product/[slug]` (dynamic).
+- Ran `npm run dev` **and** `npm run start` (production mode) and
+  `curl`'d real requests against both:
+  - `/` — all 6 homepage section IDs present, DB-backed categories/
+    featured/new-arrivals render with correct Persian digit-formatted
+    prices (e.g. `۵۹۰,۰۰۰ تومان`).
+  - `/category/men` — category name/description, sort links
+    (`?sort=price-asc`/`price-desc`), size/color filter pill links
+    (`?size=M`, `?color=...`) all present with real DB-derived values.
+  - `/product/classic-shirt` — title, breadcrumbs, price, variant data
+    all present.
+  - `/product/does-not-exist` and `/category/does-not-exist` — custom
+    not-found UI renders correctly (see "Known Issues" below for one
+    caveat on the HTTP status code, which is a Next.js framework
+    behavior, not a bug in this code).
+  - No hydration warnings/errors in the dev server log for any of the
+    above.
 
-**Consequence: `npm run typecheck`, `npm run lint`, and `npm run build`
-never ran this session.** Every file below was written and reviewed
-entirely by hand — checked line-by-line against the actual Drizzle
-schema field names, checked for type-narrowing correctness around
-`notFound()`, checked that no client component imports the
-DB-touching `queries.ts` module at runtime (only `import type`, verified
-via `grep` across every `"use client"` file), etc. This is a real,
-careful review, but it is **not a substitute for the compiler**, and
-per rule A.19/G ("do not claim a phase is complete when checks are
-failing" — extended here to "when checks could not be run at all"),
-this phase is left as **BLOCKED**, not COMPLETE, until a session with
-working `npm install` actually runs the checks.
+**Old environment note, kept for the record (previous session, no
+network access):** that session's sandbox had zero network access
+(`npm install` returned `403 Forbidden` from `registry.npmjs.org`,
+`apt-get update` failed the same way). It implemented Phase 4's code
+without being able to run a compiler, linter, or build. This session
+confirmed that implementation was correct as written — nothing needed
+fixing beyond what's noted in "Known Issues."
+
+### Phase 4 (original implementation notes, still accurate)
+
+**This session's Phase 4 verification (typecheck/lint/build/db/dev/prod
+smoke tests, all passing) is written up above.** Everything below this
+point in the Phase 4 section is the *original* implementation writeup
+from the prior (network-less) session, kept as-is because it's still an
+accurate description of what was built and why — only the verification
+status has changed, not the code.
 
 **What was implemented:**
 
@@ -444,6 +466,10 @@ digit price formatting, e.g. `590000` → `"۵۹۰,۰۰۰ تومان"`) and
 **Environment/config changes:** none.
 
 **Tests/checks — NONE ran this session (see environment note above).**
+**Superseded: all of the below was actually run in the following
+session (this file's Phase 4 section above, "COMPLETE — verified this
+session") and passed. Kept here only as a historical record of what the
+original implementing session expected/flagged as risky.**
 Specifically still outstanding, in priority order for whoever picks
 this up next:
 1. `npm install` — first time this will have actually been attempted
@@ -577,13 +603,19 @@ this up next:
   an implementation detail, not a business decision, so it didn't need
   sign-off before proceeding (rule F.1: "prefer the simplest
   production-safe solution").
-- **(Phase 4) Assuming this session's total lack of network access is a
-  sandbox anomaly, not the new normal** — the Phase 3 session had
-  working `apt-get`/npm registry access and used it to install/run a
-  real local Postgres. If the *next* session also has no network
-  access, that's worth surfacing back to whoever operates this
-  environment rather than continuing to write unverified code
-  indefinitely.
+- **(Phase 4) The prior session's assumption that its total lack of
+  network access was a sandbox anomaly, not the new normal, was
+  confirmed correct** — this session had full `npm`/`apt-get` access
+  and used it to verify everything end-to-end (see the Phase 4 write-up
+  above). No further action needed on this point.
+- **(Phase 5) Assuming `priceCurrency: "IRR"` alongside a raw Toman
+  integer in the `Product` JSON-LD's `Offer` blocks is an acceptable
+  first-pass simplification, not a silent currency-conversion bug** —
+  documented in-file and in "Known Issues" below. This is a
+  business/legal-adjacent judgment call (structured data feeding into
+  Google Shopping/rich results) that should be revisited with whoever
+  owns pricing/payment decisions, likely alongside Phase 9's payment
+  integration.
 
 ## Known Issues / Technical Debt
 
@@ -606,19 +638,18 @@ this up next:
   query functions — currently just convention. Worth a lint rule
   (e.g. `eslint-plugin-boundaries` or a simple `no-restricted-imports`
   rule) once more domains have their own DB-backed query layers.
-- Homepage (`src/app/page.tsx`) still reads from
-  `src/domains/catalog/demo-data.ts`, not the new database-backed
-  `src/domains/catalog/queries.ts` — intentional, that swap is Phase 4's
-  job (see "Next Session Instructions").
+- Homepage (`src/app/page.tsx`) now reads categories/featured
+  products/new arrivals from `src/domains/catalog/queries.ts` (swapped
+  in Phase 4). Hero slides, promo banners, and the benefits strip
+  intentionally stay on `demo-data.ts` fixtures — those are homepage
+  promotional content (Phase 11's admin scope: "hero slides",
+  "homepage promotional content"), not catalog data.
 
-**(Phase 4, this session):**
-- **Highest-priority item: none of this session's code has been run,
-  compiled, linted, or built.** See the Phase 4 write-up above for the
-  full explanation (zero network access, `npm install` impossible) and
-  the exact list of what to verify first.
+**(Phase 4, verified this session):**
 - Category listing's filter/sort/pagination is JS-side after one
   per-category fetch, not SQL — fine now, needs revisiting at scale
-  (flagged in `queries.ts`).
+  (flagged in `queries.ts`). Search (Phase 5) uses the same pattern for
+  the same reason.
 - Single-select size/color filters (not multi-select) — documented
   tradeoff in `CategoryFilters.tsx`.
 - No product images exist in the seed data, so the real-image code
@@ -626,63 +657,219 @@ this up next:
   actually rendered a real `next/image` — only the `AssetSlot`
   fallback path has any real-world exercise.
 - Related products are recency-only, no similarity/relevance logic.
+- **`notFound()` returns HTTP 200, not 404, on `/category/[slug]` and
+  `/product/[slug]`** — confirmed in both `next dev` and `next start`
+  (production) this session via `curl -D -`. This is a documented
+  upstream Next.js behavior, not a bug in this codebase: both routes
+  have a `loading.tsx` for streaming UX, and Next.js's own docs
+  (`not-found.js` reference page) state plainly that it "will return a
+  200 HTTP status code for streamed responses, and 404 for
+  non-streamed responses." Multiple long-standing upstream GitHub
+  issues (e.g. vercel/next.js#76474, #93239) confirm this is still
+  unresolved as of Next.js 16.3.4. The only framework-level fix is
+  removing `loading.tsx` from the segment, which would kill the
+  streaming UX both pages currently have — not a trade worth making
+  silently. Left as-is; flagged here for a deliberate decision (accept
+  the 200, or add an existence-check workaround) rather than a change
+  made without discussion. Low real-world impact since Google/Bing
+  both primarily key off the rendered "not found" content and
+  `noindex`/canonical signals rather than status code alone, but it's
+  worth knowing about for anyone auditing crawler behavior.
+
+**(Phase 5, this session):**
+- Search is a single `ILIKE` across `title`/`short_description`/
+  `brand` — no ranking/relevance beyond newest/price sort, no
+  fuzzy/typo tolerance, no `tags` array search (Postgres `text[]`
+  `ILIKE` isn't straightforward; would need `array_to_string` or a
+  `tsvector` — skipped for this phase's scope per "sensible PostgreSQL
+  search first," not full-text search yet). Revisit if search quality
+  becomes a real complaint — likely a `tsvector`/`GIN` index step
+  before reaching for an external search service.
+- Category pages' Open Graph metadata has no image (categories have no
+  associated image column/asset yet) — only `url` is set. Product
+  pages do get an OG image from the product's first `product_images`
+  row, but since no seed product has images yet (see the pre-existing
+  "no product images exist in the seed data" item above), this is
+  unverified against a real image end-to-end.
+- No `ItemList`/`BreadcrumbList` JSON-LD on category pages — only
+  `Product` JSON-LD on product detail pages. Category-level structured
+  data is a reasonable future addition, not called out explicitly in
+  TRENDS_PROJECT_CONTEXT.md §8's list, so left out for scope control.
+- Product JSON-LD's `Offer.priceCurrency` is set to `"IRR"` (schema.org
+  requires an ISO 4217 code; there's no code for Toman) while
+  `Offer.price` is the raw Toman integer shown on the page — **this is
+  a deliberate, documented mismatch** (see the comment in
+  `src/app/product/[slug]/page.tsx`), not a conversion bug. A fully
+  correct fix would multiply by 10 to get Rial, but that would make the
+  structured-data price silently diverge from the visible on-page
+  price, which seems worse for a first pass. Flagged for a deliberate
+  decision later (Phase 9/13?) rather than picked unilaterally.
+- No `/admin` or `/account` routes exist yet, so `robots.ts` has
+  nothing to `Disallow` today — the file has a comment flagging that it
+  needs revisiting once Phase 6 (`/account/*`) and Phase 11
+  (`/admin/*`) exist.
+
+### Phase 5 — Search + SEO foundations (COMPLETE)
+
+**Goal:** real product search, URL-driven search state, and SEO
+foundations (canonical URLs, Open Graph, sitemap, robots, structured
+data, noindex for near-duplicate/private pages) per
+CLAUDE_BUILD_INSTRUCTIONS.txt §D Phase 5.
+
+**New/changed files:**
+- `src/domains/catalog/queries.ts` — added `searchProducts({ q, sort,
+  page })`: plain PostgreSQL `ILIKE` over `title`/`short_description`/
+  `brand` (not Elasticsearch/Meilisearch — TRENDS_PROJECT_CONTEXT.md §5
+  explicitly says not to reach for those until scale requires it), same
+  batched `inArray` variant/image fetch + JS-side sort/paginate pattern
+  as `getProductsByCategorySlug`. Also added `getSitemapEntries()` —
+  lightweight slug + `updatedAt` for every active category/product, for
+  `sitemap.ts`. Also extended `getProductDetailBySlug` to select
+  `seoTitle`/`seoDescription` (existing DB columns that nothing was
+  reading before) and added them to `CatalogProductDetail`.
+- `src/domains/catalog/presentation.ts` — added `SearchQueryState` +
+  `buildSearchHref()`, the same "omit defaults, shareable URL" pattern
+  as `CategoryQueryState`/`buildCategoryHref`, keyed on the query string
+  instead of a category slug.
+- `src/app/search/page.tsx` (new) — URL-driven `/search?q=&sort=&page=`
+  page. Empty `q` shows a prompt instead of querying. `generateMetadata`
+  sets `robots: { index: false, follow: true }` — search results are
+  near-duplicate content that shifts with every query string.
+- `src/components/catalog/SearchSortSelect.tsx` /
+  `SearchPagination.tsx` (new) — same plain-link, zero-client-JS pattern
+  as `SortSelect`/`Pagination`, just keyed on `SearchQueryState`/
+  `buildSearchHref` instead of category state.
+- `src/components/overlays/SearchOverlay.tsx` — the input is now inside
+  a real `<form action="/search" method="get">` (`name="q"`, closes the
+  overlay `onSubmit`). No client-side fetch/state added — the `/search`
+  page itself is what's database-backed; the overlay is just a plain
+  GET form, works even without JS.
+- `src/lib/site-config.ts` (new) — `SITE_URL` (from
+  `NEXT_PUBLIC_SITE_URL`, falls back to `http://localhost:3000`) and
+  `SITE_NAME`, a single source of truth for `metadataBase`/canonical/
+  OG/sitemap/robots instead of repeating the env var lookup everywhere.
+- `src/app/layout.tsx` — added `metadataBase: new URL(SITE_URL)`
+  (required for Next.js to resolve relative OG image URLs) and a
+  default `openGraph` block (`siteName`, `locale: "fa_IR"`, `type:
+  "website"`).
+- `src/app/page.tsx` — added `alternates: { canonical: "/" }` +
+  `openGraph: { url: "/" }`.
+- `src/app/category/[slug]/page.tsx` — `generateMetadata` now sets
+  `alternates.canonical` to the *clean* `/category/[slug]` URL
+  (regardless of the current filter/sort/page state) and `openGraph.url`
+  to match, plus `robots: { index: false, follow: true }` whenever a
+  size/color filter or page > 1 is present — faceted URLs are
+  near-duplicate content, same reasoning as the search page.
+- `src/app/product/[slug]/page.tsx` — `generateMetadata` now uses
+  `product.seoTitle`/`seoDescription` when set (falling back to
+  `title`/`shortDescription`), sets `alternates.canonical` +
+  `openGraph` (with the first product image, if any). The page body now
+  also renders a `<script type="application/ld+json">` with a
+  schema.org `Product` block (name, description, brand, image URLs,
+  canonical URL, one `Offer` per variant with price/availability/SKU).
+- `src/app/sitemap.ts` (new) — `MetadataRoute.Sitemap` built from
+  `getSitemapEntries()`: homepage (priority 1) + every active category
+  (priority 0.8) + every active product (priority 0.7, `lastModified`
+  from `updatedAt`).
+- `src/app/robots.ts` (new) — `allow: "/"` for all user agents (no
+  `/admin`/`/account` routes exist yet to disallow — comment in-file
+  flags revisiting once Phase 6/11 add them) + a `sitemap` pointer.
+
+**Tests/checks — all run this session, all passing:**
+- `npm run typecheck` — clean.
+- `npm run lint` — clean (one warning surfaced and fixed: a leftover
+  `eslint-disable-next-line react/no-danger` comment was flagged as
+  unused since that rule isn't in this project's ESLint config; removed
+  it rather than adding an unnecessary rule just to justify the
+  comment).
+- `npm run build` — clean; new routes appear correctly as static
+  (`/robots.txt`, `/sitemap.xml`) or dynamic (`/search`).
+- Manual `curl` verification against a running `next dev` server (with
+  local PostgreSQL up and seeded):
+  - `/search` (no `q`) → prompt shown, no query executed.
+  - `/search?q=هودی` → 2 real DB results ("هودی", "هودی روزانه"),
+    `<title>جستجو: هودی | ترندز</title>`, sort links
+    (`?sort=price-asc`/`price-desc`) present and correctly
+    URL-encoded/`&amp;`-escaped.
+  - `/search?q=zzzznotfound` → empty-state message renders, HTTP 200
+    (not an error).
+  - `<meta name="robots" content="noindex, follow"/>` confirmed present
+    on `/search?q=...` via the raw RSC/HTML payload.
+  - `/robots.txt` → `User-Agent: *` / `Allow: /` / `Sitemap:` line, all
+    correct.
+  - `/sitemap.xml` → valid XML (parsed with `python3 -m
+    xml.dom.minidom`), exactly 18 `<loc>` entries = 1 homepage + 6
+    categories + 11 products, matching the seed data counts.
+  - `/` → `<link rel="canonical" href=".../">`, `og:title`/
+    `og:description`/`og:url` all present.
+  - `/category/men` (no filters) → canonical present, **no** `robots`
+    meta tag (correctly indexable).
+  - `/category/men?size=M` (filtered) → canonical points to the *clean*
+    `/category/men` URL, `<meta name="robots" content="noindex,
+    follow"/>` present.
+  - `/product/classic-shirt` → canonical, `og:title`/`og:description`/
+    `og:url`/`og:type`, and a `<script type="application/ld+json">`
+    block containing `"@type":"Product"` and one `"@type":"Offer"` per
+    variant, all confirmed present.
+
+**Known limitations / follow-ups:** see "Known Issues / Technical Debt"
+below (search relevance/full-text, category OG images, `Product`
+JSON-LD's Toman-under-`IRR` currency-code mismatch, no admin/account
+routes yet to disallow).
 
 ## Next Session Instructions
 
-- **Exact next objective: verify and fix Phase 4 before doing anything
-  else.** Phase 4's storefront pages (category listing, product detail,
-  homepage/nav wiring) are fully implemented in code but were never
-  compiled, linted, or built — this session's sandbox had no network
-  access at all (see the Phase 4 write-up above for proof). Do not
-  start Phase 5 until Phase 4 is verified and marked COMPLETE.
-  1. Confirm network access first: `npm install`. If this fails the
-     same way it did this session (403s from `registry.npmjs.org`),
-     stop and report that back rather than attempting more unverified
-     work — two sessions in a row with no network access would be worth
-     surfacing, not silently working around.
-  2. `npm run typecheck` — fix anything it finds. Read "Tests/checks"
-     in the Phase 4 section above for the specific areas I'd bet are
-     most likely to have real issues (Drizzle's inferred types for the
-     new batched `inArray` queries in `queries.ts`).
-  3. `npm run lint` — fix anything it finds (watch for stale/unused
-     imports from the demo-data → real-query swap).
-  4. Set up a local PostgreSQL + `.env.local` (see "Commands" below —
-     same steps the Phase 3 session used), then
-     `npm run db:migrate && npm run db:seed`.
-  5. `npm run build` — fix anything it finds.
-  6. `npm run dev` and manually click through: homepage (categories,
-     featured products, new arrivals all link correctly) → a category
-     page (try the sort links and, if a category has more than one
-     size/color among its products, the filter pills) → a product page
-     (variant picker updates price/stock; related products show) → an
-     unknown slug like `/product/does-not-exist` (custom 404 renders)
-     → mobile nav (category links work, menu closes on tap).
-  7. Once everything above passes, update this file: change Phase 4's
-     status to COMPLETE, move it under a normal "Completed" entry (it's
-     already written up in full above — mostly just needs its status
-     line and this section trimmed down once verified), and update
-     "Current Status" / "Last completed phase" / "Next phase"
-     accordingly.
-  8. Then start PHASE 5 — Search + SEO foundations, per
-     CLAUDE_BUILD_INSTRUCTIONS.txt §D: real product search, URL-driven
-     search state, metadata (category/product pages already have basic
-     `generateMetadata` — extend it: canonical URLs, Open Graph),
-     sitemap, robots, product structured data, 404/not-found (a custom
-     root one already exists — this phase's job is more the
-     SEO/indexability side), noindex for private/admin pages (none
-     exist yet, so this is mostly forward-looking).
-- Files/areas to inspect first: this `PROGRESS.md`'s Phase 4 section
-  above (full list of new/changed files), then
-  `src/domains/catalog/queries.ts` + `presentation.ts` (the query/URL
-  layer Phase 5's search work will extend), then
-  `src/app/category/[slug]/page.tsx` and `src/app/product/[slug]/page.tsx`
-  (the patterns — `React.cache()`-shared data loading, URL-driven
-  state via `buildCategoryHref` — that search should probably follow
-  too, e.g. a `/search?q=...` page).
-- Do not redo Phase 3's schema/migration/seed work, and do not redo
-  Phase 4's page/component implementation from scratch — verify and fix
-  what exists rather than rewriting it, unless verification actually
-  surfaces a design problem (not just a type error) worth reconsidering.
+- **Exact next objective: PHASE 6 — Authentication + customer
+  account**, per CLAUDE_BUILD_INSTRUCTIONS.txt §D. Phases 4 and 5 are
+  both verified COMPLETE (see above) — start fresh on auth, don't redo
+  catalog/search/SEO work.
+  1. Read CLAUDE_BUILD_INSTRUCTIONS.txt's Phase 6 task list and
+     TRENDS_PROJECT_CONTEXT.md §3 "Authentication" and §12 "Data model
+     direction" (users/accounts/sessions/verification tokens) before
+     writing any code.
+  2. Choose a mature auth library rather than hand-rolling
+     sessions/password hashing (rule F.2). Whatever is chosen must
+     satisfy every constraint already spelled out in
+     TRENDS_PROJECT_CONTEXT.md §3: Iranian mobile number support,
+     optional email, OTP-ready architecture (even if no real SMS
+     provider is wired up yet — Phase 6 just needs the abstraction to
+     exist), role-based authorization for staff/admin, and — this is a
+     hard rule, not a preference — **no auth tokens in `localStorage`**
+     (rule A.12 / G).
+  3. New schema needed: `users`, session storage (however the chosen
+     auth library wants it — table or otherwise), `roles`/permissions
+     if the library doesn't already give you something reasonable, and
+     an `addresses` table (per §12) even though checkout doesn't exist
+     until Phase 8 — an address book is part of "account profile" in
+     this phase's own task list.
+  4. Iranian mobile normalization: decide on and document the canonical
+     stored format (e.g. `+98XXXXXXXXXX`) in the new schema file's
+     header comment, the same way `product-variants.ts` documents its
+     money-unit choice — don't leave the format implicit.
+  5. Build: registration, login, logout, session handling, password
+     reset/recovery (if password auth is the chosen method), protected
+     `/account` routes with real server-side ownership checks (not just
+     hidden UI), and an account profile/address book page.
+  6. Wire the header's existing "حساب کاربری" (account) button — it's
+     currently a plain icon button with an `aria-label`, not a link —
+     into whatever the real login/account entry point ends up being.
+  7. Run `typecheck`/`lint`/`build` and manually verify: register → log
+     in → see account page → log out → confirm a protected route
+     redirects/blocks when logged out → confirm one user cannot view
+     another user's account data by guessing an ID/slug in the URL.
+  8. Update `PROGRESS.md` the same way this session did: mark Phase 6
+     COMPLETE (or COMPLETE WITH FOLLOW-UP/BLOCKED, per rule B) with a
+     real list of what was implemented, checks run, and what's next.
+- Files/areas to inspect first: `src/lib/db/schema/` (to see the
+  existing schema-file conventions before adding `users.ts`/etc.),
+  `src/domains/catalog/queries.ts` (the "domain owns its own DB access,
+  page/component code only calls exported functions" pattern to follow
+  for a new `src/domains/auth/` or `src/domains/customers/` module),
+  and `src/components/layout/Header.tsx` (the account button that needs
+  wiring up).
+- Do not redo Phase 3/4/5 work. Do not start Phase 7 (cart/wishlist)
+  before Phase 6 — cart's guest-to-user merge and wishlist's
+  authenticated persistence both depend on real auth existing first.
 
 ## Commands
 

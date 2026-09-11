@@ -7,6 +7,7 @@ import { ProductGallery } from "@/components/catalog/ProductGallery";
 import { VariantSelector } from "@/components/catalog/VariantSelector";
 import { ProductGrid } from "@/components/catalog/ProductGrid";
 import { getProductDetailBySlug, getRelatedProducts } from "@/domains/catalog/queries";
+import { SITE_URL } from "@/lib/site-config";
 
 type ProductPageProps = {
   params: Promise<{ slug: string }>;
@@ -20,9 +21,23 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
   const { slug } = await params;
   const product = await loadProduct(slug);
   if (!product) return { title: "محصول پیدا نشد" };
+
+  const title = product.seoTitle ?? product.title;
+  const description = product.seoDescription ?? product.shortDescription ?? `${product.title} — خرید از ترندز`;
+  const canonicalPath = `/product/${product.slug}`;
+  const firstImage = product.images[0];
+
   return {
-    title: product.title,
-    description: product.shortDescription ?? `${product.title} — خرید از ترندز`,
+    title,
+    description,
+    alternates: { canonical: canonicalPath },
+    openGraph: {
+      url: canonicalPath,
+      title,
+      description,
+      type: "website",
+      images: firstImage ? [{ url: firstImage.url, alt: firstImage.altText }] : undefined,
+    },
   };
 }
 
@@ -33,8 +48,36 @@ export default async function ProductPage({ params }: ProductPageProps) {
 
   const relatedProducts = await getRelatedProducts(product.categorySlug, product.id);
 
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: product.title,
+    description: product.shortDescription ?? undefined,
+    brand: product.brand ? { "@type": "Brand", name: product.brand } : undefined,
+    image: product.images.map((image) => image.url),
+    url: `${SITE_URL}/product/${product.slug}`,
+    offers: product.variants.map((variant) => ({
+      "@type": "Offer",
+      priceCurrency: "IRR",
+      // Storefront prices are in Toman (see product-variants.ts's header
+      // comment on the canonical money unit); schema.org's `price` field
+      // itself has no unit, so this is deliberately not converted to
+      // Rial here — it just mirrors what's shown on the page.
+      price: variant.priceToman,
+      availability:
+        variant.stockState === "out-of-stock"
+          ? "https://schema.org/OutOfStock"
+          : "https://schema.org/InStock",
+      sku: variant.id,
+    })),
+  };
+
   return (
     <main className="py-[clamp(24px,4vw,40px)]">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <Container>
         <Breadcrumbs
           items={[

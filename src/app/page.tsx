@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { HeroCarousel } from "@/components/home/HeroCarousel";
 import { CategoryNav } from "@/components/home/CategoryNav";
 import { FeaturedProducts } from "@/components/home/FeaturedProducts";
@@ -7,6 +8,11 @@ import { BenefitsStrip } from "@/components/home/BenefitsStrip";
 import { Container } from "@/components/ui/Container";
 import { demoBanners, demoBenefits, demoHeroSlides } from "@/domains/catalog/demo-data";
 import { getActiveCategories, getFeaturedProducts, getNewArrivals } from "@/domains/catalog/queries";
+
+export const metadata: Metadata = {
+  alternates: { canonical: "/" },
+  openGraph: { url: "/" },
+};
 
 /**
  * Real homepage sections (Phase 2), now backed by real catalog data for

@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, ne, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, inArray, ne, or, type SQL } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { categories, productImages, products, productVariants } from "@/lib/db/schema";
 import { discountPercent } from "@/lib/utils/money";
@@ -241,6 +241,8 @@ export type CatalogProductDetail = CatalogProductSummary & {
   brand: string | null;
   tags: string[];
   categoryName: string;
+  seoTitle: string | null;
+  seoDescription: string | null;
   /** Full active-variant list (not just the summary's derived fields) —
    * the product page's size/color picker needs every variant's own price
    * and stock, not just the cheapest one. */
@@ -257,6 +259,8 @@ export async function getProductDetailBySlug(slug: string): Promise<CatalogProdu
       longDescription: products.longDescription,
       brand: products.brand,
       tags: products.tags,
+      seoTitle: products.seoTitle,
+      seoDescription: products.seoDescription,
       categorySlug: categories.slug,
       categoryName: categories.name,
     })
@@ -289,6 +293,8 @@ export async function getProductDetailBySlug(slug: string): Promise<CatalogProdu
     longDescription: row.longDescription,
     brand: row.brand,
     tags: row.tags,
+    seoTitle: row.seoTitle,
+    seoDescription: row.seoDescription,
     categoryName: row.categoryName,
     variants,
   };
@@ -341,6 +347,130 @@ export async function getRelatedProducts(
       (imagesByProduct.get(row.id) ?? []).map((image) => ({ url: image.url, altText: image.altText })),
     ),
   );
+}
+
+const SEARCH_PAGE_SIZE = 12;
+
+export type SearchResult = {
+  query: string;
+  products: CatalogProductSummary[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+};
+
+/**
+ * Real product search (Phase 5). Plain PostgreSQL `ILIKE` over
+ * title/short description/brand — the "sensible PostgreSQL search first"
+ * TRENDS_PROJECT_CONTEXT.md §5 calls for, not Elasticsearch/Meilisearch,
+ * which the same section explicitly says not to add until scale actually
+ * requires it. Sorting/pagination happen in application code after one
+ * batched fetch, same documented tradeoff as `getProductsByCategorySlug`
+ * (fine at this catalog size; revisit with `WHERE`/`ORDER BY`/`LIMIT` if
+ * the catalog grows to hundreds/thousands of rows).
+ */
+export async function searchProducts(params: {
+  q: string;
+  page?: number;
+  sort?: ProductSort;
+}): Promise<SearchResult> {
+  const q = params.q.trim();
+  const sort = params.sort ?? "newest";
+
+  if (q.length === 0) {
+    return { query: q, products: [], total: 0, page: 1, pageSize: SEARCH_PAGE_SIZE, totalPages: 0 };
+  }
+
+  const pattern = `%${q}%`;
+  const productRows = await db
+    .select({
+      id: products.id,
+      slug: products.slug,
+      title: products.title,
+      categorySlug: categories.slug,
+      createdAt: products.createdAt,
+    })
+    .from(products)
+    .innerJoin(categories, eq(categories.id, products.categoryId))
+    .where(
+      and(
+        eq(products.isActive, true),
+        or(
+          ilike(products.title, pattern),
+          ilike(products.shortDescription, pattern),
+          ilike(products.brand, pattern),
+        ),
+      ),
+    );
+
+  if (productRows.length === 0) {
+    return { query: q, products: [], total: 0, page: 1, pageSize: SEARCH_PAGE_SIZE, totalPages: 0 };
+  }
+
+  const productIds = productRows.map((row) => row.id);
+  const [variantRows, imageRows] = await Promise.all([
+    db
+      .select(VARIANT_COLUMNS)
+      .from(productVariants)
+      .where(and(inArray(productVariants.productId, productIds), eq(productVariants.isActive, true))),
+    db
+      .select(IMAGE_COLUMNS)
+      .from(productImages)
+      .where(inArray(productImages.productId, productIds))
+      .orderBy(asc(productImages.displayOrder)),
+  ]);
+
+  const variantsByProduct = groupByProductId(variantRows);
+  const imagesByProduct = groupByProductId(imageRows);
+
+  const summaries = productRows.map((row) =>
+    buildSummary(
+      row,
+      (variantsByProduct.get(row.id) ?? []).map(toVariant),
+      (imagesByProduct.get(row.id) ?? []).map((image) => ({ url: image.url, altText: image.altText })),
+    ),
+  );
+
+  const createdAtBySlug = new Map(productRows.map((row) => [row.slug, row.createdAt]));
+  const sorted = [...summaries].sort((a, b) => {
+    if (sort === "price-asc") return (a.fromPriceToman ?? Infinity) - (b.fromPriceToman ?? Infinity);
+    if (sort === "price-desc") return (b.fromPriceToman ?? -Infinity) - (a.fromPriceToman ?? -Infinity);
+    const aCreatedAt = createdAtBySlug.get(a.slug);
+    const bCreatedAt = createdAtBySlug.get(b.slug);
+    return (bCreatedAt?.getTime() ?? 0) - (aCreatedAt?.getTime() ?? 0);
+  });
+
+  const total = sorted.length;
+  const totalPages = Math.max(1, Math.ceil(total / SEARCH_PAGE_SIZE));
+  const page = Math.min(Math.max(1, params.page ?? 1), totalPages);
+  const start = (page - 1) * SEARCH_PAGE_SIZE;
+  const pageItems = sorted.slice(start, start + SEARCH_PAGE_SIZE);
+
+  return { query: q, products: pageItems, total, page, pageSize: SEARCH_PAGE_SIZE, totalPages };
+}
+
+/**
+ * Minimal slug + last-modified data for every indexable storefront URL,
+ * for `sitemap.ts` (Phase 5). Deliberately returns nothing beyond what a
+ * sitemap needs — no variants/images — since this is a lightweight,
+ * whole-catalog query.
+ */
+export async function getSitemapEntries(): Promise<{
+  categories: Array<{ slug: string; updatedAt: Date }>;
+  products: Array<{ slug: string; updatedAt: Date }>;
+}> {
+  const [categoryRows, productRows] = await Promise.all([
+    db
+      .select({ slug: categories.slug, updatedAt: categories.updatedAt })
+      .from(categories)
+      .where(eq(categories.isActive, true)),
+    db
+      .select({ slug: products.slug, updatedAt: products.updatedAt })
+      .from(products)
+      .where(eq(products.isActive, true)),
+  ]);
+  return { categories: categoryRows, products: productRows };
 }
 
 const CATEGORY_PAGE_SIZE = 12;

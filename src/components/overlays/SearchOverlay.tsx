@@ -5,9 +5,9 @@ import { useUIOverlay } from "@/components/overlays/UIOverlayProvider";
 
 /**
  * Mirrors #searchOverlay in the prototype: focuses the input on open,
- * closes on Escape or backdrop click. Real product search (URL-driven,
- * database-backed) is Phase 5 — this is a UI shell only, same as the
- * prototype's own version.
+ * closes on Escape or backdrop click. Submits as a plain GET form to
+ * `/search?q=...` (Phase 5) — no client-side fetch/state needed, the
+ * `/search` page itself is what's database-backed and URL-driven.
  */
 export function SearchOverlay() {
   const { isSearchOpen, closeSearch } = useUIOverlay();
@@ -55,12 +55,16 @@ export function SearchOverlay() {
             ✕
           </button>
         </div>
-        <input
-          ref={inputRef}
-          type="text"
-          placeholder="نام محصول را جستجو کنید..."
-          className="w-full rounded-full border border-line bg-white px-[18px] py-3.5 text-[0.95rem] focus:outline-2 focus:outline-ink focus:outline-offset-2"
-        />
+        <form action="/search" method="get" onSubmit={closeSearch}>
+          <input
+            ref={inputRef}
+            type="text"
+            name="q"
+            required
+            placeholder="نام محصول را جستجو کنید..."
+            className="w-full rounded-full border border-line bg-white px-[18px] py-3.5 text-[0.95rem] focus:outline-2 focus:outline-ink focus:outline-offset-2"
+          />
+        </form>
         <p className="mt-3.5 text-[0.8rem] text-text-secondary">
           مثال: هودی، کتانی، پالتو، اکسسوری
         </p>

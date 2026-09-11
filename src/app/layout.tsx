@@ -5,13 +5,20 @@ import { Footer } from "@/components/layout/Footer";
 import { UIOverlayProvider } from "@/components/overlays/UIOverlayProvider";
 import { SearchOverlay } from "@/components/overlays/SearchOverlay";
 import { CartDrawer } from "@/components/overlays/CartDrawer";
+import { SITE_NAME, SITE_URL } from "@/lib/site-config";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: {
-    default: "ترندز | فروشگاه پوشاک",
-    template: "%s | ترندز",
+    default: `${SITE_NAME} | فروشگاه پوشاک`,
+    template: `%s | ${SITE_NAME}`,
   },
   description: "ترندز، فروشگاه آنلاین پوشاک ایرانی.",
+  openGraph: {
+    siteName: SITE_NAME,
+    locale: "fa_IR",
+    type: "website",
+  },
 };
 
 export default function RootLayout({

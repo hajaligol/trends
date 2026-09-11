@@ -51,9 +51,22 @@ export async function generateMetadata(props: CategoryPageProps): Promise<Metada
   const { slug, sort, size, color, page } = await resolveQueryState(props);
   const result = await loadCategoryProducts(slug, sort, size, color, page);
   if (!result) return { title: "دسته‌بندی پیدا نشد" };
+
+  const hasFacets = Boolean(size || color) || page > 1;
+  const canonicalPath = `/category/${slug}`;
+
   return {
     title: result.category.name,
     description: result.category.description ?? `محصولات دسته «${result.category.name}» در ترندز`,
+    alternates: { canonical: canonicalPath },
+    openGraph: { url: canonicalPath },
+    // Faceted URLs (size/color filters, page > 2, ...) are near-duplicate
+    // content that shifts with query params — keep only the clean
+    // category URL indexable, per TRENDS_PROJECT_CONTEXT.md §8's "no
+    // accidental indexing" and §5's "noindex for private/admin pages"
+    // (the same principle applies to any near-duplicate URL variant, not
+    // just admin/account pages).
+    robots: hasFacets ? { index: false, follow: true } : undefined,
   };
 }
 
