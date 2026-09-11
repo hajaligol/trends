@@ -1,14 +1,14 @@
 import { Container } from "@/components/ui/Container";
-import { ProductCard } from "@/components/home/ProductCard";
+import { ProductCard } from "@/components/catalog/ProductCard";
 import { SectionHead } from "@/components/home/SectionHead";
-import type { DemoProduct } from "@/domains/catalog/demo-data";
+import type { CatalogProductSummary } from "@/domains/catalog/queries";
 
 /**
  * Mirrors #featured .product-grid in the prototype: 5 columns desktop,
- * 3 from ~640px, 2 below that. Demo data only — Phase 3 swaps `products`
- * for a real catalog query.
+ * 3 from ~640px, 2 below that. Real catalog data since Phase 4 — see
+ * `getFeaturedProducts` in `@/domains/catalog/queries`.
  */
-export function FeaturedProducts({ products }: { products: DemoProduct[] }) {
+export function FeaturedProducts({ products }: { products: CatalogProductSummary[] }) {
   return (
     <section id="featured" className="py-[clamp(30px,5vw,54px)]">
       <Container>

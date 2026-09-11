@@ -1,16 +1,21 @@
 # Trends Progress Report
 
 ## Current Status
-- Overall status: Homepage is visually complete (demo data). The catalog
-  domain now has a real PostgreSQL schema, migrations, seed data, and a
-  data-access layer — verified end-to-end against a live database this
-  session. The homepage itself still renders from the Phase 2 demo-data
-  fixtures (swapping it to the new DB-backed queries is Phase 4's job,
-  not this phase's).
-- Current phase: PHASE 3 — Database + catalog domain (COMPLETE)
-- Last completed phase: PHASE 3 (verified this session)
-- Next phase: PHASE 4 — Storefront catalog pages
-- Date: 2026-09-10
+- Overall status: The full storefront browsing experience is now
+  implemented in code — homepage (real DB data), category listing pages
+  (sort/filter/pagination), and product detail pages (gallery, variant
+  picker, related products) — but **none of it has been verified by a
+  compiler, linter, or build this session**. This sandbox had zero
+  network access (see "Known Issues" and the Phase 4 write-up below for
+  proof/detail); `npm install` could not run at all, so `npm run
+  typecheck`/`lint`/`build` never ran either. Treat this phase's code as
+  "implemented, unverified" rather than "done."
+- Current phase: PHASE 4 — Storefront catalog pages (BLOCKED — see below;
+  implementation is complete, verification is not)
+- Last completed phase: PHASE 3 (verified in a prior session)
+- Next phase: finish verifying/fixing Phase 4, mark it COMPLETE, then
+  PHASE 5 — Search + SEO foundations
+- Date: 2026-09-11
 
 ## Completed
 
@@ -296,7 +301,197 @@ PostgreSQL instance and its own `.env.local` — see "Commands" below.
   a schema/seed phase but is not a substitute for the real integration
   tests Phase 14 will need for cart/checkout/payment logic.
 
-## Architecture Decisions
+### Phase 4 — Storefront catalog pages (BLOCKED on verification — see below)
+
+**Goal:** turn the catalog into a browsable storefront — category
+listing pages and product detail pages — on top of Phase 3's query
+layer, per CLAUDE_BUILD_INSTRUCTIONS.txt §D Phase 4's task list.
+
+**Environment note — read this before doing anything else next session:**
+This session's sandbox had **no network access at all**, unlike the
+Phase 3 session. Confirmed multiple ways:
+- `npm install` failed: `403 Forbidden` from `registry.npmjs.org`.
+- `curl -I https://registry.npmjs.org/react` → `403`, header
+  `x-deny-reason: host_not_allowed`.
+- `apt-get update` also failed (`403 Forbidden` on every Ubuntu/Node
+  mirror).
+- `node_modules/` did not exist and could not be created; no local
+  Postgres could be installed or run.
+
+**Consequence: `npm run typecheck`, `npm run lint`, and `npm run build`
+never ran this session.** Every file below was written and reviewed
+entirely by hand — checked line-by-line against the actual Drizzle
+schema field names, checked for type-narrowing correctness around
+`notFound()`, checked that no client component imports the
+DB-touching `queries.ts` module at runtime (only `import type`, verified
+via `grep` across every `"use client"` file), etc. This is a real,
+careful review, but it is **not a substitute for the compiler**, and
+per rule A.19/G ("do not claim a phase is complete when checks are
+failing" — extended here to "when checks could not be run at all"),
+this phase is left as **BLOCKED**, not COMPLETE, until a session with
+working `npm install` actually runs the checks.
+
+**What was implemented:**
+
+*Catalog query layer* (`src/domains/catalog/`):
+- `queries.ts` — added `StockState` computation (in-stock / low-stock /
+  out-of-stock, aggregated across a product's variants),
+  `discountPercent` display math, and rewrote the featured/new-arrivals
+  loaders to batch variant/image fetches with `inArray` instead of
+  looping one query per product (no functional change to their output
+  shape, just avoids N+1 as the catalog grows). Added:
+  - `getCategoryBySlug(slug)`
+  - `getProductsByCategorySlug({ slug, page, sort, size, color })` —
+    category product grid, paginated (12/page), sortable
+    (newest/price-asc/price-desc), filterable by one size + one color.
+    Filtering/sorting/pagination happen in application code after one
+    batched fetch, not in SQL — documented in-file as the right
+    tradeoff at today's catalog size (a handful of products/category)
+    and explicitly flagged as needing to move server-side once a
+    category can hold hundreds+ products.
+  - `getProductDetailBySlug(slug)` (replaces the old narrower
+    `getProductBySlug`, unused anywhere else so renaming was safe) —
+    full detail including description/brand/tags/all active variants.
+  - `getRelatedProducts(categorySlug, excludeProductId, limit)`.
+- `presentation.ts` (new file) — `ProductSort` type,
+  `PRODUCT_SORT_OPTIONS`, `isProductSort`, `buildCategoryHref` (builds
+  clean, shareable `/category/[slug]?...` URLs, omitting params at
+  their default value), and `swatchForCategorySlug` (UI-only pastel
+  swatch-per-category mapping — deliberately *not* a DB column, see
+  in-file comment). **This file exists specifically so client
+  components never import `queries.ts`** — `queries.ts` pulls in the
+  Drizzle/`postgres` client at module-eval time, which must never be
+  bundled for the browser. Verified via `grep` that every
+  `"use client"` component's only import from `queries.ts` (if any) is
+  `import type`.
+
+*New routes:*
+- `/category/[slug]` (`page.tsx` + `loading.tsx`) — breadcrumbs, H1 +
+  category description, sort links, size/color filter pills, product
+  grid, pagination, and a "showing X of Y" count. All sort/filter/page
+  controls are plain server-rendered `<Link>`s reading/writing URL
+  search params — no client JS/hooks anywhere on this page, so it works
+  before hydration and is fully shareable/bookmarkable.
+  `generateMetadata` and the page body share one DB fetch via
+  `React.cache()` (keyed on primitive args, not the raw Next.js
+  `props` object, since `cache()` compares by reference/value per arg).
+  Unknown category slug → `notFound()`.
+- `/product/[slug]` (`page.tsx` + `loading.tsx`) — breadcrumbs, image
+  gallery (client component: thumbnail switching; falls back to a
+  single `AssetSlot` placeholder since no real product images exist
+  yet), variant picker (client component: size/color selection with
+  live price/discount/stock; correctly falls back to the nearest valid
+  combination if a size+color pairing doesn't exist as a variant —
+  *not* currently exercised by the seed data, which only ever gives one
+  size per product, but written generically for when Phase 11 adds
+  real size runs), description/tags, and a related-products rail (same
+  category, excludes itself). Same `React.cache()` fetch-sharing
+  pattern. **No "add to cart" button** — cart mutations are Phase 7/8;
+  a button that didn't actually add anything to a real cart would be a
+  fake action per rule G, so the picker is display-only until Phase 7.
+- `src/app/not-found.tsx` (new) — custom Persian 404 page; Next's
+  default is generic/English.
+
+*Shared catalog components* (`src/components/catalog/`, all new):
+`Breadcrumbs`, `ProductCard` (real-data version, supersedes Phase 2's
+`components/home/ProductCard.tsx`, which was deleted), `ProductGrid`
+(+ empty state), `StockBadge`, `DiscountBadge`, `SortSelect`,
+`CategoryFilters`, `Pagination` (all five of these are plain Server
+Components using `next/link` — no client JS needed for sort/filter/page
+navigation), `ProductGallery` (client), `VariantSelector` (client).
+
+*Homepage/nav wired to real data:*
+- `src/app/page.tsx` — categories/featured-products/new-arrivals now
+  come from `getActiveCategories`/`getFeaturedProducts`/
+  `getNewArrivals` instead of `demo-data.ts`. Hero slides, promo
+  banners, and the benefits strip **intentionally stay on demo data** —
+  those are homepage promotional content (Phase 11 admin scope), not
+  catalog data, so swapping them is out of this phase.
+- `src/components/home/CategoryNav.tsx`, `FeaturedProducts.tsx`,
+  `NewArrivals.tsx` — rewritten to accept the real `Catalog*` types and
+  link to `/category/[slug]` / `/product/[slug]` instead of being inert.
+- `src/components/layout/Header.tsx` — "مردان"/"زنان"/"اکسسوری‌ها" now
+  link to their real `/category/[slug]` routes instead of the
+  homepage's `#categories` anchor; "صفحه اصلی" now links to `/` instead
+  of `#hero` so it works as an actual home link from category/product
+  pages. "فروشگاه" stays on `#featured` — there's no all-categories
+  catalog page in scope yet. Desktop/mobile nav render real routes via
+  `next/link` and hash-anchors via plain `<a>`.
+
+**New utility added:** `src/lib/utils/money.ts` — `formatToman` (Persian
+digit price formatting, e.g. `590000` → `"۵۹۰,۰۰۰ تومان"`) and
+`discountPercent` (rounded % off, `0` when there's nothing to show).
+
+**Files changed:**
+- New: `src/domains/catalog/presentation.ts`, `src/lib/utils/money.ts`,
+  `src/app/category/[slug]/page.tsx` + `loading.tsx`,
+  `src/app/product/[slug]/page.tsx` + `loading.tsx`,
+  `src/app/not-found.tsx`, `src/components/catalog/*` (10 files listed
+  above).
+- Rewritten: `src/domains/catalog/queries.ts`, `src/app/page.tsx`,
+  `src/components/home/CategoryNav.tsx`,
+  `src/components/home/FeaturedProducts.tsx`,
+  `src/components/home/NewArrivals.tsx`,
+  `src/components/layout/Header.tsx`.
+- Deleted: `src/components/home/ProductCard.tsx` (superseded by
+  `src/components/catalog/ProductCard.tsx`, which is used both on the
+  homepage and in category/related-product grids).
+- No schema/migration changes — Phase 3's schema is untouched, per
+  "do not redo completed work."
+
+**Database changes:** none.
+
+**Environment/config changes:** none.
+
+**Tests/checks — NONE ran this session (see environment note above).**
+Specifically still outstanding, in priority order for whoever picks
+this up next:
+1. `npm install` — first time this will have actually been attempted
+   since the code changes above. **Expect to actually need this to
+   succeed before anything else is possible.**
+2. `npm run typecheck` — highest-risk unverified area: Drizzle's
+   inferred row types for the new batched `inArray` queries in
+   `queries.ts` (`VARIANT_COLUMNS`/`IMAGE_COLUMNS` partial-select
+   objects, the `groupByProductId` generic, `RawVariantRow` structural
+   compatibility with the wider selected-row type). I'm fairly
+   confident in this by manual reading but it is exactly the kind of
+   thing `tsc` catches that a human reviewer misses.
+3. `npm run lint` — unverified; watch for unused-import warnings (I
+   removed several old demo-driven imports by hand) and the
+   `react-hooks`/`next/core-web-vitals` rules on the two new client
+   components (`ProductGallery`, `VariantSelector`).
+4. `npm run build` — unverified; the two dynamic routes
+   (`/category/[slug]`, `/product/[slug]`) will need a reachable
+   `DATABASE_URL` at build time if Next tries to statically analyze
+   them (they're fully dynamic — no `generateStaticParams` was added,
+   intentionally, since the catalog is small but not fixed — this
+   should be fine, but hasn't been confirmed against a real build).
+5. Then, an actual local Postgres + `npm run db:migrate && npm run
+   db:seed` + `npm run dev`, and manually click through: homepage →
+   category page (try sort links, size/color filters, pagination if a
+   category has enough products) → product page → related products →
+   an unknown slug (confirm the custom 404 renders) → mobile nav links.
+
+**Known limitations (in addition to "unverified", above):**
+- Category browsing's filter/sort/pagination is done in JS after one
+  batched fetch per category, not in SQL — fine at today's scale (~11
+  products total across 6 categories), explicitly flagged in
+  `queries.ts` as needing a rewrite once any category's product count
+  grows into the hundreds.
+- Related products are "same category, most recent, excluding self" —
+  no actual relevance/similarity logic. Reasonable default per rule
+  F.1; revisit if merchandising ever wants curated/algorithmic related
+  products.
+- Size/color filters are single-select (one size, one color at a time),
+  not multi-select — documented in `CategoryFilters.tsx` as the right
+  tradeoff for today's small catalog.
+- No product images exist (Phase 3 seeded zero `product_images` rows),
+  so every gallery/card renders through the `AssetSlot` placeholder
+  path. The real-`next/image` code paths in `ProductGallery`,
+  `ProductCard`, and `NewArrivals` are written and ready but literally
+  untested against a real image, since none exists in this dataset.
+
+
 
 - **Framework**: Next.js (App Router) + TypeScript + React. Unchanged.
 - **Database/ORM**: PostgreSQL + Drizzle ORM, exactly per
@@ -338,6 +533,27 @@ PostgreSQL instance and its own `.env.local` — see "Commands" below.
   is fragile across `drizzle-kit` version bumps; declaring them directly
   is more maintainable, matching rule F.6's actual intent (avoid
   *unnecessary* dependencies, not avoid declaring what's actually used).
+- **(Phase 4) `presentation.ts` split from `queries.ts`**: any catalog
+  constant/helper a client component might need (sort labels, URL
+  builders, category swatch colors) lives in a DB-free module so
+  Next.js never has a reason to try bundling the Postgres driver for
+  the browser. `queries.ts` is exclusively for Server Component /
+  future route-handler consumption.
+- **(Phase 4) Category filter/sort/pagination in application code, not
+  SQL**: see `getProductsByCategorySlug`'s doc comment in `queries.ts`.
+  Correct for the current catalog size; flagged as needing to move
+  server-side once category sizes grow substantially.
+- **(Phase 4) No "add to cart" UI on the product page yet**: cart
+  mutations are Phase 7 (and checkout is Phase 8). Rule G ("do not use
+  placeholder TODOs as a substitute for required functionality") reads
+  most safely here as "don't render a button that doesn't actually do
+  the thing it claims to" — so the variant picker is display-only
+  (price/stock for the selected combination) until real cart state
+  exists to wire it into.
+- **(Phase 4) UI-only category swatch colors, not a DB column**: see
+  `presentation.ts`'s `swatchForCategorySlug` doc comment — a category
+  circle's pastel color is presentation styling an operator wouldn't
+  need to manage via admin CRUD (Phase 11), so it isn't schema.
 
 ## Important Assumptions
 
@@ -361,6 +577,13 @@ PostgreSQL instance and its own `.env.local` — see "Commands" below.
   an implementation detail, not a business decision, so it didn't need
   sign-off before proceeding (rule F.1: "prefer the simplest
   production-safe solution").
+- **(Phase 4) Assuming this session's total lack of network access is a
+  sandbox anomaly, not the new normal** — the Phase 3 session had
+  working `apt-get`/npm registry access and used it to install/run a
+  real local Postgres. If the *next* session also has no network
+  access, that's worth surfacing back to whoever operates this
+  environment rather than continuing to write unverified code
+  indefinitely.
 
 ## Known Issues / Technical Debt
 
@@ -388,41 +611,78 @@ PostgreSQL instance and its own `.env.local` — see "Commands" below.
   `src/domains/catalog/queries.ts` — intentional, that swap is Phase 4's
   job (see "Next Session Instructions").
 
+**(Phase 4, this session):**
+- **Highest-priority item: none of this session's code has been run,
+  compiled, linted, or built.** See the Phase 4 write-up above for the
+  full explanation (zero network access, `npm install` impossible) and
+  the exact list of what to verify first.
+- Category listing's filter/sort/pagination is JS-side after one
+  per-category fetch, not SQL — fine now, needs revisiting at scale
+  (flagged in `queries.ts`).
+- Single-select size/color filters (not multi-select) — documented
+  tradeoff in `CategoryFilters.tsx`.
+- No product images exist in the seed data, so the real-image code
+  paths in `ProductGallery`/`ProductCard`/`NewArrivals` have never
+  actually rendered a real `next/image` — only the `AssetSlot`
+  fallback path has any real-world exercise.
+- Related products are recency-only, no similarity/relevance logic.
+
 ## Next Session Instructions
 
-- **Exact next objective:** PHASE 4 — Storefront catalog pages, per
-  CLAUDE_BUILD_INSTRUCTIONS.txt §D. At minimum:
-  1. Set up a local PostgreSQL instance and `.env.local` (see "Commands"
-     below), then run `npm run db:migrate && npm run db:seed` to get a
-     working local dataset — Phase 3's migration/seed already exist and
-     are verified; this is just standing them up in a fresh environment.
-  2. Build category listing pages and a product detail page using
-     `src/domains/catalog/queries.ts` (already built, verified, and
-     ready to consume — `getActiveCategories`, `getFeaturedProducts`,
-     `getNewArrivals`, `getProductBySlug`). Add whatever additional
-     query functions the catalog pages need (e.g. "products by category
-     slug with pagination/sorting/filtering") to that same file, keeping
-     the "components never import `@/lib/db` directly" convention.
-  3. Decide whether/how to swap `src/app/page.tsx`'s homepage sections
-     from `src/domains/catalog/demo-data.ts` over to the real queries —
-     the acceptance criteria for Phase 2 was already met using demo
-     data, so this is optional polish rather than a blocker, but doing it
-     now (since the query layer already exists and matches the demo
-     shapes closely) would remove the last of the "known-fake" homepage
-     content and is probably worth doing early in the Phase 4 session
-     rather than deferring further.
-  4. Product/category URLs, breadcrumbs, related products, pagination,
-     sorting, filters, loading/empty/error states — full task list in
-     CLAUDE_BUILD_INSTRUCTIONS.txt §D Phase 4.
-- Files/areas to inspect first: this `PROGRESS.md`, then
-  `src/domains/catalog/queries.ts` and `src/lib/db/schema/*` (understand
-  the data shapes before building pages against them), then
-  `src/components/home/ProductCard.tsx` (Phase 2's existing product-card
-  pattern — Phase 4's catalog pages should reuse/extend it rather than
-  inventing a second product-card component).
-- Do not redo Phase 3's schema/migration/seed work — it's verified and
-  complete. Only add new query functions to `src/domains/catalog/queries.ts`
-  as new pages need them.
+- **Exact next objective: verify and fix Phase 4 before doing anything
+  else.** Phase 4's storefront pages (category listing, product detail,
+  homepage/nav wiring) are fully implemented in code but were never
+  compiled, linted, or built — this session's sandbox had no network
+  access at all (see the Phase 4 write-up above for proof). Do not
+  start Phase 5 until Phase 4 is verified and marked COMPLETE.
+  1. Confirm network access first: `npm install`. If this fails the
+     same way it did this session (403s from `registry.npmjs.org`),
+     stop and report that back rather than attempting more unverified
+     work — two sessions in a row with no network access would be worth
+     surfacing, not silently working around.
+  2. `npm run typecheck` — fix anything it finds. Read "Tests/checks"
+     in the Phase 4 section above for the specific areas I'd bet are
+     most likely to have real issues (Drizzle's inferred types for the
+     new batched `inArray` queries in `queries.ts`).
+  3. `npm run lint` — fix anything it finds (watch for stale/unused
+     imports from the demo-data → real-query swap).
+  4. Set up a local PostgreSQL + `.env.local` (see "Commands" below —
+     same steps the Phase 3 session used), then
+     `npm run db:migrate && npm run db:seed`.
+  5. `npm run build` — fix anything it finds.
+  6. `npm run dev` and manually click through: homepage (categories,
+     featured products, new arrivals all link correctly) → a category
+     page (try the sort links and, if a category has more than one
+     size/color among its products, the filter pills) → a product page
+     (variant picker updates price/stock; related products show) → an
+     unknown slug like `/product/does-not-exist` (custom 404 renders)
+     → mobile nav (category links work, menu closes on tap).
+  7. Once everything above passes, update this file: change Phase 4's
+     status to COMPLETE, move it under a normal "Completed" entry (it's
+     already written up in full above — mostly just needs its status
+     line and this section trimmed down once verified), and update
+     "Current Status" / "Last completed phase" / "Next phase"
+     accordingly.
+  8. Then start PHASE 5 — Search + SEO foundations, per
+     CLAUDE_BUILD_INSTRUCTIONS.txt §D: real product search, URL-driven
+     search state, metadata (category/product pages already have basic
+     `generateMetadata` — extend it: canonical URLs, Open Graph),
+     sitemap, robots, product structured data, 404/not-found (a custom
+     root one already exists — this phase's job is more the
+     SEO/indexability side), noindex for private/admin pages (none
+     exist yet, so this is mostly forward-looking).
+- Files/areas to inspect first: this `PROGRESS.md`'s Phase 4 section
+  above (full list of new/changed files), then
+  `src/domains/catalog/queries.ts` + `presentation.ts` (the query/URL
+  layer Phase 5's search work will extend), then
+  `src/app/category/[slug]/page.tsx` and `src/app/product/[slug]/page.tsx`
+  (the patterns — `React.cache()`-shared data loading, URL-driven
+  state via `buildCategoryHref` — that search should probably follow
+  too, e.g. a `/search?q=...` page).
+- Do not redo Phase 3's schema/migration/seed work, and do not redo
+  Phase 4's page/component implementation from scratch — verify and fix
+  what exists rather than rewriting it, unless verification actually
+  surfaces a design problem (not just a type error) worth reconsidering.
 
 ## Commands
 
@@ -459,9 +719,17 @@ npm run db:migrate
 npm run db:seed
 ```
 
-Toolchain recorded this session (verified working, network was
-available): Node 22.22.2, npm 10.9.7, Next.js 16.3.4, React 19.2.8,
+Toolchain recorded in the Phase 3 session (verified working, network was
+available then): Node 22.22.2, npm 10.9.7, Next.js 16.3.4, React 19.2.8,
 Tailwind CSS 4.3.3, TypeScript per `package.json`'s pinned range,
 ESLint 9.39.5 + eslint-config-next 16.3.4, drizzle-orm ^0.45.2,
 drizzle-kit ^0.31.10, postgres (porsager driver, latest), tsx 4.23.13,
 PostgreSQL server 16.15.
+
+**This session (Phase 4) had zero network access** — `node`/`npm`
+binaries were present (same versions as above) but every registry/apt
+request returned `403 Forbidden` / `x-deny-reason: host_not_allowed`.
+No install, no local Postgres, no toolchain versions to newly record.
+The version list above is carried over from the last session that
+actually had network access, for reference only — confirm it's still
+accurate once `npm install` succeeds again.

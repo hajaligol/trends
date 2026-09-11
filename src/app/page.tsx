@@ -5,24 +5,25 @@ import { PromoBanners } from "@/components/home/PromoBanners";
 import { NewArrivals } from "@/components/home/NewArrivals";
 import { BenefitsStrip } from "@/components/home/BenefitsStrip";
 import { Container } from "@/components/ui/Container";
-import {
-  demoBanners,
-  demoBenefits,
-  demoCategories,
-  demoFeaturedProducts,
-  demoHeroSlides,
-  demoNewArrivals,
-} from "@/domains/catalog/demo-data";
+import { demoBanners, demoBenefits, demoHeroSlides } from "@/domains/catalog/demo-data";
+import { getActiveCategories, getFeaturedProducts, getNewArrivals } from "@/domains/catalog/queries";
 
 /**
- * Real homepage sections rebuilt as components (Phase 2), replacing the
- * Phase 1 placeholder. All content below comes from
- * src/domains/catalog/demo-data.ts -- Phase 3 swaps these fixtures for
- * real catalog queries; component props are already shaped like the
- * eventual database read models, so that swap should need minimal
- * changes to the components themselves.
+ * Real homepage sections (Phase 2), now backed by real catalog data for
+ * categories/featured products/new arrivals (Phase 4) via
+ * `@/domains/catalog/queries`. Hero slides, promo banners, and the
+ * benefits strip stay on `demo-data.ts` fixtures for now — those are
+ * homepage promotional content (Phase 11's "hero slides" / "homepage
+ * promotional content" admin scope), not catalog data, so they're out of
+ * this phase.
  */
-export default function HomePage() {
+export default async function HomePage() {
+  const [categories, featuredProducts, newArrivals] = await Promise.all([
+    getActiveCategories(),
+    getFeaturedProducts(),
+    getNewArrivals(),
+  ]);
+
   return (
     <main>
       <section id="hero" className="overflow-hidden bg-hero-beige py-[clamp(20px,3vw,32px)]">
@@ -31,10 +32,10 @@ export default function HomePage() {
         </Container>
       </section>
 
-      <CategoryNav categories={demoCategories} />
-      <FeaturedProducts products={demoFeaturedProducts} />
+      <CategoryNav categories={categories} />
+      <FeaturedProducts products={featuredProducts} />
       <PromoBanners banners={demoBanners} />
-      <NewArrivals arrivals={demoNewArrivals} />
+      <NewArrivals arrivals={newArrivals} />
       <BenefitsStrip benefits={demoBenefits} />
     </main>
   );

@@ -1,24 +1,27 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Container } from "@/components/ui/Container";
 import { CartIcon, AccountIcon, SearchIcon } from "@/components/ui/icons";
 import { useUIOverlay } from "@/components/overlays/UIOverlayProvider";
 import { demoCartItems } from "@/domains/cart/demo-data";
 import { toPersianDigits } from "@/lib/utils/persian-digits";
 
-// Nav links mirror reference/prototype.html .main-nav / .mobile-nav exactly,
-// including its (slightly odd) repeated anchors -- "مردان" and "اکسسوری‌ها"
-// both point at #categories in the prototype too. These point at homepage
-// anchors for now; once category/product pages exist as real routes
-// (Phase 4) "مردان" / "زنان" / "اکسسوری‌ها" should point at those routes
-// instead of #categories/#collections.
+// Nav links mirror reference/prototype.html .main-nav / .mobile-nav, with
+// two Phase 4 updates: "مردان"/"زنان"/"اکسسوری‌ها" now point at their real
+// /category/[slug] routes instead of the homepage's #categories anchor
+// (which only ever made sense while those categories had no pages of
+// their own), and "صفحه اصلی" points at "/" instead of "#hero" so it
+// works as an actual home link from category/product pages too.
+// "فروشگاه" stays on the homepage's #featured anchor — there's no
+// all-categories catalog page in scope yet.
 const NAV_LINKS = [
-  { href: "#hero", label: "صفحه اصلی" },
+  { href: "/", label: "صفحه اصلی" },
   { href: "#featured", label: "فروشگاه" },
-  { href: "#categories", label: "مردان" },
-  { href: "#collections", label: "زنان" },
-  { href: "#categories", label: "اکسسوری‌ها" },
+  { href: "/category/men", label: "مردان" },
+  { href: "/category/women", label: "زنان" },
+  { href: "/category/accessories", label: "اکسسوری‌ها" },
   { href: "#site-footer", label: "درباره ما" },
 ];
 
@@ -61,14 +64,15 @@ export function Header() {
         <nav aria-label="ناوبری اصلی" className="hidden items-center gap-[30px] lg:flex">
           {NAV_LINKS.map((link, i) => {
             const isActive = activeId === link.href.replace("#", "");
-            return (
-              <a
-                key={`${link.href}-${i}`}
-                href={link.href}
-                className={`relative py-1.5 text-[0.93rem] text-ink after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:origin-center after:rounded-sm after:bg-ink after:transition-transform after:duration-200 hover:after:scale-x-100 ${
-                  isActive ? "after:scale-x-100" : "after:scale-x-0"
-                }`}
-              >
+            const className = `relative py-1.5 text-[0.93rem] text-ink after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:origin-center after:rounded-sm after:bg-ink after:transition-transform after:duration-200 hover:after:scale-x-100 ${
+              isActive ? "after:scale-x-100" : "after:scale-x-0"
+            }`;
+            return link.href.startsWith("/") ? (
+              <Link key={`${link.href}-${i}`} href={link.href} className={className}>
+                {link.label}
+              </Link>
+            ) : (
+              <a key={`${link.href}-${i}`} href={link.href} className={className}>
                 {link.label}
               </a>
             );
@@ -136,16 +140,27 @@ export function Header() {
           menuOpen ? "flex" : "hidden"
         }`}
       >
-        {NAV_LINKS.map((link, i) => (
-          <a
-            key={`mobile-${link.href}-${i}`}
-            href={link.href}
-            onClick={() => setMenuOpen(false)}
-            className="rounded-md px-2 py-2.5 text-[0.95rem] text-ink hover:bg-ink/5"
-          >
-            {link.label}
-          </a>
-        ))}
+        {NAV_LINKS.map((link, i) =>
+          link.href.startsWith("/") ? (
+            <Link
+              key={`mobile-${link.href}-${i}`}
+              href={link.href}
+              onClick={() => setMenuOpen(false)}
+              className="rounded-md px-2 py-2.5 text-[0.95rem] text-ink hover:bg-ink/5"
+            >
+              {link.label}
+            </Link>
+          ) : (
+            <a
+              key={`mobile-${link.href}-${i}`}
+              href={link.href}
+              onClick={() => setMenuOpen(false)}
+              className="rounded-md px-2 py-2.5 text-[0.95rem] text-ink hover:bg-ink/5"
+            >
+              {link.label}
+            </a>
+          ),
+        )}
       </nav>
     </header>
   );
