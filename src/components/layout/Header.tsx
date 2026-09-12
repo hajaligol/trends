@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import { Container } from "@/components/ui/Container";
 import { CartIcon, AccountIcon, SearchIcon } from "@/components/ui/icons";
 import { useUIOverlay } from "@/components/overlays/UIOverlayProvider";
@@ -30,6 +31,11 @@ export function Header() {
   const [activeId, setActiveId] = useState("hero");
   const { openSearch, openCart } = useUIOverlay();
   const cartCount = demoCartItems.length;
+  const { data: session } = useSession();
+  // `session === undefined` briefly (before the client fetches
+  // `/api/auth/session`) is treated the same as "logged out" for this
+  // icon — see `AuthSessionProvider`'s comment on the tradeoff.
+  const accountHref = session?.user ? "/account" : "/login";
 
   // Highlights the nav link for the section currently in view, mirroring
   // the prototype's scroll listener -- reimplemented with
@@ -92,13 +98,13 @@ export function Header() {
               {toPersianDigits(cartCount)}
             </span>
           </button>
-          <button
-            type="button"
-            aria-label="حساب کاربری"
+          <Link
+            href={accountHref}
+            aria-label={session?.user ? "حساب کاربری" : "ورود به حساب کاربری"}
             className="flex h-[46px] w-[46px] items-center justify-center rounded-full bg-transparent transition-colors duration-200 hover:bg-ink/6"
           >
             <AccountIcon className="h-[30px] w-[30px] text-ink" />
-          </button>
+          </Link>
           <button
             type="button"
             aria-label="جستجو"

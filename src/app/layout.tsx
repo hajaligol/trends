@@ -6,6 +6,7 @@ import { UIOverlayProvider } from "@/components/overlays/UIOverlayProvider";
 import { SearchOverlay } from "@/components/overlays/SearchOverlay";
 import { CartDrawer } from "@/components/overlays/CartDrawer";
 import { SITE_NAME, SITE_URL } from "@/lib/site-config";
+import { AuthSessionProvider } from "@/components/auth/AuthSessionProvider";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -29,13 +30,15 @@ export default function RootLayout({
   return (
     <html lang="fa" dir="rtl">
       <body>
-        <UIOverlayProvider>
-          <Header />
-          {children}
-          <Footer />
-          <SearchOverlay />
-          <CartDrawer />
-        </UIOverlayProvider>
+        <AuthSessionProvider>
+          <UIOverlayProvider>
+            <Header />
+            {children}
+            <Footer />
+            <SearchOverlay />
+            <CartDrawer />
+          </UIOverlayProvider>
+        </AuthSessionProvider>
       </body>
     </html>
   );
