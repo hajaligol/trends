@@ -41,7 +41,7 @@ export function ProductCard({ product }: { product: CatalogProductSummary }) {
         <DiscountBadge percent={product.discountPercent} />
         {/* Sibling of the image link, not nested inside it — a <button>
          * inside an <a> is invalid HTML and breaks keyboard/AT navigation. */}
-        <WishlistButton productName={product.title} />
+        <WishlistButton productId={product.id} productName={product.title} />
       </div>
       <div>
         <Link href={`/product/${product.slug}`} className="mb-1 block text-[0.95rem] font-semibold">

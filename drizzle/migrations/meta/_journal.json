@@ -15,6 +15,13 @@
       "when": 1789153582384,
       "tag": "0001_perpetual_marten_broadcloak",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789209926982,
+      "tag": "0002_groovy_wrecker",
+      "breakpoints": true
     }
   ]
 }

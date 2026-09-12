@@ -7,6 +7,8 @@ import { SearchOverlay } from "@/components/overlays/SearchOverlay";
 import { CartDrawer } from "@/components/overlays/CartDrawer";
 import { SITE_NAME, SITE_URL } from "@/lib/site-config";
 import { AuthSessionProvider } from "@/components/auth/AuthSessionProvider";
+import { CartProvider } from "@/components/cart/CartProvider";
+import { WishlistProvider } from "@/components/wishlist/WishlistProvider";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -31,13 +33,17 @@ export default function RootLayout({
     <html lang="fa" dir="rtl">
       <body>
         <AuthSessionProvider>
-          <UIOverlayProvider>
-            <Header />
-            {children}
-            <Footer />
-            <SearchOverlay />
-            <CartDrawer />
-          </UIOverlayProvider>
+          <CartProvider>
+            <WishlistProvider>
+              <UIOverlayProvider>
+                <Header />
+                {children}
+                <Footer />
+                <SearchOverlay />
+                <CartDrawer />
+              </UIOverlayProvider>
+            </WishlistProvider>
+          </CartProvider>
         </AuthSessionProvider>
       </body>
     </html>

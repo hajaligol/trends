@@ -17,6 +17,8 @@ import {
   verifyPasswordResetToken,
 } from "@/domains/auth/reset-tokens";
 import { sendPasswordResetLink } from "@/domains/auth/notifications";
+import { mergeGuestCartIntoUserCart } from "@/domains/cart/merge";
+import { readGuestCartId, clearGuestCartId } from "@/domains/cart/session";
 
 /**
  * Server Actions for every auth mutation. Every one re-validates its
@@ -38,6 +40,22 @@ export type ActionResult = {
   error?: string;
   fieldErrors?: Record<string, string>;
 } | void;
+
+/**
+ * Folds a guest cart (if any) into the just-signed-in user's cart —
+ * called from both `registerAction` and `loginAction` right after
+ * `signIn()` succeeds, before the `redirect()`. See
+ * `src/domains/cart/merge.ts` for the merge semantics (quantities
+ * summed, guest cart deleted). Always clears the guest cookie
+ * afterward, even if there was nothing to merge, so a stale/empty guest
+ * cart cookie never lingers past the point where the user has a real
+ * account cart to use instead.
+ */
+async function mergeGuestCartOnSignIn(userId: string): Promise<void> {
+  const guestCartId = await readGuestCartId();
+  await mergeGuestCartIntoUserCart(guestCartId, userId);
+  if (guestCartId) await clearGuestCartId();
+}
 
 function firstFieldErrors(issues: { path: PropertyKey[]; message: string }[]): Record<string, string> {
   const fieldErrors: Record<string, string> = {};
@@ -61,8 +79,9 @@ export async function registerAction(_prevState: ActionResult, formData: FormDat
     return { fieldErrors: firstFieldErrors(parsed.error.issues) };
   }
 
+  let newUser;
   try {
-    await createUser({
+    newUser = await createUser({
       mobile: parsed.data.mobile,
       fullName: parsed.data.fullName,
       email: parsed.data.email,
@@ -82,6 +101,10 @@ export async function registerAction(_prevState: ActionResult, formData: FormDat
     password: parsed.data.password,
     redirect: false,
   });
+
+  // A brand-new account can still have a guest cart worth keeping — the
+  // person may have added items before deciding to create an account.
+  await mergeGuestCartOnSignIn(newUser.id);
 
   redirect("/account");
 }
@@ -112,6 +135,12 @@ export async function loginAction(_prevState: ActionResult, formData: FormData):
     }
     throw error;
   }
+
+  // `signIn()` above already proved these credentials are correct; this
+  // is just a read to get the user's id for the cart merge below, not a
+  // second authorization check.
+  const user = await findUserByMobile(parsed.data.mobile);
+  if (user) await mergeGuestCartOnSignIn(user.id);
 
   redirect("/account");
 }

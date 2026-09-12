@@ -6,7 +6,7 @@ import { useSession } from "next-auth/react";
 import { Container } from "@/components/ui/Container";
 import { CartIcon, AccountIcon, SearchIcon } from "@/components/ui/icons";
 import { useUIOverlay } from "@/components/overlays/UIOverlayProvider";
-import { demoCartItems } from "@/domains/cart/demo-data";
+import { useCart } from "@/components/cart/CartProvider";
 import { toPersianDigits } from "@/lib/utils/persian-digits";
 
 // Nav links mirror reference/prototype.html .main-nav / .mobile-nav, with
@@ -30,7 +30,8 @@ export function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeId, setActiveId] = useState("hero");
   const { openSearch, openCart } = useUIOverlay();
-  const cartCount = demoCartItems.length;
+  const { cart } = useCart();
+  const cartCount = cart.itemCount;
   const { data: session } = useSession();
   // `session === undefined` briefly (before the client fetches
   // `/api/auth/session`) is treated the same as "logged out" for this

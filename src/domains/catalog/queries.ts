@@ -231,6 +231,16 @@ export async function getFeaturedProducts(): Promise<CatalogProductSummary[]> {
   return loadProductSummaries(eq(products.isFeatured, true));
 }
 
+/** Product summaries for an explicit set of ids, in no particular
+ * guaranteed order (callers that care, like the wishlist page, sort
+ * client-side or don't need to). Used by
+ * `src/domains/wishlist/queries.ts` so the wishlist page's cards reuse
+ * this exact read-model instead of a bespoke shape. */
+export async function getProductSummariesByIds(ids: string[]): Promise<CatalogProductSummary[]> {
+  if (ids.length === 0) return [];
+  return loadProductSummaries(inArray(products.id, ids));
+}
+
 export async function getNewArrivals(): Promise<CatalogProductSummary[]> {
   return loadProductSummaries(eq(products.isNewArrival, true));
 }

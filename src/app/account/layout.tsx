@@ -32,6 +32,12 @@ export default async function AccountLayout({ children }: { children: ReactNode 
           >
             آدرس‌ها
           </Link>
+          <Link
+            href="/account/wishlist"
+            className="rounded-md px-3 py-2 text-[0.92rem] text-ink hover:bg-ink/5"
+          >
+            علاقه‌مندی‌ها
+          </Link>
           <form action={logoutAction}>
             <button
               type="submit"
