@@ -34,6 +34,12 @@ type CartContextValue = {
   updateQuantity: (itemId: string, quantity: number) => Promise<boolean>;
   removeItem: (itemId: string) => Promise<boolean>;
   clear: () => Promise<boolean>;
+  /** Re-fetches the authoritative cart from the server without
+   * performing a mutation itself — used by `/checkout` after
+   * `placeOrderAction` empties the cart server-side (order creation
+   * clears `cart_items` directly, not through one of the mutations
+   * above), so the Header badge/drawer don't keep showing stale items. */
+  refresh: () => Promise<void>;
 };
 
 const CartContext = createContext<CartContextValue | null>(null);
@@ -143,9 +149,21 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const refresh = useCallback(async () => {
+    try {
+      const summary = await getCurrentCartAction();
+      setCart(summary);
+    } catch {
+      // Same "not worth surfacing" reasoning as the initial-load catch
+      // above — a failed background refresh just leaves the previous
+      // (now possibly stale) state in place rather than showing an error
+      // for a call the user didn't directly trigger.
+    }
+  }, []);
+
   const value = useMemo(
-    () => ({ cart, isLoading, isMutating, error, addItem, updateQuantity, removeItem, clear }),
-    [cart, isLoading, isMutating, error, addItem, updateQuantity, removeItem, clear],
+    () => ({ cart, isLoading, isMutating, error, addItem, updateQuantity, removeItem, clear, refresh }),
+    [cart, isLoading, isMutating, error, addItem, updateQuantity, removeItem, clear, refresh],
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { AssetSlot } from "@/components/ui/AssetSlot";
 import { useUIOverlay } from "@/components/overlays/UIOverlayProvider";
@@ -145,11 +146,19 @@ export function CartDrawer() {
               برخی کالاها دیگر موجود نیستند و در جمع کل محاسبه نشده‌اند.
             </p>
           )}
-          {/* Checkout is Phase 8 — no route exists yet, so this is a
-           * disabled placeholder rather than a link to nowhere (rule G). */}
-          <Button type="button" disabled className="w-full justify-center opacity-60">
-            تسویه حساب (به‌زودی)
-          </Button>
+          {cart.items.length === 0 || hasUnavailableItems ? (
+            <Button type="button" disabled className="w-full justify-center opacity-60">
+              تسویه حساب
+            </Button>
+          ) : (
+            <Link
+              href="/checkout"
+              onClick={closeCart}
+              className="inline-flex w-full items-center justify-center gap-2.5 rounded-full border-0 bg-ink px-[30px] py-[15px] text-[0.95rem] text-white transition-opacity duration-200 ease-out hover:opacity-88"
+            >
+              تسویه حساب
+            </Link>
+          )}
         </div>
       </aside>
     </>

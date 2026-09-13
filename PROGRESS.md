@@ -1,26 +1,22 @@
 # Trends Progress Report
 
 ## Current Status
-- Overall status: Wishlist + cart (Phase 7) is implemented **and
+- Overall status: Checkout + shipping (Phase 8) is implemented **and
   verified** this session — full network access was available.
-  `npm install`, a fresh migration for 3 new tables (`carts`,
-  `cart_items`, `wishlist_items`), `typecheck`, `lint`, `build`, a fresh
-  clone migrate+seed check, and two kinds of runtime verification all
-  actually ran: (1) a direct-to-domain smoke test exercising every cart/
-  wishlist query function against the real seeded database — add,
-  stock-capping, quantity-merge-on-duplicate-add, quantity update,
-  removal, cross-cart ownership rejection, guest→user merge, idempotent
-  wishlist add/remove — all passed and were cleaned up afterward; and
-  (2) HTTP-level checks against a real `next build` + `next start`
-  server confirming every route still renders (200s), `/account/*`
-  correctly redirects to `/login` when signed out, and `/` remains `○
-  (Static)`. See "Current Phase" below for what was **not** verified
-  (the actual browser-driven Server Action wire calls — see the note on
-  verification scope there).
-- Current phase: none in progress — PHASE 7 is COMPLETE.
-- Last completed phase: PHASE 7 — Wishlist + cart
-- Next phase: PHASE 8 — Checkout + shipping
-- Date: 2026-09-12
+  `npm install` (already satisfied, no new dependencies needed), a fresh
+  migration for 2 new tables (`orders`, `order_items`), `typecheck`,
+  `lint`, `build`, a fresh-clone migrate+seed check, a direct-to-domain
+  smoke test (12 assertions, including a genuine concurrency race test),
+  and real HTTP-level verification against `npm run start` with actual
+  NextAuth session cookies (login via `/api/auth/callback/credentials`,
+  not just direct-to-domain) all ran and passed. See "Current Phase"
+  below for full detail and the one thing that still wasn't exercised
+  (the real browser `Next-Action` wire protocol for `placeOrderAction`
+  itself — see "Tests/checks").
+- Current phase: none in progress — PHASE 8 is COMPLETE.
+- Last completed phase: PHASE 8 — Checkout + shipping
+- Next phase: PHASE 9 — Promotions + payments
+- Date: 2026-09-13
 
 ## Completed
 
@@ -430,6 +426,261 @@ silently ignored):**
 - See the "What was *not* verified" note above — real browser
   Server-Action verification is still outstanding.
 
+### Phase 8 — Checkout + shipping (COMPLETE)
+
+**Goal:** a real Iranian checkout flow — address selection, shipping
+method, server-authoritative order totals, concurrency-safe inventory
+decrement, immutable order/line-item snapshots — with the payment
+*interface boundary* ready but no fabricated live gateway (§8/A.17).
+
+**New schema** (`src/lib/db/schema/`, migration
+`drizzle/migrations/0003_remarkable_lady_ursula.sql`, applied and
+verified against a real local Postgres and a brand-new one):
+- `orders.ts` — an explicit `order_status` Postgres enum
+  (`pending_payment`/`paid`/`processing`/`shipped`/`delivered`/
+  `cancelled`/`refunded`) per §6 "should be explicit and validated, not
+  arbitrary strings" — only `pending_payment` is actually reachable this
+  phase (no payment provider to advance it to `paid`; fulfillment
+  transitions are Phase 10). The full enum is modeled now so Phase 9/10
+  transition into a real value instead of needing a migration later.
+  Every field a customer saw at checkout is copied onto the row as an
+  **immutable snapshot** — shipping address (recipient/mobile/province/
+  city/address line/postal code/plaque/notes), shipping method
+  (code/label/estimate), and money (subtotal/shipping fee/discount/total,
+  integer Toman, non-negative check constraints) — never a foreign key
+  to `addresses`, since an address book row can be edited/deleted after
+  the order ships (§14 "historical order data remains stable"). Human
+  friendly `orderNumber` (`TR-YYMMDD-XXXX`, unique-indexed) is what
+  `/order/[orderNumber]` uses in the URL, not the internal uuid (§8 "do
+  not expose internal IDs unnecessarily"). `discountToman` defaults to
+  `0` — real coupons are Phase 9; the column exists now so that phase
+  needs no migration.
+- `order-items.ts` — one row per purchased line, **also** a full
+  snapshot (product title/slug/SKU/size/color/image, unit price,
+  compare-at price, quantity, line total) — unlike `cart_items` (Phase
+  7), which deliberately stores no price and always reads live.
+  `productId`/`variantId` are nullable FKs with `onDelete: "set null"`
+  purely for a future admin UI's convenience link-back; deleting a
+  product/variant later never touches historical order data.
+
+**New domain code:**
+- `src/domains/shipping/methods.ts` — a small typed config module (not a
+  database table) for the two shipping methods (standard/express) and
+  the free-shipping threshold, per rule F.1/F.6 ("simplest
+  production-safe solution", "fewer dependencies") for something this
+  static; every call site goes through `listShippingMethods`/
+  `getShippingMethod`, so promoting this to a table later (if admin
+  editing becomes a real requirement, §7) is a contained change.
+  **Assumption, documented per rule A.18:** the fee amounts
+  (₮90,000/₮180,000), the ₮2,000,000 free-shipping threshold, and the
+  courier-style labels are placeholder business values, not sourced from
+  a real contracted Iranian courier — flagged for the store operator to
+  replace before launch.
+- `src/domains/payments/provider.ts` — the `PaymentProvider` interface
+  (§8 "payment abstraction boundary") plus the one implementation this
+  repo actually ships, `NotConfiguredPaymentProvider`, whose `initiate()`
+  always returns an honest "gateway not configured" result — it never
+  fabricates a redirect URL or claims a real integration exists (rule
+  A.17). `getPaymentProvider()` is the single place that will branch on
+  a real `PAYMENT_PROVIDER` value once Phase 9 adds a real adapter (e.g.
+  ZarinPal); nothing else in the codebase should ever import a concrete
+  provider class directly.
+- `src/domains/orders/queries.ts` — `createOrderFromCart`, the core of
+  this phase, in one Postgres transaction:
+  1. Re-reads each cart line's **live** price/stock/active-flags (never
+     the client's view) and rejects up front (fast path) if a line is
+     inactive or under-stocked.
+  2. Decrements `product_variants.stock` with a **conditional** `UPDATE
+     ... SET stock = stock - :qty WHERE id = :id AND stock >= :qty
+     RETURNING id`, not a read-then-write pair — this, not the pre-check
+     above, is what actually makes it concurrency-safe. If the
+     `RETURNING` set is empty (another checkout won the race), it throws
+     `InsufficientStockError`, rolling back the whole transaction.
+     Verified for real under an actual concurrent race — see
+     "Tests/checks".
+  3. Inserts `orders` + `order_items` with the frozen snapshot, retrying
+     the (astronomically unlikely) order-number collision up to 3 times
+     via Postgres's `23505` unique-violation error code.
+  4. Clears the cart (`DELETE FROM cart_items WHERE cart_id = ...`).
+
+  Any thrown error (`EmptyCartError`/`InsufficientStockError`/anything
+  else) rolls back every step — verified that a failed checkout leaves
+  stock, the cart, and the orders table completely untouched, not
+  partially applied.
+  Also exports `getOrderForUser`/`listOrdersForUser`, both ownership
+  scoped by `userId` — same "no bare `getOrderById`" shape as
+  `addresses/queries.ts`/Phase 7's cart queries.
+- `src/domains/orders/actions.ts` — `placeOrderAction`, the Server
+  Action wiring checkout together. The client only ever sends an
+  `addressId` and a `shippingMethodCode` (plus a free-text note) —
+  **never a price**. Every dollar amount in the resulting order is
+  computed here server-side from: the authenticated session's real
+  `userId` (never trusted from the client), an address row independently
+  re-fetched and ownership-checked via `getAddressForUser`, the live
+  cart via `getCartSummary` (re-checked for `isAvailable`/
+  `isQuantityReduced` issues before allowing checkout — §8 "cannot
+  checkout unavailable inventory"), and a shipping method resolved
+  server-side via `getShippingMethod`. After a successful order, calls
+  `getPaymentProvider().initiate()` and surfaces its honest
+  "not configured" message as `paymentNote` — never marks anything paid
+  based on this call (§5 "never trust the browser return page as proof
+  of payment" applies in spirit even pre-Phase-9: initiation success
+  ≠ payment success).
+
+**New routes/pages:**
+- `/checkout` (`src/app/checkout/page.tsx` + `src/components/checkout/CheckoutView.tsx`)
+  — a single-page checkout (address selection, shipping method, order
+  note, live order summary, place-order button) rather than a multi-step
+  wizard; §6 lists checkout's steps as logical sections, not necessarily
+  separate routes, and single-page checkout is a normal pattern at this
+  store's scale. Coupon application (§6 step 5) is deliberately absent —
+  Phase 9's job; `orders.discountToman` already exists so no migration
+  will be needed to wire it in. Requires a signed-in session (redirects
+  to `/login` — see "Important Assumptions" on why there's no
+  `callbackUrl` round-trip yet) and a non-empty cart (redirects to `/`
+  otherwise). Reuses `AddressForm` (Phase 6) inline for "add a new
+  address without leaving checkout," syncing the client component's
+  local selection state from fresh server props via
+  `router.refresh()` — implemented using React's "adjust state during
+  render" pattern (comparing the incoming prop reference against a
+  tracked previous value) rather than a `useEffect`, since
+  `react-hooks/set-state-in-effect` correctly flagged the first draft's
+  `useEffect`-based version.
+- `/order/[orderNumber]` (`src/app/order/[orderNumber]/page.tsx`) — the
+  order confirmation/detail page, ownership-scoped via `getOrderForUser`
+  (a non-owner's request → `notFound()`, verified for real over HTTP —
+  see "Tests/checks"). Shows the frozen shipping/shipping-method/money
+  snapshot and a clear "پرداخت آنلاین هنوز پیکربندی نشده" notice while
+  `status === "pending_payment"`. This is *not* the Phase 10 order-history
+  list (`/account/orders` doesn't exist yet, deliberately — see "Known
+  limitations").
+- `src/components/cart/CartProvider.tsx` gained a `refresh()` method so
+  the Header badge/cart drawer can re-sync after `placeOrderAction`
+  empties the cart server-side (outside any of `CartProvider`'s own
+  mutation functions).
+- `src/components/overlays/CartDrawer.tsx`'s "تسویه حساب" button is now
+  a real `<Link href="/checkout">` (closing the drawer on click) instead
+  of Phase 7's disabled placeholder; still disabled when the cart is
+  empty or has unavailable items.
+
+**Tests/checks — all run against a real local PostgreSQL 16 instance and
+a real `next build` + `next start` production server:**
+- `npm run typecheck` — clean on the first attempt.
+- `npm run lint` — one real issue caught and fixed: `CheckoutView`'s
+  first draft synced local address-selection state from props inside a
+  `useEffect`, which `react-hooks/set-state-in-effect` flagged; fixed by
+  switching to the "adjust state during render" pattern described above.
+  Clean after that.
+- `npm run build` — clean; `/checkout` and `/order/[orderNumber]` are
+  correctly `ƒ (Dynamic)`; `/`, `/category/[slug]`, `/product/[slug]`
+  remain unaffected/static where they were before.
+- Fresh-clone check: dropped and recreated a brand-new database
+  (`trends_fresh_check`), ran `drizzle-kit migrate` against it — all 4
+  migrations (including this phase's) applied cleanly — then `db:seed`
+  populated the catalog and `\dt` confirmed all 12 tables exist,
+  including `orders`/`order_items`. Database dropped afterward.
+- Direct-to-domain smoke test (scratch script, run via `tsx`, deleted
+  after — same reasoning as Phase 7, no test runner configured yet):
+  happy-path order creation (correct total, correct snapshot values);
+  stock decremented by exactly the ordered quantity; cart cleared after
+  order; order item count/price/quantity correct; **owner can read the
+  order, a second user cannot** (`getOrderForUser` returns `null`);
+  **price-snapshot immutability** — changed the live variant price after
+  the order existed, confirmed the order item's `unitPriceToman` was
+  unaffected, then restored the price; empty-cart checkout correctly
+  throws `EmptyCartError`; a cart requesting far more than available
+  stock correctly throws `InsufficientStockError` **with stock, the
+  cart, and the orders table all provably unchanged afterward**
+  (transaction rollback verified, not assumed); and a genuine
+  **concurrency race test** — set a variant's stock to exactly 1, fired
+  two simultaneous `createOrderFromCart` calls via `Promise.allSettled`
+  each requesting 1 unit, confirmed **exactly one fulfilled and one
+  rejected**, and confirmed final stock landed at exactly `0` (never
+  negative, never left at `1`). All 12 assertions printed `PASS`. All
+  test rows deleted and stock levels restored to the seeded baseline
+  afterward (verified via a follow-up `SELECT`).
+- HTTP-level checks against `npm run start`, using **real NextAuth
+  session cookies** obtained via `/api/auth/csrf` → `/api/auth/callback/credentials`
+  (not just direct-to-domain calls) for two separate test users:
+  - `/checkout` signed out → 307 to `/login`.
+  - `/checkout` signed in with an empty cart → 307 to `/`.
+  - `/checkout` signed in with a real cart item + a real saved address →
+    200, page genuinely contains the address, shipping-method section,
+    and "ثبت سفارش" button.
+  - `/order/[orderNumber]` for a real order, as its owner → 200, page
+    contains the real order number, "در انتظار پرداخت" status, and the
+    purchased product's title.
+  - `/order/[orderNumber]` for that **same** order as a **different**
+    logged-in user → 404 (not the order's data) — cross-user ownership
+    enforced at the HTTP layer, not just in the query function.
+  - `/order/[orderNumber]` signed out → 307 to `/login`.
+  - All test users/carts/addresses/orders deleted afterward; the one
+    variant whose stock was decremented during this HTTP pass
+    (`CLASSIC-SHIRT-1`) was restored to `25` and verified via `SELECT`.
+- **What was *not* verified this session, and why:** `placeOrderAction`
+  itself was not invoked through a real browser's `Next-Action` RSC wire
+  call (same limitation Phase 7 documented for its cart actions — no
+  headless-browser tool in this sandbox, and hand-constructing that
+  protocol's per-build action-id hashing isn't practical via raw
+  `curl`). Instead, its two layers were verified separately: the
+  business logic it calls (`createOrderFromCart`) via the exhaustive
+  direct-to-domain test above, and its surrounding page/session/HTTP
+  behavior (redirects, ownership, rendering) via the real cookie-based
+  HTTP checks above. What specifically was *not* exercised end-to-end is
+  clicking "ثبت سفارش" in an actual rendered browser page and watching
+  the resulting `router.push` navigate to the confirmation page. A
+  session with browser automation available should do this once before
+  Phase 9 builds a payment flow on top of checkout.
+
+**Known limitations / follow-ups (not blocking, documented rather than
+silently ignored):**
+- **Checkout requires a signed-in customer; there is no guest checkout.**
+  This is a documented assumption (rule A.18), not an oversight: the
+  address book (`addresses`) has been authenticated-only since Phase 6,
+  and a parallel guest-address model is real, separate scope that
+  TRENDS_PROJECT_CONTEXT.md doesn't specifically call for. If guest
+  checkout becomes a real requirement, it needs its own design pass
+  (where does a guest's shipping address live? how does
+  `orders.userId`, currently `NOT NULL`, accommodate a guest order?).
+- **No `callbackUrl` round-trip from `/checkout` through `/login` back to
+  `/checkout`.** An unauthenticated visitor lands on a plain `/login`
+  and has to navigate back manually (e.g. via the cart drawer). Not
+  fixed this phase because it would mean modifying `loginAction`
+  (Phase 6, already complete) for a nicety rather than a defect (rule
+  B.4 "do not redo completed work unless fixing a defect"). Straightforward
+  to add later: a `callbackUrl` search param read by `/login`'s page and
+  threaded through to `loginAction`'s post-`signIn()` redirect.
+- **No coupon application at checkout** — Phase 9's job. The schema
+  (`orders.discountToman`) is ready; the UI/action logic to validate and
+  apply a code is not.
+- **No `/account/orders` order-history list yet** — that's explicitly
+  Phase 10's task ("order history"). `/order/[orderNumber]` (this phase)
+  is the checkout-confirmation/detail page, reachable right after
+  placing an order or by knowing the order number; there's currently no
+  in-app link to revisit a past order without it.
+- **Shipping methods/fees/free-shipping threshold are placeholder
+  business values** (see "New domain code" above) — replace with real
+  figures before launch.
+- **No inventory *reservation* window** — stock is decremented at the
+  moment `createOrderFromCart` runs (i.e., at order placement), not
+  reserved earlier in the checkout flow and released if the customer
+  abandons payment. Since there's no live payment provider yet (Phase 9
+  is what would need a reservation-then-confirm flow around a real
+  gateway's redirect-and-return), this is the simplest correct behavior
+  for this phase — revisit when Phase 9 wires in a real gateway with a
+  meaningful gap between "order placed" and "payment confirmed."
+- Order status is stuck at `pending_payment` forever right now (no code
+  path advances it) — expected; Phase 9 (payment callback → `paid`) and
+  Phase 10 (fulfillment transitions) are what move it further.
+- See "What was *not* verified" above — real browser
+  `Next-Action`-wire-protocol verification of `placeOrderAction` is
+  still outstanding, same category of gap Phase 7 left for its own
+  actions.
+- Carried over from Phase 7, still outstanding: real browser Server
+  Action verification for cart/wishlist actions.
+
+
+
 ## Architecture Decisions
 
 (Cumulative — Phase 7 additions only; see git history for Phases 0-6.)
@@ -467,6 +718,36 @@ silently ignored):**
 - Password reset tokens are single-use, short-lived (30 min), and only
   their hash is ever persisted — mirrors the `passwordHash` principle.
 
+- Orders/order items are **full immutable snapshots**, never FKs to
+  live `addresses`/`product_variants` rows for anything the customer
+  saw at checkout — the opposite tradeoff from `cart_items` (Phase 7),
+  which deliberately snapshots nothing and always reads live. This is a
+  deliberate, phase-appropriate split: a cart is "what would this cost
+  right now," an order is "what did this cost when it was placed."
+- Inventory decrement happens via a single conditional `UPDATE ... WHERE
+  stock >= quantity`, not a read-then-write pair — the conditional
+  `WHERE` clause (checked via Postgres's row-level locking during the
+  transaction) is what prevents overselling under concurrency, not
+  apparent good timing. Verified under a real simultaneous race (see
+  Phase 8's "Tests/checks").
+- The order lifecycle is a Postgres enum with states beyond what's
+  reachable yet (`paid`/`processing`/`shipped`/`delivered`/`refunded`
+  are all unreachable this phase) — modeled fully now so Phase 9/10 add
+  behavior, not columns.
+- Shipping methods live in a small typed config module, not a database
+  table, since they're static business configuration at this store's
+  current scale — promotable to a table later without touching any call
+  site if admin-editable shipping methods become a real requirement.
+- The payment-provider boundary is one function
+  (`getPaymentProvider()`) returning one interface
+  (`PaymentProvider`) — call sites never branch on "is a real gateway
+  configured" themselves, so Phase 9 adding a real adapter is a
+  contained change inside that one function.
+- Checkout is a single page/route, not a multi-step wizard — a
+  deliberate scope/complexity choice appropriate to this store's size,
+  not a requirement from TRENDS_PROJECT_CONTEXT.md (which describes
+  checkout's steps as logical sections, not mandated separate routes).
+
 ## Important Assumptions
 
 - Password-based auth (mobile + password) was chosen as this phase's
@@ -489,6 +770,22 @@ silently ignored):**
   revisiting only if abuse (e.g. cart-id enumeration) becomes a real
   concern.
 
+- **Checkout requires a signed-in customer — no guest checkout exists.**
+  See Phase 8's "Known limitations" for the full reasoning (the address
+  book has been auth-only since Phase 6; a guest-order model is separate
+  scope).
+- Shipping methods, fees, and the free-shipping threshold are
+  placeholder business values typical of an Iranian store, not sourced
+  from a real contracted courier — flagged for the operator to replace
+  before launch (rule A.18).
+- Stock is decremented at order-placement time, not reserved earlier and
+  confirmed later around a payment redirect — the simplest correct
+  behavior given no live payment provider exists yet to create a
+  meaningful gap between "placed" and "paid." Revisit once Phase 9 wires
+  in a real gateway.
+- No coupon/discount logic exists at checkout yet (`orders.discountToman`
+  is schema-ready but always `0`) — Phase 9's scope.
+
 ## Known Issues / Technical Debt
 
 (Cumulative — see Phase 5's write-up for pre-existing items: `ILIKE`
@@ -505,65 +802,99 @@ Phase 7 adds:)
 - **Real browser/Server-Action-wire-protocol verification of
   add-to-cart/wishlist-toggle has not been done** — only direct-to-domain
   and HTTP-GET-level verification (see Phase 7's "Tests/checks" for
-  exactly what was and wasn't covered). Do this before trusting Phase 8
-  (checkout) to build on a verified-working cart.
+  exactly what was and wasn't covered).
+
+Phase 8 adds:
+
+- **No guest checkout** — signed-in only (see "Important Assumptions").
+- **No `callbackUrl` from `/checkout` back through `/login`** — manual
+  navigation back to checkout after signing in.
+- **No coupon application at checkout** — Phase 9.
+- **No `/account/orders` order-history list** — Phase 10. Only
+  `/order/[orderNumber]` (direct/known-number access) exists so far.
+- Shipping methods/fees/threshold are placeholder business values —
+  replace before launch.
+- No inventory reservation window — stock decrements at order placement,
+  not reserved-then-confirmed around a payment redirect (fine with no
+  live gateway yet; revisit with Phase 9).
+- Order status is permanently stuck at `pending_payment` — expected;
+  nothing advances it yet (Phase 9/10's job).
+- **Real browser/`Next-Action`-wire-protocol verification of
+  `placeOrderAction` itself has not been done** — see Phase 8's
+  "Tests/checks" for exactly what was verified instead (direct-to-domain
+  business logic + real-cookie HTTP-level page/redirect/ownership
+  checks).
 
 ## Next Session Instructions
 
-- **Exact next objective: PHASE 8 — Checkout + shipping**, per
-  CLAUDE_BUILD_INSTRUCTIONS.txt §D. Phase 7 is COMPLETE — do not redo
-  cart/wishlist work; build checkout on top of it.
+- **Exact next objective: PHASE 9 — Promotions + payments**, per
+  CLAUDE_BUILD_INSTRUCTIONS.txt §D. Phase 8 is COMPLETE — do not redo
+  checkout/order-creation work; build promotions and a real payment
+  adapter on top of it.
   1. **First, if browser automation is available in this session's
-     environment, do the real end-to-end verification Phase 7 could not:**
-     add an item to cart as a guest (via the actual UI, not curl), confirm
-     the cart drawer/Header badge update, log in, confirm the guest
-     cart's item appears merged into the account cart, and toggle a
-     product's wishlist heart while signed in, confirming it persists
-     across a page reload. Fix anything that's actually broken before
-     building checkout on top of it; if no browser automation is
-     available, note that in this file again and proceed carefully.
-  2. Read CLAUDE_BUILD_INSTRUCTIONS.txt's Phase 8 task list and
-     TRENDS_PROJECT_CONTEXT.md §6 "Checkout"/§5 "Shipping" before writing
-     code.
-  3. The cart domain is ready to build on: `getCartSummary` (in
-     `src/domains/cart/queries.ts`) already gives a server-authoritative,
-     live-priced, availability-flagged view of the cart — checkout's
-     order-total calculation should read through this same function (or
-     something built directly on `cart_items`/`product_variants`), never
-     from a client-submitted total.
-  4. Checkout needs a real Iranian address (reuse
-     `src/domains/addresses/queries.ts`, already ownership-scoped) and a
-     shipping-method/fee abstraction that doesn't exist yet — per §5
-     "Shipping", design this as its own small module so Phase 9's
-     payment layer and Phase 10's fulfillment don't have to guess at its
-     shape later.
-  5. Order snapshots are a new concept this phase: unlike `cart_items`
-     (which intentionally has no price snapshot, see Phase 7), `orders`/
-     `order_items` **must** freeze price/discount/shipping at purchase
-     time, since a cart's live-price behavior is wrong for a completed
-     order whose product might change price later.
-  6. Concurrency-safe inventory reservation/decrement at checkout time is
-     explicitly in scope (§8 acceptance: "cannot checkout unavailable
-     inventory") — this hasn't been built yet anywhere in the codebase;
-     Phase 7's cart layer only *caps displayed/addable quantity* at
-     stock, it does not reserve/decrement it.
-  7. Payment is Phase 9 — Phase 8 only needs the *interface boundary*
-     ready (per CLAUDE_BUILD_INSTRUCTIONS.txt's Phase 8 task list), not a
-     working payment provider. Do not fabricate credentials or claim a
-     gateway is live (rule A.17).
-  8. Run `typecheck`/`lint`/`build` and verify manually: cannot check out
-     more than available stock, cannot manipulate totals from the
-     browser, an order's snapshot survives a subsequent price change on
-     the product.
-  9. Update `PROGRESS.md` the same way this session did.
-- Files/areas to inspect first: `src/domains/cart/queries.ts` (what
-  checkout reads from), `src/domains/addresses/queries.ts` (address
-  selection), `src/lib/db/schema/product-variants.ts` (`stock` — what
-  needs concurrency-safe decrementing), `src/domains/auth/actions.ts`
-  (how `getCurrentUser()`/`auth()` are already used elsewhere, for
-  consistency).
-- Do not start Phase 9 (promotions/payments) before Phase 8 — payment
-  needs a real order to attach to.
+     environment, do the real end-to-end verification Phase 7 *and*
+     Phase 8 could not:** add an item to cart, go through `/checkout` in
+     an actual rendered browser (select/add an address, pick a shipping
+     method, click "ثبت سفارش"), confirm it lands on
+     `/order/[orderNumber]` with the right contents, and confirm the
+     cart is empty afterward. Fix anything that's actually broken before
+     building payments on top of it; if no browser automation is
+     available, note that again and proceed carefully using the
+     direct-to-domain + HTTP-level verification approach both phases
+     have used so far.
+  2. Read CLAUDE_BUILD_INSTRUCTIONS.txt's Phase 9 task list and
+     TRENDS_PROJECT_CONTEXT.md §5 "Payment"/§6 "Promotions" before
+     writing code.
+  3. **Coupons**: design a `coupons`/`coupon_redemptions` schema per §6
+     "Promotions" (percentage/fixed discount, minimum basket, start/end
+     time, usage limit, per-customer limit, active flag, stacking
+     rules). Wire validation into `placeOrderAction`
+     (`src/domains/orders/actions.ts`) — the order's existing
+     `discountToman` column is ready to receive a real value; nothing
+     about `createOrderFromCart`'s signature should need to change more
+     than adding a discount amount/coupon-id parameter.
+  4. **Payments**: replace `NotConfiguredPaymentProvider`
+     (`src/domains/payments/provider.ts`) with a real adapter behind the
+     same `PaymentProvider` interface — do not change the interface
+     shape unless a real limitation is found; every call site already
+     goes through `getPaymentProvider()`. Add a `payments`/
+     `payment_events` table per §12's data model list. Payment
+     initiation redirects the customer to the gateway; **verification of
+     the return/callback must happen server-side against the gateway's
+     API, never by trusting the browser's return URL** (§5) — this is
+     the single most important correctness requirement for this phase.
+     Idempotency: a duplicate callback (gateway retries, or a user
+     double-clicking "return to store") must not double-process a
+     payment or duplicate an order — design the callback handler to be
+     safe to call twice with the same reference.
+  5. Never invent real gateway credentials (rule A.17) — if no real
+     ZarinPal/other gateway credentials are available in this
+     environment, keep `NotConfiguredPaymentProvider` as the default and
+     build a **mock/test provider** instead (CLAUDE_BUILD_INSTRUCTIONS.txt
+     Phase 9 task list explicitly allows/expects "one test/mock payment
+     provider"), clearly labeled as non-production, alongside the real
+     adapter's interface so the full flow (initiate → redirect →
+     callback → verify → mark paid) can actually be exercised and
+     verified end-to-end even without real gateway access.
+  6. Once payment verification succeeds, transition `orders.status` from
+     `pending_payment` to `paid` — this is the first code path that will
+     ever move it off `pending_payment`; make sure the transition only
+     happens after genuine server-side verification, not on gateway
+     redirect alone.
+  7. Run `typecheck`/`lint`/`build` and verify manually: a coupon can't
+     be redeemed past its usage limit or by the same user past their
+     per-user limit, a duplicate payment callback doesn't double-apply,
+     and an order only becomes `paid` after real (or mock-provider)
+     verification, never from the browser return page alone.
+  8. Update `PROGRESS.md` the same way this session did.
+- Files/areas to inspect first: `src/domains/orders/actions.ts` and
+  `queries.ts` (where discount/payment status will plug in),
+  `src/domains/payments/provider.ts` (the interface to implement
+  against), `src/lib/db/schema/orders.ts` (`discountToman`, `status`
+  enum — what Phase 9 will actually mutate).
+- Do not start Phase 10 (fulfillment/order history) before Phase 9 —
+  order-status transitions belong together with what causes them
+  (payment verification).
 
 ## Commands
 
@@ -584,7 +915,7 @@ Phase 7 adds:)
 - seed: `npm run db:seed` (or `npx tsx --env-file=.env.local src/lib/db/seed.ts`)
   — wipes and re-populates the catalog tables from
   `src/domains/catalog/demo-data.ts`. Does not touch `users`/`addresses`/
-  `password_reset_tokens`.
+  `password_reset_tokens`/`carts`/`orders`/etc.
 
 **Local PostgreSQL setup used this session** (Ubuntu 24.04 sandbox with
 `apt-get` access — adjust for whatever environment runs the next
@@ -611,5 +942,5 @@ npm 10.9.7, Next.js 16.3.4, React 19.2.8, Tailwind CSS 4.3.3,
 ESLint 9.39.5 + eslint-config-next 16.3.4, drizzle-orm ^0.45.2,
 drizzle-kit ^0.31.10, postgres (porsager driver, latest), tsx 4.23.13,
 PostgreSQL server 16.15, next-auth@beta 5.0.0-beta.32, bcryptjs 3.0.3,
-zod 4.6.2. No new dependencies were added in Phase 7 — cart/wishlist
-used only what was already installed.
+zod 4.6.2. No new dependencies were added in Phase 8 — checkout/shipping/
+orders used only what was already installed (same as Phase 7).

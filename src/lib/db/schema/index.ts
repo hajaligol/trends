@@ -8,3 +8,5 @@ export * from "./password-reset-tokens";
 export * from "./carts";
 export * from "./cart-items";
 export * from "./wishlist-items";
+export * from "./order-items";
+export * from "./orders";
