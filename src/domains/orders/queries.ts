@@ -1,8 +1,9 @@
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
-import { db } from "@/lib/db/client";
+import { db, type DbTransaction } from "@/lib/db/client";
 import {
   cartItems,
   orderItems,
+  orderStatusHistory,
   orders,
   productImages,
   productVariants,
@@ -10,9 +11,12 @@ import {
   type NewOrderItem,
   type Order,
   type OrderItem,
+  type OrderStatusHistoryRow,
 } from "@/lib/db/schema";
 import type { ShippingMethod } from "@/domains/shipping/methods";
 import { CouponInvalidError, recordCouponRedemption, validateCoupon } from "@/domains/promotions/queries";
+import { canAdminTransition, canCustomerCancel, type OrderStatus } from "@/domains/orders/lifecycle";
+import { notifyOrderEvent } from "@/domains/notifications/provider";
 
 /**
  * The only sanctioned place for application code to read/write `orders`/
@@ -32,6 +36,25 @@ export class EmptyCartError extends Error {
   constructor() {
     super("سبد خرید شما خالی است");
     this.name = "EmptyCartError";
+  }
+}
+
+export class OrderNotFoundError extends Error {
+  constructor() {
+    super("سفارش یافت نشد");
+    this.name = "OrderNotFoundError";
+  }
+}
+
+/** Thrown when a requested status transition isn't legal from the
+ * order's *current* database status — see
+ * `src/domains/orders/lifecycle.ts` for the actual transition table.
+ * Never constructed from a client-trusted "current status"; the
+ * transaction that throws this always re-reads the real row first. */
+export class InvalidOrderTransitionError extends Error {
+  constructor(from: string, to: string) {
+    super(`امکان تغییر وضعیت سفارش از «${from}» به «${to}» وجود ندارد`);
+    this.name = "InvalidOrderTransitionError";
   }
 }
 
@@ -99,7 +122,7 @@ export async function createOrderFromCart(
   // Persian message it would have shown at preview time.
   couponCode: string | null = null,
 ): Promise<Order> {
-  return db.transaction(async (tx) => {
+  const order = await db.transaction(async (tx) => {
     const lines = await tx
       .select({
         variantId: productVariants.id,
@@ -255,6 +278,18 @@ export async function createOrderFromCart(
 
     return order;
   });
+
+  // Outside the transaction, after commit — a notification failure must
+  // never roll back an already-successfully-placed order (see
+  // `notifyOrderEvent`'s own header comment on why it never throws).
+  await notifyOrderEvent({
+    type: "order_confirmed",
+    mobile: order.recipientMobile,
+    orderNumber: order.orderNumber,
+    totalToman: order.totalToman,
+  });
+
+  return order;
 }
 
 export type OrderWithItems = Order & { items: OrderItem[] };
@@ -273,4 +308,203 @@ export async function getOrderForUser(orderNumber: string, userId: string): Prom
 
 export async function listOrdersForUser(userId: string): Promise<Order[]> {
   return db.select().from(orders).where(eq(orders.userId, userId)).orderBy(desc(orders.createdAt));
+}
+
+/** Ownership-scoped, same shape as everything else in this file — a
+ * customer can only ever read their *own* order's timeline. */
+export async function getOrderStatusHistoryForUser(
+  orderNumber: string,
+  userId: string,
+): Promise<OrderStatusHistoryRow[]> {
+  const [order] = await db
+    .select({ id: orders.id })
+    .from(orders)
+    .where(and(eq(orders.orderNumber, orderNumber), eq(orders.userId, userId)))
+    .limit(1);
+  if (!order) return [];
+  return db
+    .select()
+    .from(orderStatusHistory)
+    .where(eq(orderStatusHistory.orderId, order.id))
+    .orderBy(orderStatusHistory.createdAt);
+}
+
+/** Not ownership-scoped by design — callers (admin Server Actions/pages)
+ * are responsible for checking `session.user.role` themselves before
+ * calling this, the same way `src/domains/promotions/queries.ts` and
+ * every payment function in this codebase separate "is this data valid"
+ * from "is this caller allowed to see it." */
+export async function getOrderStatusHistoryForOrder(orderId: string): Promise<OrderStatusHistoryRow[]> {
+  return db
+    .select()
+    .from(orderStatusHistory)
+    .where(eq(orderStatusHistory.orderId, orderId))
+    .orderBy(orderStatusHistory.createdAt);
+}
+
+export async function getOrderByOrderNumberForAdmin(orderNumber: string): Promise<OrderWithItems | null> {
+  const [order] = await db.select().from(orders).where(eq(orders.orderNumber, orderNumber)).limit(1);
+  if (!order) return null;
+  const items = await db.select().from(orderItems).where(eq(orderItems.orderId, order.id));
+  return { ...order, items };
+}
+
+/** Deliberately unpaginated-but-capped for this phase — a real paginated/
+ * filterable admin order list is Phase 11's "orders" admin-area task.
+ * `limit(200)` keeps this usable without that work while still being a
+ * real, live database read (never demo data). */
+export async function listOrdersForAdmin(): Promise<Order[]> {
+  return db.select().from(orders).orderBy(desc(orders.createdAt)).limit(200);
+}
+
+/** Restocks every line of a cancelled order back onto its variant — the
+ * inverse of `createOrderFromCart`'s conditional decrement. Called only
+ * from inside the same transaction that flips an order to `cancelled`
+ * (`cancelOrderForUser`/`adminTransitionOrderStatus` below), so a
+ * cancellation and its restock can never be split by a crash between
+ * them. Lines whose `variantId` is `null` (the live variant was since
+ * deleted — `order_items.variantId` is `onDelete: "set null"`, see that
+ * file's header comment) are skipped: there is no live row left to
+ * restock onto. */
+async function restockCancelledOrderItems(tx: DbTransaction, orderId: string): Promise<void> {
+  const items = await tx
+    .select({ variantId: orderItems.variantId, quantity: orderItems.quantity })
+    .from(orderItems)
+    .where(eq(orderItems.orderId, orderId));
+  for (const item of items) {
+    if (!item.variantId) continue;
+    await tx
+      .update(productVariants)
+      .set({ stock: sql`${productVariants.stock} + ${item.quantity}`, updatedAt: new Date() })
+      .where(eq(productVariants.id, item.variantId));
+  }
+}
+
+/**
+ * Customer self-service cancellation. Re-reads the order's *current*
+ * status inside the transaction (`FOR UPDATE`, so a concurrent admin
+ * transition on the same order serializes against this rather than
+ * racing it) and validates the transition against
+ * `canCustomerCancel` — never trusts that the UI merely hid the button
+ * for an uncancellable order. Restocks inventory (see
+ * `restockCancelledOrderItems`) since a cancelled order's reserved units
+ * genuinely become available again — TRENDS_PROJECT_CONTEXT.md's
+ * inventory model has no separate "reserved" column yet (documented in
+ * Phase 8's known limitations), so this restock is the correct
+ * counterpart to `createOrderFromCart`'s decrement in that same model.
+ */
+export async function cancelOrderForUser(orderNumber: string, userId: string, reason: string | null): Promise<Order> {
+  const order = await db.transaction(async (tx) => {
+    const [current] = await tx
+      .select()
+      .from(orders)
+      .where(and(eq(orders.orderNumber, orderNumber), eq(orders.userId, userId)))
+      .for("update")
+      .limit(1);
+    if (!current) throw new OrderNotFoundError();
+    if (!canCustomerCancel(current.status)) {
+      throw new InvalidOrderTransitionError(current.status, "cancelled");
+    }
+
+    const [updated] = await tx
+      .update(orders)
+      .set({ status: "cancelled", cancelReason: reason, cancelledAt: new Date(), updatedAt: new Date() })
+      .where(eq(orders.id, current.id))
+      .returning();
+    if (!updated) throw new Error("Order cancel update returned no row");
+
+    await tx.insert(orderStatusHistory).values({
+      orderId: current.id,
+      fromStatus: current.status,
+      toStatus: "cancelled",
+      actorRole: "customer",
+      actorUserId: userId,
+      note: reason,
+    });
+
+    await restockCancelledOrderItems(tx, current.id);
+
+    return updated;
+  });
+
+  await notifyOrderEvent({ type: "order_cancelled", mobile: order.recipientMobile, orderNumber: order.orderNumber });
+  return order;
+}
+
+export type AdminTransitionInput = {
+  trackingNumber?: string | null;
+  note?: string | null;
+};
+
+/**
+ * Admin/staff-only status transition — callers (Server Actions) must
+ * check `session.user.role` themselves before calling this; this
+ * function's own job is only "is this a legal transition from the
+ * order's real current status," the same separation of concerns as
+ * `validateCoupon`/payment verification elsewhere in this codebase.
+ * `toStatus` is validated against `canAdminTransition`, so a forged
+ * request naming an illegal target status (e.g. jumping straight to
+ * `delivered`, or setting `paid` — never a legal *target* here at all,
+ * see `lifecycle.ts`'s header comment) is rejected before any write.
+ */
+export async function adminTransitionOrderStatus(
+  orderNumber: string,
+  adminUserId: string,
+  toStatus: OrderStatus,
+  input: AdminTransitionInput = {},
+): Promise<Order> {
+  const order = await db.transaction(async (tx) => {
+    const [current] = await tx
+      .select()
+      .from(orders)
+      .where(eq(orders.orderNumber, orderNumber))
+      .for("update")
+      .limit(1);
+    if (!current) throw new OrderNotFoundError();
+    if (!canAdminTransition(current.status, toStatus)) {
+      throw new InvalidOrderTransitionError(current.status, toStatus);
+    }
+
+    const trimmedTracking = input.trackingNumber?.trim() || null;
+    const trimmedNote = input.note?.trim() || null;
+
+    const [updated] = await tx
+      .update(orders)
+      .set({
+        status: toStatus,
+        updatedAt: new Date(),
+        ...(toStatus === "shipped" && trimmedTracking ? { trackingNumber: trimmedTracking } : {}),
+        ...(toStatus === "cancelled" ? { cancelReason: trimmedNote, cancelledAt: new Date() } : {}),
+      })
+      .where(eq(orders.id, current.id))
+      .returning();
+    if (!updated) throw new Error("Order status update returned no row");
+
+    await tx.insert(orderStatusHistory).values({
+      orderId: current.id,
+      fromStatus: current.status,
+      toStatus,
+      actorRole: "admin",
+      actorUserId: adminUserId,
+      note: trimmedNote,
+    });
+
+    if (toStatus === "cancelled") {
+      await restockCancelledOrderItems(tx, current.id);
+    }
+
+    return updated;
+  });
+
+  if (order.status === "cancelled") {
+    await notifyOrderEvent({ type: "order_cancelled", mobile: order.recipientMobile, orderNumber: order.orderNumber });
+  } else {
+    await notifyOrderEvent({
+      type: "order_status_changed",
+      mobile: order.recipientMobile,
+      orderNumber: order.orderNumber,
+      status: order.status,
+    });
+  }
+  return order;
 }

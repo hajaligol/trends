@@ -1,6 +1,7 @@
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db/client";
-import { orders, paymentEvents, payments, type Payment } from "@/lib/db/schema";
+import { orderStatusHistory, orders, paymentEvents, payments, type Payment } from "@/lib/db/schema";
+import { notifyOrderEvent } from "@/domains/notifications/provider";
 
 /**
  * The only sanctioned place for application code to read/write
@@ -66,10 +67,18 @@ export type FinalizeVerificationOutcome =
  *    "Duplicate callbacks do not duplicate orders/payment effects").
  * 4. Only if still `pending`: writes `succeeded`/`failed` onto the
  *    payment, and — only on `succeeded` — flips the order from
- *    `pending_payment` to `paid` in the same transaction. The order
- *    update's own `WHERE status = 'pending_payment'` guard is a second,
- *    independent layer of the same idempotency property in case a
- *    payment row were ever (incorrectly) reused across two orders.
+ *    `pending_payment` to `paid` in the same transaction, recording that
+ *    transition in `order_status_history` (actor `system` — Phase 10 —
+ *    this is the one order-status change no human triggers directly).
+ *    The order update's own `WHERE status = 'pending_payment'` guard is
+ *    a second, independent layer of the same idempotency property in
+ *    case a payment row were ever (incorrectly) reused across two
+ *    orders.
+ * 5. A `payment_succeeded`/`payment_failed` notification (Phase 10, see
+ *    `src/domains/notifications/provider.ts`) is sent once the
+ *    transaction has committed — never from inside it, and never for
+ *    the `already_processed`/`not_found` branches, since those made no
+ *    real state change worth notifying about.
  *
  * `verified` must already be the result of calling the provider's
  * `verify()` — this function never re-derives it from a raw query
@@ -82,7 +91,7 @@ export async function finalizePaymentVerification(
   verified: boolean,
   payload: Record<string, unknown>,
 ): Promise<FinalizeVerificationOutcome> {
-  return db.transaction(async (tx) => {
+  const outcome = await db.transaction(async (tx): Promise<FinalizeVerificationOutcome & { mobile?: string }> => {
     const [payment] = await tx
       .select()
       .from(payments)
@@ -107,16 +116,35 @@ export async function finalizePaymentVerification(
         .update(payments)
         .set({ status: "succeeded", verifiedAt: new Date(), updatedAt: new Date() })
         .where(eq(payments.id, payment.id));
-      await tx
+      const [updatedOrder] = await tx
         .update(orders)
         .set({ status: "paid", updatedAt: new Date() })
-        .where(and(eq(orders.id, order.id), eq(orders.status, "pending_payment")));
+        .where(and(eq(orders.id, order.id), eq(orders.status, "pending_payment")))
+        .returning();
+      if (updatedOrder) {
+        await tx.insert(orderStatusHistory).values({
+          orderId: order.id,
+          fromStatus: "pending_payment",
+          toStatus: "paid",
+          actorRole: "system",
+          note: `${provider} providerRef=${providerRef}`,
+        });
+      }
       await tx.insert(paymentEvents).values({ paymentId: payment.id, type: "verified_succeeded", payload });
-      return { status: "succeeded", orderNumber: order.orderNumber };
+      return { status: "succeeded", orderNumber: order.orderNumber, mobile: order.recipientMobile };
     }
 
     await tx.update(payments).set({ status: "failed", updatedAt: new Date() }).where(eq(payments.id, payment.id));
     await tx.insert(paymentEvents).values({ paymentId: payment.id, type: "verified_failed", payload });
-    return { status: "failed", orderNumber: order.orderNumber };
+    return { status: "failed", orderNumber: order.orderNumber, mobile: order.recipientMobile };
   });
+
+  if (outcome.status === "succeeded" && outcome.mobile) {
+    await notifyOrderEvent({ type: "payment_succeeded", mobile: outcome.mobile, orderNumber: outcome.orderNumber });
+  } else if (outcome.status === "failed" && outcome.mobile) {
+    await notifyOrderEvent({ type: "payment_failed", mobile: outcome.mobile, orderNumber: outcome.orderNumber });
+  }
+
+  const { mobile: _mobile, ...publicOutcome } = outcome;
+  return publicOutcome;
 }

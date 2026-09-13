@@ -1,22 +1,22 @@
 # Trends Progress Report
 
 ## Current Status
-- Overall status: Promotions + payments (Phase 9) is implemented **and
-  verified** this session — full network access was available.
-  `npm install` (no new dependencies needed), a fresh migration for 4 new
-  tables (`coupons`, `coupon_redemptions`, `payments`, `payment_events`)
-  plus 2 new columns on `orders` (`coupon_id`, `coupon_code`), `typecheck`,
-  `lint`, `build`, a fresh-clone migrate+seed check, a direct-to-domain
-  smoke test (30 assertions, including a genuine coupon-usage-limit
-  concurrency race and a genuine duplicate-payment-callback idempotency
-  check), and HTTP-level checks against `npm run start` all ran and
-  passed. See "Current Phase" below for full detail and what still
-  wasn't exercised (real browser `Next-Action` wire protocol for
-  `placeOrderAction`/`previewCouponAction` — same category of gap Phase 7
-  and Phase 8 already documented).
-- Current phase: none in progress — PHASE 9 is COMPLETE.
-- Last completed phase: PHASE 9 — Promotions + payments
-- Next phase: PHASE 10 — Orders + fulfillment + customer lifecycle
+- Overall status: Orders + fulfillment + customer lifecycle (Phase 10) is
+  implemented **and verified** this session — full network access was
+  available. A migration for 1 new table (`order_status_history`) plus 3
+  new columns on `orders` (`tracking_number`, `cancel_reason`,
+  `cancelled_at`), `typecheck`, `lint`, `build`, a fresh-clone
+  migrate+seed check, a direct-to-domain smoke test (23 assertions,
+  including a genuine concurrent-double-cancellation race and forged
+  admin-transition rejection), and HTTP-level checks against
+  `npm run start` (using real NextAuth session cookies for both a
+  `customer`-role and an `admin`-role user) all ran and passed. See
+  "Current Phase" below for full detail and what still wasn't exercised
+  (same real-browser `Next-Action` wire-protocol gap Phases 7-9 already
+  documented).
+- Current phase: none in progress — PHASE 10 is COMPLETE.
+- Last completed phase: PHASE 10 — Orders + fulfillment + customer lifecycle
+- Next phase: PHASE 11 — Admin/operations
 - Date: 2026-09-13
 
 ## Completed
@@ -925,6 +925,325 @@ silently ignored):**
   round-trip through `/login`, no `/account/orders` list (Phase 10).
 - See "What was *not* verified" above.
 
+### Phase 10 — Orders + fulfillment + customer lifecycle (COMPLETE)
+
+**New database schema** (`src/lib/db/schema/`):
+- `order-status.ts` — `orderStatusEnum` (`pending_payment | paid |
+  processing | shipped | delivered | cancelled | refunded`), **extracted
+  out of `orders.ts`** (where it originated in Phase 8) into its own leaf
+  module. Reason: `orders.ts` needs `orderStatusHistory` (for its
+  `relations()` call) and `order-status-history.ts` (new this phase)
+  needs `orderStatusEnum` — a genuine two-file cycle, and unlike the
+  `order-items.ts`/`orders.ts` cycle that's tolerated since Phase 8 (only
+  used inside a *deferred* `relations()` callback), this enum is used
+  directly inside `pgTable()` column definitions in *both* files at
+  module-evaluation time, which `drizzle-kit generate` confirmed cannot
+  resolve as a true circular `require`
+  (`ReferenceError: Cannot access 'orderStatusEnum' before
+  initialization`). A shared leaf module both import from is the fix.
+- `order-status-history.ts` — `order_status_history` table: `orderId`
+  (FK, `cascade`), `fromStatus`/`toStatus` (both `orderStatusEnum`,
+  `fromStatus` nullable), `actorRole` (new `order_status_actor` enum:
+  `customer | admin | system`), `actorUserId` (FK to `users`,
+  `onDelete: "set null"` — a system-driven transition has no acting user
+  at all, and a row must survive its actor's account later being
+  deleted), `note`, `createdAt`. Append-only audit trail — `orders.status`
+  itself only ever reflects the *current* state; this table is what lets
+  a customer see a timeline and an operator answer "when did this
+  change, and who changed it." Written from exactly three places, all
+  inside the same transaction as the status update itself: the payment
+  callback (Phase 9's `finalizePaymentVerification`, actor `system`),
+  `cancelOrderForUser` (actor `customer`), and
+  `adminTransitionOrderStatus` (actor `admin`) — so status and history
+  can never drift apart.
+- `orders.ts` — added `trackingNumber` (plain free-text, not a carrier-API
+  integration — Phase 10's task list explicitly calls a simple column
+  enough for this phase), `cancelReason`, `cancelledAt` (both set only by
+  a transition into `cancelled`, `null` otherwise). Added an
+  `ordersRelations.statusHistory` `many()` relation.
+
+**New domain code** (`src/domains/`):
+- `orders/lifecycle.ts` — the single source of truth for legal
+  `orders.status` transitions, so every caller checks against one table
+  instead of trusting a client-submitted status string
+  (TRENDS_PROJECT_CONTEXT.md §6 "explicit and validated, not arbitrary
+  strings"):
+  - `canCustomerCancel(status)` — true for `pending_payment`, `paid`,
+    `processing`. Stops at `processing`, not `shipped`, because
+    TRENDS_PROJECT_CONTEXT.md has no returns/refund flow for goods
+    already in transit yet (that's Phase 12's "return/refund
+    architecture"); self-service cancellation intentionally doesn't
+    reach into that gap.
+  - `getAdminAllowedNextStatuses(status)` / `canAdminTransition(from, to)`
+    — the admin transition table. **`paid` is deliberately absent as a
+    target anywhere in this table** — the only sanctioned way an order
+    becomes `paid` is a verified payment callback
+    (`finalizePaymentVerification`, Phase 9), never an admin form, so a
+    compromised or careless admin UI can never mark an unpaid order paid.
+    `cancelled -> refunded` is the one admin-only transition that follows
+    cancelling an already-paid order; per rule A.17 it never calls a real
+    gateway refund API, it only records that an operator has manually
+    reconciled a refund outside this system.
+  - `ORDER_STATUS_LABELS` — the one place Persian status labels live;
+    `/order/[orderNumber]`, `/account/orders`, and the new `/admin/orders*`
+    pages all import from here instead of each hand-rolling their own copy
+    (the customer order page previously had its own inline copy from
+    Phase 8/9 — replaced to import this).
+- `notifications/provider.ts` — a `NotificationProvider` adapter
+  interface (mirrors `payments/provider.ts`'s shape) with
+  `ConsoleNotificationProvider` as the only implementation: no SMS/email
+  provider is configured (`SMS_PROVIDER_API_KEY` is blank in
+  `.env.example`), so per rule A.17 this never pretends to send a real
+  message — it logs a clearly-labeled `[notifications] ... is NOT a real
+  SMS` line instead. `notifyOrderEvent()` is the wrapper every call site
+  uses; it never throws (a notification failure must not roll back or
+  block the commerce operation that triggered it). Wired into:
+  order confirmation (`createOrderFromCart`, after its transaction
+  commits), payment succeeded/failed (`finalizePaymentVerification`,
+  after commit), and order cancelled / order status changed
+  (`cancelOrderForUser` / `adminTransitionOrderStatus`, after commit).
+- `orders/queries.ts` additions:
+  - `cancelOrderForUser(orderNumber, userId, reason)` — ownership-scoped
+    (takes `userId`, not a bare order id), transactional, re-reads the
+    order's *current* status with `SELECT ... FOR UPDATE` and validates
+    against `canCustomerCancel` before writing anything — never trusts
+    that the UI merely hid the cancel button for an uncancellable order.
+    Restocks inventory via `restockCancelledOrderItems` (increments
+    `product_variants.stock` back for every line whose `variantId` is
+    still non-null — a deleted variant, `onDelete: "set null"`, has
+    nothing left to restock onto) inside the same transaction. Throws
+    `OrderNotFoundError` (wrong owner or unknown order number, same
+    message either way — no ownership-guessing oracle) or
+    `InvalidOrderTransitionError`.
+  - `adminTransitionOrderStatus(orderNumber, adminUserId, toStatus, {trackingNumber?, note?})`
+    — the transactional counterpart for staff/admin, same `FOR UPDATE` +
+    `canAdminTransition` re-validation pattern. Sets `trackingNumber` only
+    on a transition into `shipped`; sets `cancelReason`/`cancelledAt` and
+    restocks only on a transition into `cancelled`. **Authorization
+    (`session.user.role`) is not this function's job** — it only enforces
+    "is this a legal transition from the real current status," the same
+    separation `validateCoupon` uses; the caller
+    (`adminTransitionOrderStatusAction`, a Server Action) is what checks
+    role.
+  - Read helpers: `getOrderStatusHistoryForUser` (ownership-scoped, for
+    the customer timeline), `getOrderStatusHistoryForOrder` (not
+    ownership-scoped — admin-only, caller checks role),
+    `getOrderByOrderNumberForAdmin`, `listOrdersForAdmin` (capped at
+    `limit(200)` — a real paginated/filterable admin order list is Phase
+    11's scope; this is a real, live, unpaginated-but-capped read, never
+    demo data).
+  - `EmptyCartError`/`OrderNotFoundError` moved up and
+    `InvalidOrderTransitionError` added as a new error class.
+- `orders/actions.ts` — added `cancelOrderAction(orderNumber, reason)`
+  Server Action (auth check, delegates ownership/legality entirely to
+  `cancelOrderForUser`, `revalidatePath`s both the order page and
+  `/account/orders`).
+- `orders/admin-actions.ts` (new file) — `adminTransitionOrderStatusAction`,
+  the **only** place `session.user.role` is checked for this phase's admin
+  mutation (`role === "admin" || role === "staff"`) — real server-side
+  authorization, not just an unlinked route
+  (CLAUDE_BUILD_INSTRUCTIONS.txt §7 "Admin must not rely on hidden UI
+  alone for authorization"). Kept in its own file, separate from the
+  customer-facing `actions.ts`, so the one admin-authorization check in
+  this phase is easy to find and audit.
+- `payments/queries.ts` — `finalizePaymentVerification` now also: (a)
+  inserts an `order_status_history` row (`pending_payment -> paid`, actor
+  `system`) in the same transaction as the `succeeded` branch's order
+  update, and (b) sends a `payment_succeeded`/`payment_failed`
+  notification after the transaction commits (never for the
+  `already_processed`/`not_found` branches, since those made no real
+  state change worth notifying about).
+
+**New UI**:
+- `/account/orders` (new page) — Phase 10's "order history" task.
+  Ownership-scoped list via `listOrdersForUser`, links each row to the
+  existing `/order/[orderNumber]` detail page. Closes the gap Phase 8's
+  PROGRESS.md documented ("no in-app link to revisit a past order without
+  knowing the order number"). Linked from `/account`'s sidebar.
+- `/order/[orderNumber]` — added: a status-timeline section (reads
+  `getOrderStatusHistoryForUser`), a tracking-number line when present, a
+  cancel-reason line when the order is cancelled, and a
+  `<CancelOrderButton>` client component (renders only when
+  `canCustomerCancel(order.status)` — real enforcement is server-side in
+  `cancelOrderForUser`, this is only the conditional render). Refactored
+  its previously-inline `STATUS_LABELS` map to import
+  `ORDER_STATUS_LABELS` from `lifecycle.ts` instead of duplicating it.
+- `/admin` (new route tree, minimal by design — see "Known limitations"):
+  - `layout.tsx` — the one place every `/admin/*` route is gated:
+    `redirect("/login")` if signed out, `notFound()` (not a redirect) if
+    signed in but not `admin`/`staff` — a plain 404 doesn't confirm to a
+    curious customer that `/admin` is even a real, protected area, the
+    same reasoning `/order/[orderNumber]` already uses for cross-user
+    order access.
+  - `/admin/orders` — a live, capped, unfiltered order list
+    (`listOrdersForAdmin`).
+  - `/admin/orders/[orderNumber]` — order detail (items, shipping address,
+    tracking number, cancel reason, full status history with actor
+    labels) plus `<AdminOrderStatusForm>`, a client component that only
+    *renders* the statuses `getAdminAllowedNextStatuses` says are legal
+    from the current status (the real enforcement, again, is server-side
+    in `adminTransitionOrderStatus` + the role check in
+    `adminTransitionOrderStatusAction`).
+
+**Files changed**: `src/lib/db/schema/order-status.ts` (new),
+`src/lib/db/schema/order-status-history.ts` (new),
+`src/lib/db/schema/orders.ts`, `src/lib/db/schema/index.ts`,
+`src/domains/orders/lifecycle.ts` (new),
+`src/domains/notifications/provider.ts` (new),
+`src/domains/orders/queries.ts`, `src/domains/orders/actions.ts`,
+`src/domains/orders/admin-actions.ts` (new),
+`src/domains/payments/queries.ts`,
+`src/app/account/orders/page.tsx` (new), `src/app/account/layout.tsx`,
+`src/app/order/[orderNumber]/page.tsx`,
+`src/components/orders/CancelOrderButton.tsx` (new),
+`src/app/admin/layout.tsx` (new), `src/app/admin/orders/page.tsx` (new),
+`src/app/admin/orders/[orderNumber]/page.tsx` (new),
+`src/components/admin/AdminOrderStatusForm.tsx` (new).
+
+**Database changes**: 1 new migration
+(`drizzle/migrations/0005_faulty_joseph.sql`) — `CREATE TYPE
+order_status_actor`, `CREATE TABLE order_status_history` (2 indexes, 2
+FKs), 3 new nullable columns on `orders`
+(`tracking_number`/`cancel_reason`/`cancelled_at`). No data migration
+needed (all new columns nullable, all existing rows unaffected).
+
+**Environment/config changes**: none — no new environment variables. The
+`SMS_PROVIDER_API_KEY` line in `.env.example` (already present from an
+earlier phase) is what `notifications/provider.ts`'s header comment
+references as "not configured."
+
+**Tests/checks — this session, with full network access**:
+- `npx tsc --noEmit` — clean, no errors.
+- `npx eslint .` — clean, no warnings.
+- `npm run build` — succeeds; `/` (homepage) still statically prerendered
+  (unaffected by this phase); new routes `/account/orders`,
+  `/admin/orders`, `/admin/orders/[orderNumber]` all correctly appear as
+  dynamic (`ƒ`), consistent with every other authenticated/ownership-
+  scoped route in the app.
+- **Fresh-clone migrate+seed check**: `DROP DATABASE` / `CREATE DATABASE`
+  / `npm run db:migrate` (all 6 migrations, including this phase's new
+  one, applied cleanly from empty) / `npm run db:seed` (6 categories, 11
+  products) — twice during this session, both clean.
+- **Direct-to-domain smoke test** (temporary script, deleted after use —
+  not part of the deliverable) — 23/23 assertions passed:
+  - New order starts `pending_payment`; stock decremented by ordered
+    quantity.
+  - Customer cancels a `pending_payment` order → status becomes
+    `cancelled`, `cancelReason` persisted, **stock restocked back to
+    the exact pre-order level**, one `order_status_history` row recorded
+    with `actorRole: "customer"`.
+  - Cancelling an already-cancelled order → `InvalidOrderTransitionError`.
+  - **Ownership**: a different signed-in user attempting to cancel, or
+    read the status history of, someone else's order → both correctly
+    blocked (`OrderNotFoundError` / empty history) rather than leaking
+    any data about the order's existence or status.
+  - Full paid lifecycle: `createPendingPayment` +
+    `finalizePaymentVerification(verified: true)` → order becomes `paid`;
+    admin transitions `paid -> processing -> shipped (with tracking
+    number) -> delivered`; the resulting `order_status_history` reads
+    back as exactly `paid, processing, shipped, delivered` with the
+    `paid` entry's actor `system` and the rest `admin`; tracking number
+    persisted.
+  - Admin cannot transition a `delivered` order backward to `processing`
+    (`InvalidOrderTransitionError`) — the transition table has no exit
+    from `delivered`.
+  - Customer cannot self-cancel a `delivered` order.
+  - **Admin cannot forge a transition directly to `paid`** — passing
+    `"paid"` as the target status to `adminTransitionOrderStatus` throws
+    `InvalidOrderTransitionError`, confirming the domain layer rejects
+    this regardless of what any UI would ever render (only the payment
+    callback may set `paid`).
+  - **Genuine concurrency race**: two simultaneous
+    `cancelOrderForUser` calls against the *same* order via
+    `Promise.allSettled` — exactly one resolved, one rejected (the
+    `SELECT ... FOR UPDATE` lock serializes the second call behind the
+    first, which then sees the already-`cancelled` status and correctly
+    rejects rather than racing it); stock was restocked by exactly one
+    order's worth, not double-applied.
+  - `listOrdersForUser`/`listOrdersForAdmin` sanity checks.
+  - All test rows (3 users, all their orders/order_items/payments via
+    cascade) deleted afterward; the shared test variant's stock was
+    explicitly reset to its pre-test baseline and re-verified via
+    `SELECT`. Confirmed via a follow-up run against a freshly-reseeded
+    database that the script leaves `users`/`orders` at exactly `0` rows
+    on its own — genuinely self-contained, not reliant on the
+    `DROP DATABASE` reset to hide leftover state.
+- **HTTP-level checks** against `npm run start`, using **real NextAuth
+  session cookies** (via `/api/auth/csrf` → `/api/auth/callback/credentials`)
+  for a `customer`-role user and a separate `admin`-role user:
+  - `GET /admin/orders` / `GET /account/orders` signed out → `307` to
+    `/login`.
+  - `GET /admin/orders` as a signed-in **customer** (non-staff) → `404`
+    — confirms role-gating is real server-side enforcement, not merely
+    an unlinked route, satisfying Phase 10's "unauthorized admin access"
+    concern one phase early (full coverage is Phase 14's test list item).
+  - `GET /admin/orders` as a signed-in **admin** → `200`.
+  - `GET /account/orders` as the order-owning customer → `200`, page
+    genuinely contains that customer's real order number.
+  - `GET /order/[orderNumber]` as the owning customer → `200`, page
+    contains the real order number and a rendered "لغو سفارش" (cancel)
+    button (order was `pending_payment`, a cancellable status).
+  - `GET /order/[orderNumber]` for that same order as a **different**
+    logged-in customer → `404` — cross-user ownership still enforced.
+  - `GET /admin/orders` as admin → page lists **both** test orders
+    (across two different customers), confirming this is a real,
+    unscoped admin read.
+  - `GET /admin/orders/[orderNumber]` as admin → `200`, renders "تغییر
+    وضعیت سفارش" (change order status) and the transition `<select>`
+    contains only the one legal next status (`cancelled`) for a
+    `pending_payment` order — confirming `getAdminAllowedNextStatuses`
+    correctly narrows the rendered options per order.
+  - All test users/addresses/carts/orders created for this pass removed
+    by resetting the database (`DROP DATABASE`/`CREATE DATABASE`/migrate/
+    seed) back to the clean seeded baseline this report leaves the
+    project in.
+- **What was *not* verified this session, and why:** same category of gap
+  Phases 7-9 already documented — no browser-automation tool available in
+  this sandbox, so `cancelOrderAction`/`adminTransitionOrderStatusAction`
+  were not driven through a real browser's `Next-Action` RSC wire call.
+  Every piece of business logic those actions call was verified directly
+  (the smoke test above), and their surrounding HTTP/auth/redirect/role-
+  gating/rendering behavior was verified via real cookie-based `curl`
+  requests (above) — what's specifically missing is watching an actual
+  rendered browser click the "لغو سفارش" button or the admin status-
+  transition form and observing the resulting `router.refresh()`. A
+  session with browser automation available should do this once, and
+  should also close out the same-category gap already carried over from
+  Phases 7-9.
+
+**Known limitations / follow-ups (not blocking, documented rather than
+silently ignored):**
+- **The `/admin` area is intentionally minimal** — just enough to satisfy
+  this phase's own acceptance criterion ("Admin can operate an order
+  safely"): a plain unstyled-relative-to-the-storefront order list and
+  detail page, no dashboard, no nav beyond a single "سفارش‌ها" link. A
+  real admin dashboard/nav/products/customers/coupons/reviews CRUD is
+  explicitly Phase 11's scope (CLAUDE_BUILD_INSTRUCTIONS.txt Phase 11
+  "Admin/operations") — `/admin/orders*` and
+  `orders/admin-actions.ts` are meant to be absorbed into that work, not
+  duplicated by it.
+- **`listOrdersForAdmin` is unpaginated-but-capped (`limit(200)`), with no
+  filtering/search.** Fine for this phase's scope; a real filterable,
+  paginated admin order list is Phase 11's job.
+- **No refund-money integration.** `cancelled -> refunded` (admin-only)
+  only records that an operator has manually reconciled a refund outside
+  this system — per rule A.17, nothing here calls any real payment
+  gateway refund API. If a future phase adds a live gateway with a real
+  refund endpoint, this transition is where that call would eventually
+  be wired in.
+- **No returns/exchange flow for delivered goods** — out of scope for
+  Phase 10 by design (`canCustomerCancel` stops at `processing`); that's
+  Phase 12's "return/refund architecture."
+- **No email/SMS provider is actually configured** — by design, per rule
+  A.17. `ConsoleNotificationProvider` exercises every call site's shape;
+  a real SMS/email adapter is a contained addition inside
+  `getNotificationProvider()` whenever real provider credentials exist.
+- **No customer-facing UI for order search/filtering** in `/account/orders`
+  — it's a plain reverse-chronological list. Not called for by any
+  specific requirement so far.
+- Same carried-over gaps as Phases 8-9: no guest checkout, no
+  `callbackUrl` round-trip through `/login`.
+- See "What was *not* verified" above.
 
 
 ## Architecture Decisions
@@ -1020,6 +1339,41 @@ silently ignored):**
   is a matter of replacing `verify()`'s internals with a real HTTP call,
   not redesigning the callback route or the `payments` schema.
 
+- `order_status_history` is append-only and the single source of truth
+  for "when did this order's status change, and who changed it" —
+  `orders.status` itself is only ever the current value. Every writer
+  (the payment callback, `cancelOrderForUser`,
+  `adminTransitionOrderStatus`) inserts its history row inside the exact
+  same transaction as the status update, so the two can never drift.
+- The legal-transition table (`orders/lifecycle.ts`) is a plain
+  in-memory `Record`, not a database table — transitions are fixed
+  business logic, not admin-configurable data, so a typed module (one
+  file, one export, every caller imports the same table) is the simplest
+  correct choice, same reasoning Phase 8 used for shipping methods.
+  `paid` is deliberately unreachable as an admin-transition *target* —
+  only the verified-payment callback may ever set it.
+- Order cancellation restocks inventory via the same "let a conditional
+  SQL statement provide the guarantee" principle Phase 8 established for
+  the original decrement — here an unconditional `+= quantity` inside
+  the same transaction that flips status to `cancelled`, which is safe
+  specifically because it's guarded by that transaction's own
+  `SELECT ... FOR UPDATE` on the order row (a concurrent second
+  cancel attempt on the same order blocks until the first commits, then
+  sees the already-`cancelled` status and is rejected before it can
+  restock a second time — verified under a real race, see this phase's
+  "Tests/checks").
+- The notification-provider boundary (`notifications/provider.ts`)
+  mirrors the payment-provider boundary exactly on purpose — one
+  function (`getNotificationProvider()`) returning one interface, so a
+  future real SMS/email adapter is a contained change inside that one
+  function, not a rewrite of every order-lifecycle call site.
+- The Phase 10 admin surface (`/admin/orders*`) is deliberately not
+  folded into a `/admin` dashboard shell with a real nav — Phase 11 owns
+  building that shell; this phase's `layout.tsx` is intentionally the
+  minimum needed to make its own single feature (order fulfillment)
+  safely reachable, so Phase 11 replaces this layout rather than
+  extending around it.
+
 ## Important Assumptions
 
 - Password-based auth (mobile + password) was chosen as this phase's
@@ -1070,6 +1424,29 @@ silently ignored):**
   to change it except a direct database write.
 - Coupons apply store-wide with no category/product restriction — no
   documented requirement called for scoping them narrower yet.
+
+- **Customer self-service cancellation stops at `processing`** — once an
+  order is `shipped`/`delivered`, a customer can no longer cancel it
+  themselves through this phase's UI/action. TRENDS_PROJECT_CONTEXT.md
+  has no returns/refund flow specified for goods already shipped (that's
+  explicitly Phase 12's "return/refund architecture"), so this is a
+  deliberate scope boundary, not an oversight.
+- **`refunded` is a record-keeping status only** — transitioning an order
+  to `refunded` does not call any payment gateway and does not move any
+  real money; it exists so an operator can mark, in the audit trail, that
+  a refund for a cancelled paid order was handled manually outside this
+  system (rule A.17: never fabricate a live refund integration).
+- **`staff` role, not just `admin`, can perform fulfillment transitions**
+  — `adminTransitionOrderStatusAction` checks
+  `role === "admin" || role === "staff"`. TRENDS_PROJECT_CONTEXT.md's
+  §7 describes "role-based permissions" generally without spelling out
+  exactly which roles may do what per action; allowing both for order
+  fulfillment (as opposed to, say, more sensitive future admin actions)
+  was judged the more useful default. Revisit if Phase 11's permission
+  model wants finer granularity.
+- No SMS/email provider is configured — `notifyOrderEvent` logs to the
+  server console instead of sending anything real (rule A.17), same
+  posture as the payment provider.
 
 ## Known Issues / Technical Debt
 
@@ -1134,75 +1511,111 @@ Phase 9 adds:
   (Phase 10), real browser Server Action verification for cart/wishlist
   actions (Phase 7) and for checkout/order-placement actions (Phase 8).
 
+Phase 10 adds:
+
+- **`/account/orders` list now exists** — the Phase 8/9 gap above is
+  closed.
+- **`/admin` area is intentionally minimal** — only order fulfillment
+  (list + detail + status-transition form). No dashboard, no nav beyond
+  one link, no products/customers/coupons/reviews CRUD. Phase 11's job.
+- **`listOrdersForAdmin` has no pagination or filtering** — capped at
+  `limit(200)`. Fine at this catalog's/order volume's current scale;
+  revisit as part of Phase 11's real admin order list.
+- **No real refund-money integration** — `refunded` is a manual
+  record-keeping status only (see "Important Assumptions").
+- **No returns/exchange flow for delivered goods** — Phase 12's job;
+  self-service cancellation intentionally stops at `processing`.
+- **No SMS/email provider configured** — `ConsoleNotificationProvider`
+  logs instead of sending; same posture as the payment provider.
+- **Real browser/`Next-Action`-wire-protocol verification of
+  `cancelOrderAction`/`adminTransitionOrderStatusAction` has not been
+  done** — same sandbox limitation (no browser automation tool
+  available) as every phase since Phase 7; see this phase's
+  "Tests/checks" for exactly what direct-to-domain and real-`curl`
+  HTTP-level (including real role-gated session cookies for both a
+  customer and an admin user) verification was done instead.
+- Carried over, still outstanding: guest checkout doesn't exist, no
+  `callbackUrl` round-trip through `/login`, real browser Server Action
+  verification for cart/wishlist actions (Phase 7), checkout/order-
+  placement actions (Phase 8), and coupon/payment actions (Phase 9).
+
 ## Next Session Instructions
 
-- **Exact next objective: PHASE 10 — Orders + fulfillment + customer
-  lifecycle**, per CLAUDE_BUILD_INSTRUCTIONS.txt §D. Phase 9 is
-  COMPLETE — do not redo coupon/payment work; build order history,
-  status transitions, and fulfillment on top of it.
+- **Exact next objective: PHASE 11 — Admin/operations**, per
+  CLAUDE_BUILD_INSTRUCTIONS.txt §D. Phase 10 is COMPLETE — do not redo
+  order-history/status-transition/cancellation/notification work; build
+  the real admin area on top of it.
   1. **First, if browser automation is available in this session's
-     environment, do the real end-to-end verification Phases 7, 8, and 9
-     could not:** in an actual rendered browser, add an item to cart, go
-     through `/checkout` (apply a real coupon code, pick a shipping
-     method, click "ثبت سفارش"), land on the mock gateway simulator page,
-     click "شبیه‌سازی پرداخت موفق", confirm the redirect lands on
-     `/order/[orderNumber]?payment=success` with `paid` status displayed.
-     Fix anything genuinely broken before building fulfillment on top of
-     it; if no browser automation is available, note that again and
-     continue with the direct-to-domain + HTTP-level verification
-     approach all three phases have used so far.
-  2. Read CLAUDE_BUILD_INSTRUCTIONS.txt's Phase 10 task list and
-     TRENDS_PROJECT_CONTEXT.md §6 "Orders" before writing code.
-  3. **Order history**: build `/account/orders` (a list of the signed-in
-     customer's own orders, ownership-scoped — reuse/extend
-     `src/domains/orders/queries.ts`, add a `getOrdersForUser(userId)`-
-     style function rather than a bare `getAllOrders`). Link to it from
-     the account area.
-  4. **Order status timeline**: the `orders.status` enum already has
-     `processing`/`shipped`/`delivered`/`cancelled`/`refunded` states
-     defined but unreachable — Phase 10 is what should add the actual
-     transitions (customer-facing status display + an
-     `order_status_history`-style audit trail per
-     TRENDS_PROJECT_CONTEXT.md §12's data model list, not yet a table in
-     this schema — add it this phase).
-  5. **Admin order status transitions**: needs *some* form of
-     authorization even though Phase 11 (full admin area) hasn't been
-     built yet — either scope this phase's admin mutation narrowly and
-     re-home it under Phase 11's admin area later, or coordinate with
-     Phase 11's scope so the two don't duplicate work. Use `role`
-     (already on `users`, unused until now) to gate it — never a route
-     that's merely unlinked from the UI (rule §7 "Admin must not rely on
-     hidden UI alone for authorization").
-  6. **Cancellation rules**: a customer should be able to cancel their
-     own order only from an appropriate status (e.g. `pending_payment` or
-     early `paid`/`processing`, not `shipped`/`delivered`) — validate the
-     transition server-side against the current status, not against
-     whatever the client claims it is.
-  7. **Tracking number field + shipment abstraction**: a simple
-     `trackingNumber` column (or a small `shipments` table, per §12) is
-     enough for this phase — no real carrier API integration is expected
-     yet.
-  8. **Notification abstraction**: order confirmation/status-change
-     notifications need *an* adapter interface (mirrors the
-     `PaymentProvider` pattern) even if the only implementation is a
-     console-log/no-op stub for now (an SMS/email provider isn't
-     configured — rule A.17 applies the same way it did to payments).
-  9. Run `typecheck`/`lint`/`build` and verify manually: a customer can
-     see their own order history and not anyone else's, a status
-     transition is validated against the *current* database status (not
-     an arbitrary string from the client), and historical order data
-     stays stable even if the underlying product/variant is later
-     edited (already true since Phase 8's snapshots — just confirm it
-     still holds).
-  10. Update `PROGRESS.md` the same way this session did.
-- Files/areas to inspect first: `src/domains/orders/queries.ts` (where
-  `getOrderForUser` already exists — Phase 10 needs its list-returning
-  sibling), `src/lib/db/schema/orders.ts` (the `status` enum — what
-  Phase 10 will actually transition through), `src/app/order/[orderNumber]/page.tsx`
-  (the existing detail page Phase 10's timeline UI extends).
-- Do not start Phase 11 (admin) before Phase 10's fulfillment/lifecycle
-  work is done, per CLAUDE_BUILD_INSTRUCTIONS.txt's "do not jump ahead
-  multiple phases."
+     environment, do the real end-to-end verification Phases 7-10 could
+     not:** in an actual rendered browser, place a real order end-to-end
+     (cart → checkout → mock gateway success), then click "لغو سفارش" on
+     an eligible order and confirm the page updates; separately, sign in
+     as an admin/staff user, open `/admin/orders/[orderNumber]`, and
+     click through a real `pending_payment/paid → processing → shipped →
+     delivered` transition in the browser, confirming each
+     `router.refresh()` reflects the new status without a manual reload.
+     Fix anything genuinely broken before building more admin surface on
+     top of it; if no browser automation is available, note that again
+     and continue with the direct-to-domain + real-cookie HTTP-level
+     verification approach every phase since Phase 7 has used.
+  2. Read CLAUDE_BUILD_INSTRUCTIONS.txt's Phase 11 task list and
+     TRENDS_PROJECT_CONTEXT.md §7 "Admin/operations scope" before writing
+     code.
+  3. **Reuse, don't duplicate, this phase's admin work.** `/admin/layout.tsx`
+     already gates every `/admin/*` route on `session.user.role` (admin/
+     staff) via `notFound()` for non-staff — extend this layout into the
+     real dashboard shell/nav Phase 11 needs, rather than creating a
+     second gating mechanism. `/admin/orders` and
+     `/admin/orders/[orderNumber]` already exist (Phase 10, intentionally
+     minimal — see this report's "Known limitations") — Phase 11 should
+     absorb these into its own orders admin surface (adding pagination/
+     filtering/search to `listOrdersForAdmin`, which currently just does
+     `limit(200)` with no `WHERE`/`ORDER BY` options) rather than
+     building a parallel, separate orders page.
+  4. **Products/variants/images/categories/inventory CRUD** — the biggest
+     net-new piece this phase. Follow the ownership/authorization pattern
+     already established: no bare "is admin" boolean check scattered
+     across route handlers — one shared role-check helper (see
+     `isStaffOrAdmin` in `src/domains/orders/admin-actions.ts` for the
+     shape, though it's currently a private, unexported function in that
+     file — worth promoting to a shared `src/domains/auth/roles.ts` or
+     similar once a second file needs it, rather than copy-pasting it).
+     Server-side Zod validation for every CRUD form, per
+     CLAUDE_BUILD_INSTRUCTIONS.txt's non-negotiable rule 9.
+  5. **Customers, coupons (CRUD UI on top of Phase 9's `coupons` table —
+     no schema changes needed, just admin-facing create/edit/deactivate
+     forms), reviews/moderation, hero slides, homepage promotional
+     content, newsletter subscribers, basic settings, audit logs** — per
+     the full Phase 11 task list. Reviews/newsletter tables don't exist
+     yet (Phase 12's scope per the phase plan) — don't build UI for
+     tables that don't exist; coordinate scope carefully against
+     CLAUDE_BUILD_INSTRUCTIONS.txt §D's phase boundaries rather than
+     pulling Phase 12 schema work forward.
+  6. **Audit logs**: TRENDS_PROJECT_CONTEXT.md §12 lists `audit_logs` as
+     a table; Phase 10's `order_status_history` is a narrow,
+     order-specific precedent for "who did what, when" — a general
+     `audit_logs` table (admin user id, action, target entity/id,
+     timestamp, diff/payload) is genuinely new schema work this phase,
+     not an extension of `order_status_history`.
+  7. Run `typecheck`/`lint`/`build` and verify manually: every admin
+     mutation is authorized server-side (not just hidden from a
+     non-admin's nav — confirm with a real signed-in non-staff `curl`
+     request the same way this phase's HTTP checks did for
+     `/admin/orders`), CRUD forms reject invalid input server-side, and
+     sensitive actions are actually recorded in the new audit log.
+  8. Update `PROGRESS.md` the same way this session did.
+- Files/areas to inspect first: `src/app/admin/layout.tsx` (the existing
+  role gate to extend, not replace), `src/app/admin/orders/` (the
+  existing minimal admin surface to fold into the real admin area),
+  `src/domains/orders/admin-actions.ts` (the existing
+  role-check-in-a-Server-Action pattern to replicate for every other
+  admin mutation), `src/lib/db/schema/` (categories/products/
+  product-variants/product-images/coupons — all already exist and just
+  need admin CRUD built on top; no schema changes needed for most of
+  this phase except `audit_logs`).
+- Do not start Phase 12 (reviews/content/support/notifications-as-
+  customer-features) before Phase 11's admin work is done, per
+  CLAUDE_BUILD_INSTRUCTIONS.txt's "do not jump ahead multiple phases."
 
 ## Commands
 

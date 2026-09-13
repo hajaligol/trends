@@ -3,7 +3,6 @@ import {
   check,
   index,
   integer,
-  pgEnum,
   pgTable,
   text,
   timestamp,
@@ -13,30 +12,8 @@ import {
 import { users } from "./users";
 import { orderItems } from "./order-items";
 import { coupons } from "./coupons";
-
-/**
- * An explicit, validated order lifecycle (TRENDS_PROJECT_CONTEXT.md §6
- * "Orders" — "should be explicit and validated, not arbitrary strings"),
- * not a free-text status column.
- *
- * Only `pending_payment` and `cancelled` are actually reachable by any
- * code path in this phase — Phase 8's checkout has no working payment
- * provider to transition an order to `paid` (rule A.17: don't fabricate
- * a live integration), and fulfillment transitions
- * (`processing`/`shipped`/`delivered`) are Phase 10's admin/fulfillment
- * work. The full set is modeled now so `order_status_history` (Phase 10)
- * and Phase 9's payment-verification callback have a real enum to
- * transition into rather than a schema migration later.
- */
-export const orderStatusEnum = pgEnum("order_status", [
-  "pending_payment",
-  "paid",
-  "processing",
-  "shipped",
-  "delivered",
-  "cancelled",
-  "refunded",
-]);
+import { orderStatusHistory } from "./order-status-history";
+import { orderStatusEnum } from "./order-status";
 
 /**
  * A placed order. Everything a customer saw at checkout time —
@@ -113,6 +90,18 @@ export const orders = pgTable(
     couponId: uuid("coupon_id").references(() => coupons.id, { onDelete: "set null" }),
     couponCode: text("coupon_code"),
 
+    // --- Fulfillment (Phase 10). `trackingNumber` is a plain free-text
+    // field, not a carrier-API integration — CLAUDE_BUILD_INSTRUCTIONS.txt
+    // Phase 10 explicitly calls a simple column enough for this phase
+    // ("no real carrier API integration is expected yet"). `cancelReason`/
+    // `cancelledAt` are set only by `cancelOrderForUser`/
+    // `adminTransitionOrderStatus` (`src/domains/orders/queries.ts`) when
+    // a transition into `cancelled` happens; both stay `null` for an
+    // order that was never cancelled. ---
+    trackingNumber: text("tracking_number"),
+    cancelReason: text("cancel_reason"),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+
     customerNote: text("customer_note"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -130,6 +119,7 @@ export const orders = pgTable(
 export const ordersRelations = relations(orders, ({ one, many }) => ({
   user: one(users, { fields: [orders.userId], references: [users.id] }),
   items: many(orderItems),
+  statusHistory: many(orderStatusHistory),
 }));
 
 export type Order = typeof orders.$inferSelect;

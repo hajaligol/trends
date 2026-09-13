@@ -33,6 +33,12 @@ export default async function AccountLayout({ children }: { children: ReactNode 
             آدرس‌ها
           </Link>
           <Link
+            href="/account/orders"
+            className="rounded-md px-3 py-2 text-[0.92rem] text-ink hover:bg-ink/5"
+          >
+            سفارش‌های من
+          </Link>
+          <Link
             href="/account/wishlist"
             className="rounded-md px-3 py-2 text-[0.92rem] text-ink hover:bg-ink/5"
           >

@@ -1,15 +1,19 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth/config";
 import { getAddressForUser } from "@/domains/addresses/queries";
 import { getCurrentCartIdReadOnly } from "@/domains/cart/resolve";
 import { getCartSummary } from "@/domains/cart/queries";
 import { getShippingMethod } from "@/domains/shipping/methods";
 import {
+  cancelOrderForUser,
   createOrderFromCart,
   EmptyCartError,
   getOrderForUser,
   InsufficientStockError,
+  InvalidOrderTransitionError,
+  OrderNotFoundError,
   type ShippingSnapshotInput,
 } from "@/domains/orders/queries";
 import { CouponInvalidError } from "@/domains/promotions/queries";
@@ -159,4 +163,36 @@ export async function retryPaymentAction(orderNumber: string): Promise<RetryPaym
     redirectUrl: paymentResult.ok ? paymentResult.redirectUrl : null,
     paymentNote: paymentResult.ok ? "در حال انتقال به درگاه پرداخت..." : paymentResult.reason,
   };
+}
+
+/**
+ * Customer self-service order cancellation (Phase 10). Ownership is
+ * enforced by `cancelOrderForUser` itself (it takes `session.user.id`,
+ * not a bare order id — same shape as every other function in this
+ * file), and the legality of the transition is enforced there too, from
+ * the order's real database status, never from whatever the button's
+ * mere presence in the UI implied.
+ */
+export type CancelOrderResult = { ok: true } | { ok: false; error: string };
+
+export async function cancelOrderAction(orderNumber: string, reason: string): Promise<CancelOrderResult> {
+  const session = await auth();
+  if (!session?.user) {
+    return { ok: false, error: "برای لغو سفارش ابتدا وارد حساب کاربری خود شوید" };
+  }
+
+  const trimmedReason = reason.trim().slice(0, 300) || null;
+
+  try {
+    await cancelOrderForUser(orderNumber, session.user.id, trimmedReason);
+  } catch (error) {
+    if (error instanceof OrderNotFoundError || error instanceof InvalidOrderTransitionError) {
+      return { ok: false, error: error.message };
+    }
+    throw error;
+  }
+
+  revalidatePath(`/order/${orderNumber}`);
+  revalidatePath("/account/orders");
+  return { ok: true };
 }

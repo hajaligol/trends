@@ -5,25 +5,19 @@ import Image from "next/image";
 import { Container } from "@/components/ui/Container";
 import { AssetSlot } from "@/components/ui/AssetSlot";
 import { getCurrentUser } from "@/domains/auth/actions";
-import { getOrderForUser } from "@/domains/orders/queries";
+import { getOrderForUser, getOrderStatusHistoryForUser } from "@/domains/orders/queries";
+import { canCustomerCancel, ORDER_STATUS_LABELS } from "@/domains/orders/lifecycle";
 import { formatToman } from "@/lib/utils/money";
 import { toPersianDigits } from "@/lib/utils/persian-digits";
 import { RetryPaymentButton } from "@/components/orders/RetryPaymentButton";
+import { CancelOrderButton } from "@/components/orders/CancelOrderButton";
 
 export const metadata: Metadata = {
   title: "سفارش من",
   robots: { index: false, follow: false },
 };
 
-const STATUS_LABELS: Record<string, string> = {
-  pending_payment: "در انتظار پرداخت",
-  paid: "پرداخت‌شده",
-  processing: "در حال آماده‌سازی",
-  shipped: "ارسال‌شده",
-  delivered: "تحویل داده‌شده",
-  cancelled: "لغو‌شده",
-  refunded: "بازپرداخت‌شده",
-};
+const STATUS_LABELS = ORDER_STATUS_LABELS;
 
 /** Banner shown right after returning from the (mock, currently — see
  * `src/domains/payments/provider.ts`) payment gateway, driven by the
@@ -65,6 +59,8 @@ export default async function OrderConfirmationPage({
   const order = await getOrderForUser(orderNumber, user.id);
   if (!order) notFound();
 
+  const statusHistory = await getOrderStatusHistoryForUser(orderNumber, user.id);
+
   const paymentBanner = payment ? PAYMENT_RESULT_BANNERS[payment] : null;
 
   return (
@@ -93,6 +89,18 @@ export default async function OrderConfirmationPage({
             </p>
             <RetryPaymentButton orderNumber={order.orderNumber} />
           </div>
+        )}
+
+        {canCustomerCancel(order.status) && (
+          <div className="flex justify-center">
+            <CancelOrderButton orderNumber={order.orderNumber} />
+          </div>
+        )}
+
+        {order.status === "cancelled" && order.cancelReason && (
+          <p className="rounded-[var(--radius-md)] bg-ink/[0.05] px-4 py-3 text-center text-[0.85rem] text-text-secondary">
+            دلیل لغو: {order.cancelReason}
+          </p>
         )}
 
         <section className="rounded-[var(--radius-lg)] border border-line bg-white p-5">
@@ -142,6 +150,11 @@ export default async function OrderConfirmationPage({
             <h2 className="mb-3 text-[1rem] font-bold">روش ارسال و پرداخت</h2>
             <p className="text-ink">{order.shippingMethodLabel}</p>
             <p className="mb-3 text-text-secondary">{order.shippingEstimateLabel}</p>
+            {order.trackingNumber && (
+              <p className="mb-3 text-text-secondary">
+                کد رهگیری مرسوله: <span dir="ltr">{toPersianDigits(order.trackingNumber)}</span>
+              </p>
+            )}
             <div className="flex flex-col gap-1 border-t border-line pt-3">
               <div className="flex justify-between">
                 <span className="text-text-secondary">جمع کالاها</span>
@@ -166,6 +179,30 @@ export default async function OrderConfirmationPage({
             </div>
           </div>
         </section>
+
+        {statusHistory.length > 0 && (
+          <section className="rounded-[var(--radius-lg)] border border-line bg-white p-5">
+            <h2 className="mb-4 text-[1.05rem] font-bold">روند سفارش</h2>
+            <ol className="flex flex-col gap-3">
+              {statusHistory.map((entry) => (
+                <li key={entry.id} className="flex items-center justify-between gap-3 text-[0.85rem]">
+                  <span className="text-ink">{STATUS_LABELS[entry.toStatus] ?? entry.toStatus}</span>
+                  <span className="text-text-secondary">
+                    {toPersianDigits(
+                      new Intl.DateTimeFormat("fa-IR", {
+                        year: "numeric",
+                        month: "long",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      }).format(entry.createdAt),
+                    )}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          </section>
+        )}
 
         <Link href="/" className="text-center text-[0.88rem] font-semibold text-ink underline underline-offset-2">
           بازگشت به فروشگاه
