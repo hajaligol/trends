@@ -8,10 +8,13 @@ import { getShippingMethod } from "@/domains/shipping/methods";
 import {
   createOrderFromCart,
   EmptyCartError,
+  getOrderForUser,
   InsufficientStockError,
   type ShippingSnapshotInput,
 } from "@/domains/orders/queries";
+import { CouponInvalidError } from "@/domains/promotions/queries";
 import { getPaymentProvider } from "@/domains/payments/provider";
+import { createPendingPayment } from "@/domains/payments/queries";
 
 /**
  * `placeOrderAction` is the one place checkout's "cannot manipulate
@@ -24,13 +27,17 @@ import { getPaymentProvider } from "@/domains/payments/provider";
  */
 
 export type PlaceOrderResult =
-  | { ok: true; orderNumber: string; paymentNote: string }
+  | { ok: true; orderNumber: string; paymentNote: string; redirectUrl: string | null }
   | { ok: false; error: string };
 
 export async function placeOrderAction(
   addressId: string,
   shippingMethodCode: string,
   customerNote: string,
+  // `null`/empty when no coupon was applied — see `createOrderFromCart`'s
+  // header comment for why this is re-validated authoritatively here
+  // rather than trusting whatever `previewCouponAction` returned earlier.
+  couponCode: string | null = null,
 ): Promise<PlaceOrderResult> {
   const session = await auth();
   if (!session?.user) {
@@ -75,6 +82,8 @@ export async function placeOrderAction(
 
   const trimmedNote = customerNote.trim().slice(0, 500) || null;
 
+  const trimmedCoupon = couponCode?.trim() || null;
+
   let order;
   try {
     order = await createOrderFromCart(
@@ -83,30 +92,71 @@ export async function placeOrderAction(
       shippingSnapshot,
       shippingMethod,
       trimmedNote,
+      trimmedCoupon,
     );
   } catch (error) {
-    if (error instanceof InsufficientStockError || error instanceof EmptyCartError) {
+    if (error instanceof InsufficientStockError || error instanceof EmptyCartError || error instanceof CouponInvalidError) {
       return { ok: false, error: error.message };
     }
     throw error;
   }
 
-  // Payment is Phase 9 (rule A.17 — no real gateway exists yet). The
-  // order is created as `pending_payment`; `initiate()` always reports
-  // "not configured" from the stub provider, and its message is exactly
-  // what's shown on the confirmation page, so there's one honest source
-  // of truth for that copy instead of duplicating it here.
-  const paymentResult = await getPaymentProvider().initiate({
-    id: order.id,
-    orderNumber: order.orderNumber,
-    totalToman: order.totalToman,
-  });
+  const paymentResult = await initiatePaymentForOrder(order.id, order.orderNumber, order.totalToman);
 
   return {
     ok: true,
     orderNumber: order.orderNumber,
-    paymentNote: paymentResult.ok
-      ? "در حال انتقال به درگاه پرداخت..."
-      : paymentResult.reason,
+    paymentNote: paymentResult.ok ? "در حال انتقال به درگاه پرداخت..." : paymentResult.reason,
+    redirectUrl: paymentResult.ok ? paymentResult.redirectUrl : null,
+  };
+}
+
+/**
+ * Wraps `getPaymentProvider().initiate()` with persisting the resulting
+ * `payments` row — a real gateway response and a database write must
+ * happen together, or a customer could be sent to pay for a reference
+ * this app never recorded and could never later verify a callback
+ * against. If `initiate()` reports "not configured" (§8/A.17's stub),
+ * no `payments` row is created at all — there is nothing to track.
+ */
+async function initiatePaymentForOrder(orderId: string, orderNumber: string, totalToman: number) {
+  const result = await getPaymentProvider().initiate({ id: orderId, orderNumber, totalToman });
+  if (result.ok) {
+    await createPendingPayment(orderId, getPaymentProvider().name, totalToman, result.providerRef);
+  }
+  return result;
+}
+
+/**
+ * Lets a customer re-attempt payment for their own order that's still
+ * `pending_payment` — e.g. they closed the mock gateway tab without
+ * choosing success/failure, or a real gateway session expired. Ownership
+ * is enforced the same way as everywhere else (`getOrderForUser`, no
+ * bare `getOrderById`). A second `payments` row is created for the new
+ * attempt; the first attempt's row (if any) is untouched history.
+ */
+export type RetryPaymentResult =
+  | { ok: true; redirectUrl: string | null; paymentNote: string }
+  | { ok: false; error: string };
+
+export async function retryPaymentAction(orderNumber: string): Promise<RetryPaymentResult> {
+  const session = await auth();
+  if (!session?.user) {
+    return { ok: false, error: "برای پرداخت ابتدا وارد حساب کاربری خود شوید" };
+  }
+
+  const order = await getOrderForUser(orderNumber, session.user.id);
+  if (!order) {
+    return { ok: false, error: "سفارش یافت نشد" };
+  }
+  if (order.status !== "pending_payment") {
+    return { ok: false, error: "این سفارش دیگر در انتظار پرداخت نیست" };
+  }
+
+  const paymentResult = await initiatePaymentForOrder(order.id, order.orderNumber, order.totalToman);
+  return {
+    ok: true,
+    redirectUrl: paymentResult.ok ? paymentResult.redirectUrl : null,
+    paymentNote: paymentResult.ok ? "در حال انتقال به درگاه پرداخت..." : paymentResult.reason,
   };
 }

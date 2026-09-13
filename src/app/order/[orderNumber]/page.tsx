@@ -8,6 +8,7 @@ import { getCurrentUser } from "@/domains/auth/actions";
 import { getOrderForUser } from "@/domains/orders/queries";
 import { formatToman } from "@/lib/utils/money";
 import { toPersianDigits } from "@/lib/utils/persian-digits";
+import { RetryPaymentButton } from "@/components/orders/RetryPaymentButton";
 
 export const metadata: Metadata = {
   title: "سفارش من",
@@ -24,6 +25,25 @@ const STATUS_LABELS: Record<string, string> = {
   refunded: "بازپرداخت‌شده",
 };
 
+/** Banner shown right after returning from the (mock, currently — see
+ * `src/domains/payments/provider.ts`) payment gateway, driven by the
+ * `?payment=` query param the callback route redirects with. This is
+ * purely a friendly status message — the order's actual `status` column
+ * (already updated server-side by the time this page renders, since the
+ * callback's `finalizePaymentVerification` runs before its redirect) is
+ * always what's displayed for real, not this banner. */
+const PAYMENT_RESULT_BANNERS: Record<string, { tone: "success" | "error" | "info"; text: string }> = {
+  success: { tone: "success", text: "پرداخت شما با موفقیت انجام و تأیید شد." },
+  failed: { tone: "error", text: "پرداخت ناموفق بود یا لغو شد. می‌توانید دوباره تلاش کنید." },
+  "already-processed": { tone: "info", text: "این پرداخت قبلاً پردازش شده است." },
+};
+
+const BANNER_CLASSES: Record<"success" | "error" | "info", string> = {
+  success: "bg-[#D2D9BF]/60 text-ink",
+  error: "bg-red-50 text-red-700",
+  info: "bg-ink/[0.05] text-ink",
+};
+
 /**
  * `getOrderForUser` is ownership-scoped by `userId` (same shape as
  * `addresses/queries.ts`) — a signed-in customer requesting someone
@@ -32,15 +52,20 @@ const STATUS_LABELS: Record<string, string> = {
  */
 export default async function OrderConfirmationPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ orderNumber: string }>;
+  searchParams: Promise<{ payment?: string }>;
 }) {
   const { orderNumber } = await params;
+  const { payment } = await searchParams;
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
   const order = await getOrderForUser(orderNumber, user.id);
   if (!order) notFound();
+
+  const paymentBanner = payment ? PAYMENT_RESULT_BANNERS[payment] : null;
 
   return (
     <main className="py-[clamp(40px,7vw,80px)]">
@@ -52,11 +77,22 @@ export default async function OrderConfirmationPage({
           </p>
         </div>
 
-        {order.status === "pending_payment" && (
-          <p className="rounded-[var(--radius-md)] bg-[#FBE1B4]/50 px-4 py-3 text-center text-[0.88rem] text-ink">
-            درگاه پرداخت آنلاین هنوز پیکربندی نشده است؛ این سفارش در وضعیت «در انتظار پرداخت» ثبت شده و پس از
-            راه‌اندازی درگاه پرداخت تکمیل خواهد شد.
+        {paymentBanner && (
+          <p
+            role={paymentBanner.tone === "error" ? "alert" : "status"}
+            className={`rounded-[var(--radius-md)] px-4 py-3 text-center text-[0.88rem] ${BANNER_CLASSES[paymentBanner.tone]}`}
+          >
+            {paymentBanner.text}
           </p>
+        )}
+
+        {order.status === "pending_payment" && (
+          <div className="flex flex-col items-center gap-3 rounded-[var(--radius-md)] bg-[#FBE1B4]/50 px-4 py-3 text-center text-[0.88rem] text-ink">
+            <p>
+              درگاه پرداخت آنلاین هنوز تکمیل نشده است؛ این سفارش در وضعیت «در انتظار پرداخت» قرار دارد.
+            </p>
+            <RetryPaymentButton orderNumber={order.orderNumber} />
+          </div>
         )}
 
         <section className="rounded-[var(--radius-lg)] border border-line bg-white p-5">
@@ -115,6 +151,14 @@ export default async function OrderConfirmationPage({
                 <span className="text-text-secondary">هزینه ارسال</span>
                 <span>{order.shippingFeeToman === 0 ? "رایگان" : formatToman(order.shippingFeeToman)}</span>
               </div>
+              {order.discountToman > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-text-secondary">
+                    تخفیف {order.couponCode ? `(${order.couponCode})` : ""}
+                  </span>
+                  <span>−{formatToman(order.discountToman)}</span>
+                </div>
+              )}
               <div className="flex justify-between border-t border-line pt-1 font-bold">
                 <span>مبلغ نهایی</span>
                 <span>{formatToman(order.totalToman)}</span>

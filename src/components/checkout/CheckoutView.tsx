@@ -8,6 +8,7 @@ import type { Address } from "@/lib/db/schema";
 import type { CartSummary } from "@/domains/cart/queries";
 import type { ShippingMethod } from "@/domains/shipping/methods";
 import { placeOrderAction } from "@/domains/orders/actions";
+import { previewCouponAction } from "@/domains/promotions/actions";
 import { AssetSlot } from "@/components/ui/AssetSlot";
 import { AddressForm } from "@/components/account/AddressForm";
 import { Button } from "@/components/ui/Button";
@@ -49,6 +50,10 @@ export function CheckoutView({
   const [showAddAddress, setShowAddAddress] = useState(initialAddresses.length === 0);
   const [shippingMethodCode, setShippingMethodCode] = useState(shippingMethods[0]?.code ?? "");
   const [customerNote, setCustomerNote] = useState("");
+  const [couponInput, setCouponInput] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discountToman: number } | null>(null);
+  const [couponError, setCouponError] = useState<string | null>(null);
+  const [isCouponPending, startCouponTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -78,7 +83,32 @@ export function CheckoutView({
     () => shippingMethods.find((method) => method.code === shippingMethodCode) ?? null,
     [shippingMethods, shippingMethodCode],
   );
-  const totalToman = cart.subtotalToman + (selectedShippingMethod?.feeToman ?? 0);
+  const discountToman = appliedCoupon?.discountToman ?? 0;
+  const totalToman = Math.max(0, cart.subtotalToman + (selectedShippingMethod?.feeToman ?? 0) - discountToman);
+
+  function handleApplyCoupon() {
+    setCouponError(null);
+    const code = couponInput.trim();
+    if (!code) {
+      setCouponError("کد تخفیف را وارد کنید");
+      return;
+    }
+    startCouponTransition(async () => {
+      const result = await previewCouponAction(code);
+      if (!result.ok) {
+        setAppliedCoupon(null);
+        setCouponError(result.error);
+        return;
+      }
+      setAppliedCoupon({ code: result.code, discountToman: result.discountToman });
+    });
+  }
+
+  function handleRemoveCoupon() {
+    setAppliedCoupon(null);
+    setCouponInput("");
+    setCouponError(null);
+  }
 
   function handleAddressAdded() {
     // `createAddressAction` already revalidated `/account/addresses`'s
@@ -102,12 +132,27 @@ export function CheckoutView({
     }
 
     startTransition(async () => {
-      const result = await placeOrderAction(selectedAddressId, shippingMethodCode, customerNote);
+      const result = await placeOrderAction(
+        selectedAddressId,
+        shippingMethodCode,
+        customerNote,
+        appliedCoupon?.code ?? null,
+      );
       if (!result.ok) {
         setError(result.error);
         return;
       }
       await refreshCart();
+      // A configured provider (mock, or a real gateway later) hands back
+      // a `redirectUrl` — send the browser there (an external/simulated
+      // gateway page), not to the confirmation page directly, since
+      // payment hasn't been verified yet at this point. Only when no
+      // provider is configured (`redirectUrl: null`) does the customer go
+      // straight to the confirmation page, still `pending_payment`.
+      if (result.redirectUrl) {
+        window.location.href = result.redirectUrl;
+        return;
+      }
       router.push(`/order/${result.orderNumber}`);
     });
   }
@@ -216,6 +261,51 @@ export function CheckoutView({
             className="w-full rounded-[var(--radius-md)] border border-line bg-white px-4 py-3 text-[0.9rem] text-ink outline-none focus:outline-2 focus:outline-ink focus:outline-offset-2"
           />
         </section>
+
+        <section>
+          <h2 className="mb-4 text-[1.1rem] font-bold">کد تخفیف (اختیاری)</h2>
+          {appliedCoupon ? (
+            <div className="flex items-center justify-between rounded-[var(--radius-lg)] border border-line bg-white p-4 text-[0.88rem]">
+              <div>
+                <p className="font-semibold text-ink" dir="ltr">
+                  {appliedCoupon.code}
+                </p>
+                <p className="text-text-secondary">{formatToman(appliedCoupon.discountToman)} تخفیف اعمال شد</p>
+              </div>
+              <button
+                type="button"
+                onClick={handleRemoveCoupon}
+                className="text-[0.82rem] text-text-secondary underline underline-offset-2"
+              >
+                حذف
+              </button>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={couponInput}
+                onChange={(event) => setCouponInput(event.target.value)}
+                placeholder="کد تخفیف را وارد کنید"
+                dir="ltr"
+                className="min-w-0 flex-1 rounded-[var(--radius-md)] border border-line bg-white px-4 py-2.5 text-[0.9rem] text-ink outline-none focus:outline-2 focus:outline-ink focus:outline-offset-2"
+              />
+              <button
+                type="button"
+                onClick={handleApplyCoupon}
+                disabled={isCouponPending}
+                className="shrink-0 rounded-[var(--radius-md)] border border-ink px-4 py-2.5 text-[0.85rem] font-semibold text-ink disabled:opacity-60"
+              >
+                {isCouponPending ? "در حال بررسی..." : "اعمال کد"}
+              </button>
+            </div>
+          )}
+          {couponError && (
+            <p role="alert" className="mt-2 text-[0.8rem] text-red-700">
+              {couponError}
+            </p>
+          )}
+        </section>
       </div>
 
       <aside className="h-fit rounded-[var(--radius-lg)] border border-line bg-white p-5">
@@ -271,6 +361,12 @@ export function CheckoutView({
                 : "—"}
             </span>
           </div>
+          {discountToman > 0 && (
+            <div className="flex justify-between">
+              <span className="text-text-secondary">تخفیف</span>
+              <span>−{formatToman(discountToman)}</span>
+            </div>
+          )}
           <div className="flex justify-between border-t border-line pt-2 text-[1rem] font-bold">
             <span>مبلغ قابل پرداخت</span>
             <span>{formatToman(totalToman)}</span>

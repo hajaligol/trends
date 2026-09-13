@@ -43,3 +43,10 @@ if (process.env.NODE_ENV !== "production") {
 
 export const db = drizzle(client, { schema });
 export type Database = typeof db;
+
+/** The exact transaction handle type `db.transaction(async (tx) => ...)`
+ * infers for its callback — exported so domain functions that need to
+ * participate in a caller's transaction (e.g.
+ * `src/domains/promotions/queries.ts`'s `validateCoupon`) can accept it
+ * as a typed parameter instead of reaching for `any`. */
+export type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];

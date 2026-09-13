@@ -12,6 +12,7 @@ import {
   type OrderItem,
 } from "@/lib/db/schema";
 import type { ShippingMethod } from "@/domains/shipping/methods";
+import { CouponInvalidError, recordCouponRedemption, validateCoupon } from "@/domains/promotions/queries";
 
 /**
  * The only sanctioned place for application code to read/write `orders`/
@@ -90,6 +91,13 @@ export async function createOrderFromCart(
   shipping: ShippingSnapshotInput,
   shippingMethod: ShippingMethod,
   customerNote: string | null,
+  // `couponCode: null` (no coupon) is the common case. Re-throws
+  // `CouponInvalidError` as-is when a code is supplied but no longer
+  // valid at the moment of placing the order (§4.3 — the checkout-preview
+  // validation in `promotions/actions.ts` is advisory only; this is the
+  // authoritative check) so `placeOrderAction` can surface the same
+  // Persian message it would have shown at preview time.
+  couponCode: string | null = null,
 ): Promise<Order> {
   return db.transaction(async (tx) => {
     const lines = await tx
@@ -160,7 +168,24 @@ export async function createOrderFromCart(
     }
 
     const subtotalToman = lines.reduce((sum, line) => sum + line.priceToman * line.requestedQuantity, 0);
-    const totalToman = subtotalToman + shippingMethod.feeToman;
+
+    // Coupon validation happens *inside* this transaction, against the
+    // real subtotal computed above, and with `coupons` locked
+    // (`FOR UPDATE`, see `promotions/queries.ts`) for the rest of the
+    // transaction — so a coupon whose usage limit fills up in a race
+    // with another checkout is caught here, not just at preview time.
+    // Any thrown `CouponInvalidError` rolls back the stock decrement
+    // above along with everything else (§4.3 — an invalid coupon must
+    // not partially apply).
+    let discountToman = 0;
+    let appliedCouponId: string | null = null;
+    if (couponCode) {
+      const { coupon, discountToman: computedDiscount } = await validateCoupon(tx, couponCode, userId, subtotalToman);
+      discountToman = computedDiscount;
+      appliedCouponId = coupon.id;
+    }
+
+    const totalToman = Math.max(0, subtotalToman + shippingMethod.feeToman - discountToman);
 
     let order: Order | undefined;
     // Retry once on the astronomically unlikely order-number collision
@@ -187,8 +212,10 @@ export async function createOrderFromCart(
             shippingEstimateLabel: shippingMethod.estimateLabel,
             subtotalToman,
             shippingFeeToman: shippingMethod.feeToman,
-            discountToman: 0,
+            discountToman,
             totalToman,
+            couponId: appliedCouponId,
+            couponCode: appliedCouponId ? couponCode!.trim().toUpperCase() : null,
             customerNote,
           })
           .returning();
@@ -200,6 +227,12 @@ export async function createOrderFromCart(
       }
     }
     if (!order) throw new Error("Order creation failed after retries (order number collision)");
+
+    if (appliedCouponId) {
+      // Written only after the order row exists — see
+      // `recordCouponRedemption`'s header comment.
+      await recordCouponRedemption(tx, appliedCouponId, userId, order.id);
+    }
 
     const newItems: NewOrderItem[] = lines.map((line) => ({
       orderId: order!.id,

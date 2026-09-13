@@ -12,6 +12,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { users } from "./users";
 import { orderItems } from "./order-items";
+import { coupons } from "./coupons";
 
 /**
  * An explicit, validated order lifecycle (TRENDS_PROJECT_CONTEXT.md §6
@@ -102,6 +103,15 @@ export const orders = pgTable(
     shippingFeeToman: integer("shipping_fee_toman").notNull(),
     discountToman: integer("discount_toman").notNull().default(0),
     totalToman: integer("total_toman").notNull(),
+
+    // --- Coupon snapshot (Phase 9). `couponId` is a nullable FK purely
+    // for admin convenience link-back (`onDelete: "set null"` — see
+    // `order-items.ts`'s header comment for the identical rationale);
+    // `couponCode` is the actual source of truth for what's displayed,
+    // since a coupon row can be edited/deleted after the order that used
+    // it still exists. Both are `null` when no coupon was applied. ---
+    couponId: uuid("coupon_id").references(() => coupons.id, { onDelete: "set null" }),
+    couponCode: text("coupon_code"),
 
     customerNote: text("customer_note"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

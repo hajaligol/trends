@@ -1,21 +1,22 @@
 # Trends Progress Report
 
 ## Current Status
-- Overall status: Checkout + shipping (Phase 8) is implemented **and
+- Overall status: Promotions + payments (Phase 9) is implemented **and
   verified** this session — full network access was available.
-  `npm install` (already satisfied, no new dependencies needed), a fresh
-  migration for 2 new tables (`orders`, `order_items`), `typecheck`,
+  `npm install` (no new dependencies needed), a fresh migration for 4 new
+  tables (`coupons`, `coupon_redemptions`, `payments`, `payment_events`)
+  plus 2 new columns on `orders` (`coupon_id`, `coupon_code`), `typecheck`,
   `lint`, `build`, a fresh-clone migrate+seed check, a direct-to-domain
-  smoke test (12 assertions, including a genuine concurrency race test),
-  and real HTTP-level verification against `npm run start` with actual
-  NextAuth session cookies (login via `/api/auth/callback/credentials`,
-  not just direct-to-domain) all ran and passed. See "Current Phase"
-  below for full detail and the one thing that still wasn't exercised
-  (the real browser `Next-Action` wire protocol for `placeOrderAction`
-  itself — see "Tests/checks").
-- Current phase: none in progress — PHASE 8 is COMPLETE.
-- Last completed phase: PHASE 8 — Checkout + shipping
-- Next phase: PHASE 9 — Promotions + payments
+  smoke test (30 assertions, including a genuine coupon-usage-limit
+  concurrency race and a genuine duplicate-payment-callback idempotency
+  check), and HTTP-level checks against `npm run start` all ran and
+  passed. See "Current Phase" below for full detail and what still
+  wasn't exercised (real browser `Next-Action` wire protocol for
+  `placeOrderAction`/`previewCouponAction` — same category of gap Phase 7
+  and Phase 8 already documented).
+- Current phase: none in progress — PHASE 9 is COMPLETE.
+- Last completed phase: PHASE 9 — Promotions + payments
+- Next phase: PHASE 10 — Orders + fulfillment + customer lifecycle
 - Date: 2026-09-13
 
 ## Completed
@@ -28,6 +29,7 @@ nothing here changed this session.
 ### Phase 1 — Next.js foundation + design system shell
 Next.js App Router + TypeScript + Tailwind v4 foundation, design tokens
 ported verbatim from the prototype, Header/Footer shell, Button/Container
+
 primitives. Verified passing at the time.
 
 ### Phase 2 — Homepage visual migration (verified COMPLETE)
@@ -679,6 +681,250 @@ silently ignored):**
 - Carried over from Phase 7, still outstanding: real browser Server
   Action verification for cart/wishlist actions.
 
+### Phase 9 — Promotions + payments (COMPLETE)
+
+**New database schema** (`src/lib/db/schema/`):
+- `coupons.ts` — `code` (unique, stored upper-cased for case-insensitive
+  lookup), `discountType` enum (`percentage`/`fixed`), `discountValue`
+  (a `CHECK` constraint enforces 1-100 for percentage, >0 for fixed —
+  Postgres, not just application code, rejects a nonsensical row),
+  `minBasketToman`, `startsAt`/`endsAt`, `usageLimit` (nullable =
+  unlimited), `perCustomerLimit` (nullable = unlimited, defaults to `1`),
+  `isActive`. No category/product-restriction columns yet — not called
+  for by any documented requirement this phase; "stacking rules" (§6) is
+  satisfied by construction: an order has exactly one `couponId`, so
+  coupons can never stack with each other.
+- `coupon_redemptions.ts` — one row per successful redemption, written
+  inside `createOrderFromCart`'s transaction. This table, not a counter
+  column on `coupons`, is what usage-limit checks count against.
+  `uniqueIndex(orderId)` — at most one redemption per order.
+- `payments.ts` — one row per payment *attempt* (an order can have more
+  than one, e.g. a failed attempt followed by a retry).
+  `uniqueIndex(provider, providerRef)` is the mechanism idempotent
+  callback handling relies on. `status` enum: `pending`/`succeeded`/`failed`.
+- `payment_events.ts` — an append-only audit trail (§5
+  "reconciliation-friendly records"), written on *every* callback
+  invocation including duplicates, not just on state changes.
+- `orders.ts` — added `couponId` (nullable FK, `onDelete: "set null"`,
+  admin link-back convenience only) and `couponCode` (the actual
+  display/audit source of truth, since a coupon row can later be
+  edited/deleted while old orders that used it still exist).
+- Migration: `drizzle/migrations/0004_rainy_devos.sql` (3 new enums, 4
+  new tables, 2 new columns + 1 new FK on `orders`). Applied cleanly to a
+  fresh database this session.
+
+**New domain code — promotions** (`src/domains/promotions/`):
+- `queries.ts` — `validateCoupon(executor, code, userId, subtotal)`,
+  the single place that checks active/date-window/min-basket/usage-limit/
+  per-customer-limit and computes the discount amount (capped so it can
+  never exceed the subtotal). Takes either the plain `db` (read-only
+  preview) or a transaction handle (`DbTransaction`, exported from
+  `src/lib/db/client.ts` specifically for this) — when called with a
+  transaction, it locks the `coupons` row with `FOR UPDATE` for the rest
+  of that transaction, so two simultaneous checkouts racing for the last
+  redemption of a `usageLimit`-capped coupon serialize against each
+  other rather than both reading "capacity available." This mirrors
+  Phase 8's conditional stock-decrement pattern: the guarantee comes from
+  the database, not from a check-then-write race. `recordCouponRedemption`
+  writes the redemption row, called only after the order row already
+  exists.
+- `actions.ts` — `previewCouponAction(code)`, a read-only Server Action
+  the checkout UI calls before placing the order, purely for UX (shows
+  the discount immediately). It never redeems anything. The authoritative
+  check + actual redemption happen again inside `createOrderFromCart`
+  when the order is actually placed — a code that validates at preview
+  time can still legitimately fail at placement time (e.g. its usage
+  limit fills up in between), which is correct per §4.3, not a bug.
+
+**New domain code — payments** (`src/domains/payments/`):
+- `provider.ts` — extended the `PaymentProvider` interface (established
+  in Phase 8) with `verify(params): Promise<{verified: boolean}>` — the
+  other half of "initiate → redirect → callback → verify." Kept
+  `NotConfiguredPaymentProvider` as the default (`getPaymentProvider()`
+  falls back to it for any `PAYMENT_PROVIDER` value other than `"mock"`).
+  Added `MockPaymentProvider` — a **deliberately test-only, clearly
+  labeled non-production** provider simulating a ZarinPal-style
+  Authority/Status redirect-based gateway, since rule A.17 forbids
+  inventing real gateway credentials in this environment and
+  CLAUDE_BUILD_INSTRUCTIONS.txt's Phase 9 task list explicitly calls for
+  "one test/mock payment provider." Only active when
+  `PAYMENT_PROVIDER=mock` is explicitly set — never the default, and its
+  `name`/routes are labeled "mock" throughout.
+- `queries.ts` — `createPendingPayment()` (writes the `payments` row
+  right after a successful `initiate()` call) and
+  `finalizePaymentVerification(provider, providerRef, verified, payload)`
+  — the one function that turns a verification answer into a durable
+  state change: locks the `payments` row `FOR UPDATE`, records a
+  `callback_received` event unconditionally, and if the payment is no
+  longer `pending` (i.e. this is a duplicate callback), records
+  `duplicate_ignored` and stops — no further writes. Only if still
+  `pending` does it write `succeeded`/`failed` onto the payment and, only
+  on success, flip `orders.status` from `pending_payment` to `paid` in
+  the same transaction (with its own `WHERE status = 'pending_payment'`
+  guard as a second independent layer of the same idempotency property).
+  This is the *only* place in the codebase that ever writes `paid` onto
+  an order.
+
+**Route handlers / pages:**
+- `src/app/api/payments/callback/mock/route.ts` — the callback endpoint
+  the mock gateway "redirects" to (`GET` with `Authority`/`Status` query
+  params, the same shape a real redirect-based gateway uses). Calls
+  `provider.verify()` and acts only on its answer via
+  `finalizePaymentVerification` — never trusts the `Status` query param
+  directly (§5 "never trust the browser return page as proof of
+  payment"). Redirects to `/order/[orderNumber]?payment=success|failed|already-processed`.
+- `src/app/payment/mock/[authority]/page.tsx` — a clearly-labeled
+  (`noindex`, on-page Persian banner) test-only simulator page standing
+  in for a gateway's hosted checkout page; its two buttons are literally
+  links to the callback route with `Status=OK`/`Status=NOK`.
+
+**Order/checkout wiring:**
+- `createOrderFromCart` (`src/domains/orders/queries.ts`) now takes an
+  optional `couponCode` parameter, validates + redeems it inside the same
+  transaction as stock decrement and order insertion (so an invalid
+  coupon rolls back everything, including the stock decrement), and
+  computes `totalToman = subtotal + shippingFee - discount` (floored at
+  0).
+- `placeOrderAction` (`src/domains/orders/actions.ts`) threads the coupon
+  code through, catches `CouponInvalidError` alongside the existing
+  `InsufficientStockError`/`EmptyCartError`, and — after the order is
+  created — calls the payment provider's `initiate()` and persists a
+  `payments` row if it succeeds. Returns `redirectUrl` (to the gateway/
+  simulator) alongside the existing `orderNumber`/`paymentNote`.
+- Added `retryPaymentAction(orderNumber)` for a customer to re-attempt
+  payment on their own still-`pending_payment` order (ownership enforced
+  via `getOrderForUser`, no bare lookup) — creates a fresh `payments` row
+  for the new attempt; any earlier attempt's row is untouched history.
+- `CheckoutView.tsx` — added a coupon-code input (apply/remove, calls
+  `previewCouponAction`, shows the resulting discount in the order
+  summary) and changed order placement to `window.location.href` to
+  `result.redirectUrl` when a provider is configured, falling back to
+  `router.push` to the confirmation page when it isn't (unchanged
+  Phase 8 behavior for the not-configured case).
+- `/order/[orderNumber]` page — shows a discount line (with the coupon
+  code) when `order.discountToman > 0`, a `?payment=` result banner
+  driven by the callback's redirect, and a "پرداخت مجدد" (retry payment)
+  button + `RetryPaymentButton` client component when the order is still
+  `pending_payment`.
+
+**Environment/config:** `.env.example`'s `PAYMENT_PROVIDER` comment now
+documents the `mock` option and points at `MockPaymentProvider`'s header
+comment. No new dependencies.
+
+**Tests/checks — all run this session, full network access available:**
+- `npx tsc --noEmit` — clean.
+- `npx eslint .` — clean.
+- `npm run build` — succeeds; `/` still statically prerendered;
+  `/payment/mock/[authority]` and `/api/payments/callback/mock` both
+  appear as new dynamic (`ƒ`) routes, everything else unchanged from
+  Phase 8's route list.
+- Fresh-database check: `DROP DATABASE`/`CREATE DATABASE`, `drizzle-kit
+  migrate` (all 5 migrations, including this session's new one, applied
+  cleanly), `npm run db:seed` — all succeeded from empty.
+- **Direct-to-domain smoke test** (temporary `scripts/scratch-phase9.ts`,
+  deleted after use — not part of the deliverable): 30 assertions, all
+  passed:
+  - Invalid/expired/inactive/below-minimum-basket coupon codes are all
+    rejected with `CouponInvalidError`.
+  - A percentage coupon computes the correct discount and is looked up
+    case-insensitively (`test10` matches a coupon stored as `TEST10`).
+  - A full order created with a valid coupon has the correct
+    `discountToman`, `totalToman`, and `couponCode` snapshot.
+  - **Per-customer limit**: the same user attempting to redeem a
+    `perCustomerLimit: 1` coupon a second time is rejected, and — because
+    the rejection happens inside the same transaction as the (would-be)
+    stock decrement — the cart item from the failed attempt is confirmed
+    still present (the whole transaction rolled back, not just the
+    coupon check).
+  - **Global usage limit**: a `usageLimit: 1` coupon succeeds once, then
+    is rejected for a *different* customer's subsequent order.
+  - **Genuine concurrency race**: a fresh `usageLimit: 1` coupon, two
+    different users' orders fired via `Promise.allSettled` at the same
+    time — exactly one order succeeded and exactly one was rejected,
+    confirming the `FOR UPDATE` lock actually serializes the race rather
+    than both racing past a read-then-write check.
+  - **Full mock payment loop**: `getPaymentProvider()` returns the mock
+    provider only when `PAYMENT_PROVIDER=mock`; `initiate()` returns an
+    `ok: true` result with a `redirectUrl`/`providerRef`;
+    `createPendingPayment` persists it; `provider.verify({Status: "OK"})`
+    reports `verified: true`; `finalizePaymentVerification` transitions
+    the payment to `succeeded` and the order to `paid`.
+  - **Duplicate callback idempotency**: calling
+    `finalizePaymentVerification` a second time with the same
+    `providerRef` reports `already_processed`, the order's status is
+    unchanged (`paid`, not re-processed), the payment row is still
+    exactly `succeeded` (not double-applied), and `payment_events`
+    contains exactly one `callback_received` per actual call (2 total),
+    one `verified_succeeded`, and one `duplicate_ignored` — a real,
+    inspectable audit trail, not just a boolean.
+  - **Failure path**: `Status: "NOK"` reports `verified: false`;
+    `finalizePaymentVerification` marks the payment `failed` and leaves
+    the order at `pending_payment` (so `retryPaymentAction` can act on it
+    later).
+  - An unknown `providerRef` (a forged/garbled callback) reports
+    `not_found` without touching any row.
+  - With `PAYMENT_PROVIDER` unset, `getPaymentProvider()` returns the
+    not-configured stub, whose `initiate()` never returns `ok: true` and
+    whose `verify()` always reports `false` — a misconfigured environment
+    can never be tricked into marking anything paid.
+  - All test users/coupons deleted afterward (orders/payments referencing
+    them were left in place by design — an order retains history even if
+    the customer row is later removed — so the database was reset via
+    `DROP DATABASE`/`CREATE DATABASE`/migrate/seed rather than row-level
+    cleanup, and reseeded to the clean baseline state this report leaves
+    the project in).
+- **HTTP-level checks** against `npm run start` (a genuine listening
+  server in this session, verified via `curl`):
+  - `GET /` → `200`.
+  - `GET /payment/mock/[authority]?orderNumber=...&amount=...` → `200`,
+    renders without a real `payments` row existing (it's a static
+    simulator page, independent of database state).
+  - `GET /api/payments/callback/mock?Authority=...&Status=OK` for an
+    authority with no matching `payments` row → `307` to `/` (the
+    `not_found` branch), confirming a forged/garbled callback can't
+    crash the route or leak whether any order exists.
+  - `GET /order/[orderNumber]` (any number) while signed out → `307` to
+    `/login` — ownership/auth gate still enforced at the HTTP layer.
+  - `GET /checkout` while signed out → `307` to `/login` (unchanged from
+    Phase 8, re-confirmed after this phase's edits).
+- **What was *not* verified this session, and why:** the same category of
+  gap Phase 7 and Phase 8 both documented — no browser-automation tool is
+  available in this sandbox, so `previewCouponAction`/`placeOrderAction`/
+  `retryPaymentAction` were not driven through a real browser's
+  `Next-Action` RSC wire call, nor was a full authenticated
+  browser-clicks-"شبیه‌سازی پرداخت موفق"-and-lands-on-the-confirmation-page
+  round trip exercised end-to-end. Every piece of business logic those
+  actions call was verified directly (above), and their surrounding
+  HTTP/auth/redirect behavior was verified via real `curl` requests
+  (above) — what's specifically missing is watching an actual rendered
+  browser click through the whole coupon-apply → place-order → mock-gateway
+  → callback → confirmation-page flow. A session with browser automation
+  available should do this once, and should also close out the
+  same-category gap already carried over from Phases 7 and 8.
+
+**Known limitations / follow-ups (not blocking, documented rather than
+silently ignored):**
+- **No real payment gateway is configured** — by design, per rule A.17.
+  `MockPaymentProvider` exercises the full protocol shape; a real
+  ZarinPal-or-similar adapter is a contained addition inside
+  `getPaymentProvider()` whenever real merchant credentials exist.
+- **No coupon admin UI** — coupons must currently be inserted directly
+  into the `coupons` table (as the smoke test did). Admin CRUD for
+  coupons is explicitly Phase 11's scope ("coupons/promotions" in the
+  admin task list).
+- **No category/product-restricted coupons** — every active coupon
+  applies store-wide. Not called for by any specific requirement so far;
+  would need a `coupon_category_restrictions`/`coupon_product_restrictions`
+  join table if it becomes a real requirement.
+- **No inventory reservation window, still** — carried over from Phase 8;
+  a real gateway integration (a genuine gap between "redirected to pay"
+  and "verified paid") is what would make a reservation-then-confirm
+  flow meaningfully different from today's "decrement at order placement"
+  behavior. Revisit if/when a real gateway is wired in.
+- Same carried-over gaps as Phase 8: no guest checkout, no `callbackUrl`
+  round-trip through `/login`, no `/account/orders` list (Phase 10).
+- See "What was *not* verified" above.
+
 
 
 ## Architecture Decisions
@@ -748,6 +994,32 @@ silently ignored):**
   not a requirement from TRENDS_PROJECT_CONTEXT.md (which describes
   checkout's steps as logical sections, not mandated separate routes).
 
+- Coupon usage-limit/per-customer-limit enforcement counts real rows in
+  `coupon_redemptions`, never a counter column on `coupons` — a counter
+  can drift from reality under a crash mid-transaction; counting rows
+  inside the same transaction that's already `FOR UPDATE`-locking the
+  coupon cannot.
+- `validateCoupon` accepts either the plain `db` or a transaction handle
+  (typed via `DbTransaction`, exported from `db/client.ts`) rather than
+  being two separate functions — one preview-mode, one authoritative —
+  because the actual validation rules must be identical in both places;
+  duplicating them would risk the two drifting apart.
+- `payments` intentionally allows multiple rows per order (one per
+  attempt) rather than one row updated in place — history of a failed
+  attempt followed by a successful retry is real reconciliation-relevant
+  data (§5), not noise to overwrite.
+- `finalizePaymentVerification`'s idempotency comes from `FOR UPDATE`
+  row-locking plus a `WHERE status = 'pending'` conditional transition —
+  the same "let the database provide the guarantee" principle Phase 8
+  used for stock decrement, applied here to "a duplicate callback must be
+  a no-op," not "a duplicate callback must be prevented from arriving,"
+  since the latter isn't something a callback endpoint can control.
+- The mock payment provider deliberately mimics a *specific* real
+  gateway's shape (ZarinPal's Authority/Status redirect pattern) rather
+  than an abstract/generic one, so that swapping in a real adapter later
+  is a matter of replacing `verify()`'s internals with a real HTTP call,
+  not redesigning the callback route or the `payments` schema.
+
 ## Important Assumptions
 
 - Password-based auth (mobile + password) was chosen as this phase's
@@ -785,6 +1057,19 @@ silently ignored):**
   in a real gateway.
 - No coupon/discount logic exists at checkout yet (`orders.discountToman`
   is schema-ready but always `0`) — Phase 9's scope.
+
+- **`PAYMENT_PROVIDER` is unset by default in `.env.example`** — a real
+  deployment stays on the honest `NotConfiguredPaymentProvider` until an
+  operator deliberately sets up a real gateway. `PAYMENT_PROVIDER=mock`
+  is a session/testing convenience, not a recommended default anywhere
+  outside development.
+- **`perCustomerLimit` defaults to `1`** at the schema level (not
+  `null`/unlimited) — a sensible default for typical promo-code use
+  (one redemption per customer) that an admin can override per-coupon
+  once Phase 11 builds the admin UI to do so; there is currently no way
+  to change it except a direct database write.
+- Coupons apply store-wide with no category/product restriction — no
+  documented requirement called for scoping them narrower yet.
 
 ## Known Issues / Technical Debt
 
@@ -825,76 +1110,99 @@ Phase 8 adds:
   business logic + real-cookie HTTP-level page/redirect/ownership
   checks).
 
+Phase 9 adds:
+
+- **No real payment gateway configured** — by design (rule A.17); only
+  the mock provider exists. Replacing it with a real adapter is Phase 9's
+  work whenever real credentials are available (not scheduled as a
+  numbered phase — see CLAUDE_BUILD_INSTRUCTIONS.txt's phase list, which
+  doesn't allocate a separate phase to this).
+- **No coupon admin UI** — coupons are database-rows-only right now;
+  Phase 11's job.
+- **No category/product-restricted coupons** — every coupon is store-wide.
+- **No inventory reservation window, still** — same reasoning as Phase 8;
+  revisit once/if a real gateway creates a meaningful placed-vs-paid gap.
+- **Real browser/`Next-Action`-wire-protocol verification of
+  `previewCouponAction`/`placeOrderAction`/`retryPaymentAction`, and of
+  the full coupon-apply → place-order → mock-gateway → callback →
+  confirmation round trip, has not been done** — same sandbox limitation
+  (no browser automation tool available) as Phases 7 and 8; see this
+  phase's "Tests/checks" for exactly what direct-to-domain and
+  real-`curl` HTTP-level verification was done instead.
+- Carried over, still outstanding: guest checkout doesn't exist, no
+  `callbackUrl` round-trip through `/login`, no `/account/orders` list
+  (Phase 10), real browser Server Action verification for cart/wishlist
+  actions (Phase 7) and for checkout/order-placement actions (Phase 8).
+
 ## Next Session Instructions
 
-- **Exact next objective: PHASE 9 — Promotions + payments**, per
-  CLAUDE_BUILD_INSTRUCTIONS.txt §D. Phase 8 is COMPLETE — do not redo
-  checkout/order-creation work; build promotions and a real payment
-  adapter on top of it.
+- **Exact next objective: PHASE 10 — Orders + fulfillment + customer
+  lifecycle**, per CLAUDE_BUILD_INSTRUCTIONS.txt §D. Phase 9 is
+  COMPLETE — do not redo coupon/payment work; build order history,
+  status transitions, and fulfillment on top of it.
   1. **First, if browser automation is available in this session's
-     environment, do the real end-to-end verification Phase 7 *and*
-     Phase 8 could not:** add an item to cart, go through `/checkout` in
-     an actual rendered browser (select/add an address, pick a shipping
-     method, click "ثبت سفارش"), confirm it lands on
-     `/order/[orderNumber]` with the right contents, and confirm the
-     cart is empty afterward. Fix anything that's actually broken before
-     building payments on top of it; if no browser automation is
-     available, note that again and proceed carefully using the
-     direct-to-domain + HTTP-level verification approach both phases
-     have used so far.
-  2. Read CLAUDE_BUILD_INSTRUCTIONS.txt's Phase 9 task list and
-     TRENDS_PROJECT_CONTEXT.md §5 "Payment"/§6 "Promotions" before
-     writing code.
-  3. **Coupons**: design a `coupons`/`coupon_redemptions` schema per §6
-     "Promotions" (percentage/fixed discount, minimum basket, start/end
-     time, usage limit, per-customer limit, active flag, stacking
-     rules). Wire validation into `placeOrderAction`
-     (`src/domains/orders/actions.ts`) — the order's existing
-     `discountToman` column is ready to receive a real value; nothing
-     about `createOrderFromCart`'s signature should need to change more
-     than adding a discount amount/coupon-id parameter.
-  4. **Payments**: replace `NotConfiguredPaymentProvider`
-     (`src/domains/payments/provider.ts`) with a real adapter behind the
-     same `PaymentProvider` interface — do not change the interface
-     shape unless a real limitation is found; every call site already
-     goes through `getPaymentProvider()`. Add a `payments`/
-     `payment_events` table per §12's data model list. Payment
-     initiation redirects the customer to the gateway; **verification of
-     the return/callback must happen server-side against the gateway's
-     API, never by trusting the browser's return URL** (§5) — this is
-     the single most important correctness requirement for this phase.
-     Idempotency: a duplicate callback (gateway retries, or a user
-     double-clicking "return to store") must not double-process a
-     payment or duplicate an order — design the callback handler to be
-     safe to call twice with the same reference.
-  5. Never invent real gateway credentials (rule A.17) — if no real
-     ZarinPal/other gateway credentials are available in this
-     environment, keep `NotConfiguredPaymentProvider` as the default and
-     build a **mock/test provider** instead (CLAUDE_BUILD_INSTRUCTIONS.txt
-     Phase 9 task list explicitly allows/expects "one test/mock payment
-     provider"), clearly labeled as non-production, alongside the real
-     adapter's interface so the full flow (initiate → redirect →
-     callback → verify → mark paid) can actually be exercised and
-     verified end-to-end even without real gateway access.
-  6. Once payment verification succeeds, transition `orders.status` from
-     `pending_payment` to `paid` — this is the first code path that will
-     ever move it off `pending_payment`; make sure the transition only
-     happens after genuine server-side verification, not on gateway
-     redirect alone.
-  7. Run `typecheck`/`lint`/`build` and verify manually: a coupon can't
-     be redeemed past its usage limit or by the same user past their
-     per-user limit, a duplicate payment callback doesn't double-apply,
-     and an order only becomes `paid` after real (or mock-provider)
-     verification, never from the browser return page alone.
-  8. Update `PROGRESS.md` the same way this session did.
-- Files/areas to inspect first: `src/domains/orders/actions.ts` and
-  `queries.ts` (where discount/payment status will plug in),
-  `src/domains/payments/provider.ts` (the interface to implement
-  against), `src/lib/db/schema/orders.ts` (`discountToman`, `status`
-  enum — what Phase 9 will actually mutate).
-- Do not start Phase 10 (fulfillment/order history) before Phase 9 —
-  order-status transitions belong together with what causes them
-  (payment verification).
+     environment, do the real end-to-end verification Phases 7, 8, and 9
+     could not:** in an actual rendered browser, add an item to cart, go
+     through `/checkout` (apply a real coupon code, pick a shipping
+     method, click "ثبت سفارش"), land on the mock gateway simulator page,
+     click "شبیه‌سازی پرداخت موفق", confirm the redirect lands on
+     `/order/[orderNumber]?payment=success` with `paid` status displayed.
+     Fix anything genuinely broken before building fulfillment on top of
+     it; if no browser automation is available, note that again and
+     continue with the direct-to-domain + HTTP-level verification
+     approach all three phases have used so far.
+  2. Read CLAUDE_BUILD_INSTRUCTIONS.txt's Phase 10 task list and
+     TRENDS_PROJECT_CONTEXT.md §6 "Orders" before writing code.
+  3. **Order history**: build `/account/orders` (a list of the signed-in
+     customer's own orders, ownership-scoped — reuse/extend
+     `src/domains/orders/queries.ts`, add a `getOrdersForUser(userId)`-
+     style function rather than a bare `getAllOrders`). Link to it from
+     the account area.
+  4. **Order status timeline**: the `orders.status` enum already has
+     `processing`/`shipped`/`delivered`/`cancelled`/`refunded` states
+     defined but unreachable — Phase 10 is what should add the actual
+     transitions (customer-facing status display + an
+     `order_status_history`-style audit trail per
+     TRENDS_PROJECT_CONTEXT.md §12's data model list, not yet a table in
+     this schema — add it this phase).
+  5. **Admin order status transitions**: needs *some* form of
+     authorization even though Phase 11 (full admin area) hasn't been
+     built yet — either scope this phase's admin mutation narrowly and
+     re-home it under Phase 11's admin area later, or coordinate with
+     Phase 11's scope so the two don't duplicate work. Use `role`
+     (already on `users`, unused until now) to gate it — never a route
+     that's merely unlinked from the UI (rule §7 "Admin must not rely on
+     hidden UI alone for authorization").
+  6. **Cancellation rules**: a customer should be able to cancel their
+     own order only from an appropriate status (e.g. `pending_payment` or
+     early `paid`/`processing`, not `shipped`/`delivered`) — validate the
+     transition server-side against the current status, not against
+     whatever the client claims it is.
+  7. **Tracking number field + shipment abstraction**: a simple
+     `trackingNumber` column (or a small `shipments` table, per §12) is
+     enough for this phase — no real carrier API integration is expected
+     yet.
+  8. **Notification abstraction**: order confirmation/status-change
+     notifications need *an* adapter interface (mirrors the
+     `PaymentProvider` pattern) even if the only implementation is a
+     console-log/no-op stub for now (an SMS/email provider isn't
+     configured — rule A.17 applies the same way it did to payments).
+  9. Run `typecheck`/`lint`/`build` and verify manually: a customer can
+     see their own order history and not anyone else's, a status
+     transition is validated against the *current* database status (not
+     an arbitrary string from the client), and historical order data
+     stays stable even if the underlying product/variant is later
+     edited (already true since Phase 8's snapshots — just confirm it
+     still holds).
+  10. Update `PROGRESS.md` the same way this session did.
+- Files/areas to inspect first: `src/domains/orders/queries.ts` (where
+  `getOrderForUser` already exists — Phase 10 needs its list-returning
+  sibling), `src/lib/db/schema/orders.ts` (the `status` enum — what
+  Phase 10 will actually transition through), `src/app/order/[orderNumber]/page.tsx`
+  (the existing detail page Phase 10's timeline UI extends).
+- Do not start Phase 11 (admin) before Phase 10's fulfillment/lifecycle
+  work is done, per CLAUDE_BUILD_INSTRUCTIONS.txt's "do not jump ahead
+  multiple phases."
 
 ## Commands
 
@@ -915,7 +1223,11 @@ Phase 8 adds:
 - seed: `npm run db:seed` (or `npx tsx --env-file=.env.local src/lib/db/seed.ts`)
   — wipes and re-populates the catalog tables from
   `src/domains/catalog/demo-data.ts`. Does not touch `users`/`addresses`/
-  `password_reset_tokens`/`carts`/`orders`/etc.
+  `password_reset_tokens`/`carts`/`orders`/`coupons`/`payments`/etc.
+- To exercise the mock payment gateway locally: set `PAYMENT_PROVIDER=mock`
+  in `.env.local`, restart the dev/start server, and place an order —
+  checkout will redirect to `/payment/mock/[authority]`, a simulator page
+  with "success"/"fail" buttons that hit `/api/payments/callback/mock`.
 
 **Local PostgreSQL setup used this session** (Ubuntu 24.04 sandbox with
 `apt-get` access — adjust for whatever environment runs the next
@@ -942,5 +1254,5 @@ npm 10.9.7, Next.js 16.3.4, React 19.2.8, Tailwind CSS 4.3.3,
 ESLint 9.39.5 + eslint-config-next 16.3.4, drizzle-orm ^0.45.2,
 drizzle-kit ^0.31.10, postgres (porsager driver, latest), tsx 4.23.13,
 PostgreSQL server 16.15, next-auth@beta 5.0.0-beta.32, bcryptjs 3.0.3,
-zod 4.6.2. No new dependencies were added in Phase 8 — checkout/shipping/
-orders used only what was already installed (same as Phase 7).
+zod 4.6.2. No new dependencies were added in Phase 9 — coupons/payments
+used only what was already installed (same as Phases 7 and 8).
