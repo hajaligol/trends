@@ -1,26 +1,28 @@
+import { getSiteSettings } from "@/domains/admin/settings-queries";
+
 /**
  * Shipping-method abstraction, per TRENDS_PROJECT_CONTEXT.md §5
  * "Shipping" (methods, fee, free-shipping threshold, estimated delivery,
  * serviceability rules) and §8 "free-shipping threshold configuration".
  *
- * This is a small, self-contained module (not a database table) — the
- * two methods below and the free-shipping threshold are business
- * configuration, not user-generated data, and CLAUDE_BUILD_INSTRUCTIONS.txt
- * rule F.1/F.6 ("prefer the simplest production-safe solution", "prefer
- * fewer dependencies") favors a typed config module over a `shipping_methods`
- * table for something this small and static. If a future phase needs
- * admin-editable shipping methods (§7 "shipping settings"), promoting
- * this to a table is a contained migration — every call site already
- * goes through `getShippingMethod`/`listShippingMethods`, never a
- * hardcoded literal.
+ * Method labels/estimates/codes stay a small typed config module
+ * here (not a database table) — CLAUDE_BUILD_INSTRUCTIONS.txt rule
+ * F.1/F.6 ("prefer the simplest production-safe solution", "prefer fewer
+ * dependencies") still favors that over a `shipping_methods` table for
+ * something this static (no admin task asks for adding/removing
+ * *methods*, only editing their *fees* and the threshold).
  *
- * **Assumption (documented per rule A.18):** since
- * TRENDS_PROJECT_CONTEXT.md doesn't specify real courier names, fees, or
- * delivery windows, these are placeholder business values typical of an
- * Iranian online store (Tipax/Post-style standard shipping + a paid
- * express option), clearly not sourced from a real contracted courier.
- * Whoever operates the store should replace `FEE_TOMAN`/`FREE_SHIPPING_THRESHOLD_TOMAN`
- * with real figures before launch.
+ * Phase 11 promoted exactly what §7's "shipping settings" admin task
+ * asked for — the fee amounts and the free-shipping threshold — to the
+ * admin-editable `site_settings` singleton row (see
+ * `src/domains/admin/settings-queries.ts`), fulfilling this module's own
+ * previously-documented migration note ("if a future phase needs
+ * admin-editable shipping methods, promoting this to a table is a
+ * contained migration"). `getShippingMethod`/`listShippingMethods`
+ * became async as a result; both of their only two call sites
+ * (`src/app/checkout/page.tsx`, `src/domains/orders/actions.ts`) already
+ * ran inside `async` server functions, so this was a same-file,
+ * low-risk change.
  */
 
 export type ShippingMethod = {
@@ -30,21 +32,11 @@ export type ShippingMethod = {
   feeToman: number;
 };
 
-const FREE_SHIPPING_THRESHOLD_TOMAN = 2_000_000;
+type BaseMethod = { code: string; label: string; estimateLabel: string };
 
-const BASE_METHODS: ShippingMethod[] = [
-  {
-    code: "standard",
-    label: "ارسال استاندارد (پست پیشتاز)",
-    estimateLabel: "۳ تا ۵ روز کاری",
-    feeToman: 90_000,
-  },
-  {
-    code: "express",
-    label: "ارسال اکسپرس",
-    estimateLabel: "۱ تا ۲ روز کاری",
-    feeToman: 180_000,
-  },
+const BASE_METHODS: BaseMethod[] = [
+  { code: "standard", label: "ارسال استاندارد (پست پیشتاز)", estimateLabel: "۳ تا ۵ روز کاری" },
+  { code: "express", label: "ارسال اکسپرس", estimateLabel: "۱ تا ۲ روز کاری" },
 ];
 
 /**
@@ -58,17 +50,24 @@ const BASE_METHODS: ShippingMethod[] = [
  * Iran for now; a future phase can filter this list by the selected
  * address's province if that becomes a real requirement.
  */
-export function listShippingMethods(subtotalToman: number): ShippingMethod[] {
-  const qualifiesForFreeStandard = subtotalToman >= FREE_SHIPPING_THRESHOLD_TOMAN;
-  return BASE_METHODS.map((method) =>
-    method.code === "standard" && qualifiesForFreeStandard
-      ? { ...method, feeToman: 0, label: `${method.label} (رایگان)` }
-      : method,
-  );
+export async function listShippingMethods(subtotalToman: number): Promise<ShippingMethod[]> {
+  const settings = await getSiteSettings();
+  const feeByCode: Record<string, number> = {
+    standard: settings.standardShippingFeeToman,
+    express: settings.expressShippingFeeToman,
+  };
+  const qualifiesForFreeStandard = subtotalToman >= settings.freeShippingThresholdToman;
+
+  return BASE_METHODS.map((method) => {
+    const feeToman = feeByCode[method.code] ?? 0;
+    if (method.code === "standard" && qualifiesForFreeStandard) {
+      return { ...method, feeToman: 0, label: `${method.label} (رایگان)` };
+    }
+    return { ...method, feeToman };
+  });
 }
 
-export function getShippingMethod(code: string, subtotalToman: number): ShippingMethod | null {
-  return listShippingMethods(subtotalToman).find((method) => method.code === code) ?? null;
+export async function getShippingMethod(code: string, subtotalToman: number): Promise<ShippingMethod | null> {
+  const methods = await listShippingMethods(subtotalToman);
+  return methods.find((method) => method.code === code) ?? null;
 }
-
-export { FREE_SHIPPING_THRESHOLD_TOMAN };

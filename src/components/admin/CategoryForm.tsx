@@ -1,0 +1,76 @@
+"use client";
+
+import { useActionState } from "react";
+import { FormField } from "@/components/ui/FormField";
+import { SubmitButton } from "@/components/ui/SubmitButton";
+import { createCategoryAction, updateCategoryAction } from "@/domains/categories/actions";
+import type { AdminCategoryRow } from "@/domains/categories/queries";
+import type { ActionResult } from "@/domains/auth/roles";
+
+const initialState: ActionResult = { ok: true };
+
+export function CategoryForm({
+  category,
+  parentOptions,
+  onDone,
+}: {
+  category?: AdminCategoryRow;
+  parentOptions: { id: string; name: string }[];
+  onDone?: () => void;
+}) {
+  const action = category ? updateCategoryAction : createCategoryAction;
+  const [state, formAction] = useActionState(action, initialState);
+
+  return (
+    <form
+      action={async (formData) => {
+        await formAction(formData);
+        onDone?.();
+      }}
+      className="flex flex-col gap-4"
+    >
+      {category && <input type="hidden" name="id" value={category.id} />}
+
+      {!state.ok && (
+        <p role="alert" className="rounded-[var(--radius-sm)] bg-red-50 px-4 py-2.5 text-[0.85rem] text-red-700">
+          {state.error}
+        </p>
+      )}
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <FormField label="نام دسته" name="name" defaultValue={category?.name} required />
+        <FormField label="نامک (slug)" name="slug" defaultValue={category?.slug} required placeholder="مثال: women-shoes" />
+      </div>
+
+      <FormField label="توضیحات (اختیاری)" name="description" defaultValue={category?.description ?? ""} />
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <label className="flex flex-col gap-1.5">
+          <span className="text-[0.85rem] text-ink">دسته والد (اختیاری)</span>
+          <select
+            name="parentId"
+            defaultValue={category?.parentId ?? ""}
+            className="w-full rounded-[var(--radius-md)] border border-line bg-white px-4 py-3 text-[0.92rem] text-ink outline-none focus:outline-2 focus:outline-ink"
+          >
+            <option value="">— بدون والد —</option>
+            {parentOptions
+              .filter((option) => option.id !== category?.id)
+              .map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.name}
+                </option>
+              ))}
+          </select>
+        </label>
+        <FormField label="ترتیب نمایش" name="displayOrder" type="number" defaultValue={String(category?.displayOrder ?? 0)} />
+      </div>
+
+      <label className="flex items-center gap-2 text-[0.88rem] text-ink">
+        <input type="checkbox" name="isActive" defaultChecked={category?.isActive ?? true} className="h-4 w-4" />
+        فعال (در فروشگاه نمایش داده شود)
+      </label>
+
+      <SubmitButton pendingLabel="در حال ذخیره...">{category ? "ذخیره تغییرات" : "افزودن دسته"}</SubmitButton>
+    </form>
+  );
+}

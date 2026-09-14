@@ -1,23 +1,19 @@
 # Trends Progress Report
 
 ## Current Status
-- Overall status: Orders + fulfillment + customer lifecycle (Phase 10) is
-  implemented **and verified** this session — full network access was
-  available. A migration for 1 new table (`order_status_history`) plus 3
-  new columns on `orders` (`tracking_number`, `cancel_reason`,
-  `cancelled_at`), `typecheck`, `lint`, `build`, a fresh-clone
-  migrate+seed check, a direct-to-domain smoke test (23 assertions,
-  including a genuine concurrent-double-cancellation race and forged
-  admin-transition rejection), and HTTP-level checks against
-  `npm run start` (using real NextAuth session cookies for both a
-  `customer`-role and an `admin`-role user) all ran and passed. See
-  "Current Phase" below for full detail and what still wasn't exercised
-  (same real-browser `Next-Action` wire-protocol gap Phases 7-9 already
-  documented).
-- Current phase: none in progress — PHASE 10 is COMPLETE.
-- Last completed phase: PHASE 10 — Orders + fulfillment + customer lifecycle
-- Next phase: PHASE 11 — Admin/operations
-- Date: 2026-09-13
+- Overall status: Admin/operations (Phase 11) is implemented **and
+  verified** this session — full network access was available. 4 new
+  tables (`audit_logs`, `hero_slides`, `promo_banners`, singleton
+  `site_settings`) were migrated against a fresh local Postgres,
+  `typecheck`/`lint`/`build` all pass clean, the seed script now also
+  populates `hero_slides`/`promo_banners`, and every new query/action
+  module was exercised directly against the real database (not just
+  compiled) via throwaway verification scripts that were deleted again
+  before finishing — see "Tests/checks" below for exactly what ran.
+- Current phase: none in progress — PHASE 11 is COMPLETE.
+- Last completed phase: PHASE 11 — Admin/operations
+- Next phase: PHASE 12 — Reviews, content, support, notifications
+- Date: 2026-09-14
 
 ## Completed
 
@@ -1246,6 +1242,230 @@ silently ignored):**
 - See "What was *not* verified" above.
 
 
+### Phase 11 — Admin/operations (COMPLETE)
+
+**Goal:** make the shop operable without editing code — real admin CRUD
+for every catalog/customer/promotion/content/settings surface, with
+server-side authorization and audit logging, per
+TRENDS_PROJECT_CONTEXT.md §7 and CLAUDE_BUILD_INSTRUCTIONS.txt Phase 11.
+
+**New schema** (`src/lib/db/schema/`, migration
+`drizzle/migrations/0006_green_selene.sql`, applied and verified against
+a real local Postgres):
+- `audit-logs.ts` — general "who did what, when" trail (actor, action,
+  entity type/id, JSON payload). Distinct from Phase 10's
+  `order_status_history`, which stays the order-specific timeline
+  customers/admins see on an order's own page; `audit_logs` is the
+  cross-entity admin activity log every mutation this phase adds writes
+  to. `actorId` is `onDelete: "set null"` so deleting a staff account
+  (not currently even possible from the UI) can never destroy history.
+- `hero-slides.ts` / `promo-banners.ts` — homepage promotional content,
+  replacing `demo-data.ts`'s hardcoded `demoHeroSlides`/`demoBanners`
+  per CLAUDE_BUILD_INSTRUCTIONS.txt §14. No image-upload/URL column yet
+  — there is still no object-storage/CDN pipeline (§3), so slides/
+  banners keep rendering through `AssetSlot` placeholders exactly as the
+  demo fixtures did; only text content, CTA links, ordering, and
+  active-state became admin-editable. `src/app/page.tsx` now reads both
+  from the DB (`@/domains/content/queries`), and the homepage sections
+  simply don't render when empty (no crash on a freshly-migrated,
+  unseeded DB).
+- `site-settings.ts` — a genuine singleton row (fixed id `"default"`,
+  enforced by `getSiteSettings()` in
+  `src/domains/admin/settings-queries.ts`, which creates the row with
+  defaults on first read if missing). Promotes what was previously
+  hardcoded in `src/domains/shipping/methods.ts`
+  (`FREE_SHIPPING_THRESHOLD_TOMAN` and per-method fees) to admin-editable
+  config — `listShippingMethods`/`getShippingMethod` became `async` as a
+  result; both call sites (`src/app/checkout/page.tsx`,
+  `src/domains/orders/actions.ts`) already ran inside `async` functions,
+  so this was a low-risk, same-file change. Payment provider config is
+  deliberately **not** in this table — `/admin/settings` only displays
+  which `PAYMENT_PROVIDER` env var is currently set (read server-side,
+  never a secret value), per rule A.13/G; changing the real provider
+  still requires editing environment config and redeploying.
+
+**New domain code:**
+- `src/domains/auth/roles.ts` — shared `isStaffOrAdmin`/`isAdmin`
+  predicates and a generic `ActionResult<T>` type, promoted out of
+  `orders/admin-actions.ts`'s previously-private `isStaffOrAdmin` per
+  this phase's own hand-off instruction. Every admin Server Action added
+  this phase imports this instead of redefining its own check.
+  `orders/admin-actions.ts` was updated to use it and to additionally
+  write to `audit_logs` on every successful status transition.
+- `src/domains/analytics/audit.ts` — `recordAuditLog` (write) +
+  `listAuditLogs`/`listAuditLogEntityTypes` (paginated read for
+  `/admin/audit-log`).
+- `src/domains/categories/{queries,actions}.ts` — admin-facing category
+  reads (including inactive rows, product counts, parent names) and
+  create/update/delete. Delete is blocked with a friendly error if the
+  category has children or products (`categoryHasChildrenOrProducts`) —
+  the DB's FK constraints would otherwise just throw.
+- `src/domains/catalog/{admin-queries,admin-actions}.ts` — admin product
+  list (search/category filter/pagination, aggregated variant
+  count/total stock/min price), product detail (with variants+images),
+  and full CRUD for products/variants/images. Variant SKU and
+  size+color-per-product uniqueness are enforced by the DB (the latter
+  via the existing `product_variants_product_size_color_idx` from Phase
+  3) with a friendly Persian message on conflict, not just an app-level
+  check. Product delete is safe by existing schema design —
+  `order_items.productId`/`variantId` are `onDelete: "set null"` (Phase
+  8), so historical orders keep their own immutable snapshot fields
+  regardless of whether the live product still exists.
+- `src/domains/inventory/actions.ts` — a single `adjustStockAction`
+  (signed delta + reason), not a full `inventory_movements` ledger
+  table. Documented in-file why: Phase 8's checkout inventory decrement
+  doesn't participate in any ledger either (it updates `stock` directly
+  inside the order transaction), so building a ledger only for this one
+  admin action would produce a half-populated table arguably worse than
+  none. Every adjustment is instead written to the general `audit_logs`
+  table with before/after stock and reason — a real, queryable trail
+  without a second, parallel inventory-tracking system. The actual
+  update is a single conditional
+  `SET stock = stock + delta WHERE ... AND stock + delta >= 0` (never a
+  read-then-write), so a concurrent checkout decrementing the same
+  variant can't be raced into negative stock.
+- `src/domains/customers/{queries,actions}.ts` — paginated/searchable
+  customer list (search matches mobile/name/email) with order
+  count/total spend, detail view with recent orders, and an admin-only
+  `updateCustomerRoleAction`. Two guards beyond the plain `isAdmin`
+  check: an admin cannot demote themselves, and the last remaining
+  staff/admin account in the whole system cannot be demoted to
+  `customer` — both verified directly this session (see "Tests/checks").
+- `src/domains/promotions/{admin-queries,admin-actions}.ts` — admin
+  coupon list (with redemption counts), create/update, and a lightweight
+  `toggleCouponActiveAction`. Kept separate from
+  `src/domains/promotions/queries.ts`'s `validateCoupon` (Phase 9), which
+  remains the only place a discount is ever actually computed/applied.
+- `src/domains/content/{queries,actions}.ts` — hero slide / promo banner
+  CRUD, plus the active-only reads the homepage uses.
+- `src/domains/admin/{dashboard,settings-queries,settings-actions}.ts` —
+  dashboard summary aggregate (orders awaiting action, this month's
+  revenue, customer count, low-stock count, recent orders) and site
+  settings get/update. `settings-queries.ts` intentionally has no `"use
+  server"` directive (it exports a synchronous `getPaymentProviderStatus`
+  alongside async reads — a `"use server"` file may only export async
+  functions, so the mutation went in a separate `settings-actions.ts`).
+- `src/lib/validation/admin.ts` — Zod schemas for every new form
+  (category/product/variant/image/stock-adjustment/coupon/hero-slide/
+  promo-banner/site-settings/customer-role).
+
+**New admin UI** (`src/app/admin/`, `src/components/admin/`):
+- `/admin/layout.tsx` rebuilt from Phase 10's minimal "just Orders"
+  shell into a real dashboard shell: top bar + `AdminNav` (pill nav to
+  every section below) + the same server-side `role !== admin/staff →
+  notFound()` gate as before (unchanged reasoning — a 404, not a
+  redirect, so a non-staff customer can't even tell `/admin` is a real
+  protected area). Every individual page's Server Actions still
+  re-check role themselves — the layout gate is defense-in-depth, not
+  the only check.
+- `/admin` — dashboard summary cards + recent orders.
+- `/admin/categories` — table + inline create/edit (toggle per row) +
+  delete-with-confirm.
+- `/admin/products` (list: search + category filter + pagination),
+  `/admin/products/new`, `/admin/products/[id]` (product fields form +
+  variants table with inline add/edit/delete + images list with
+  add/delete + a top-level delete-product button).
+- `/admin/inventory` — every active variant at/below its low-stock
+  threshold, with an inline adjust-stock mini-form per row.
+- `/admin/orders` — **extended, not duplicated**: `listOrdersForAdmin`
+  gained `status`/`search`/pagination parameters (previously an
+  unpaginated `limit(200)`, per Phase 10's own hand-off note); the list
+  page gained a search box + status filter + page links.
+  `/admin/orders/[orderNumber]` is untouched from Phase 10.
+- `/admin/customers` (list: search + pagination),
+  `/admin/customers/[id]` (profile + recent orders + role-change form,
+  the form only rendered at all when the viewer is `admin`, not `staff`).
+- `/admin/coupons` (list with an active/inactive toggle button),
+  `/admin/coupons/new`, `/admin/coupons/[id]` (full edit form).
+- `/admin/content` — hero slides and promo banners, each with an
+  inline list/add/edit/delete manager component.
+- `/admin/settings` — shipping fees/free-shipping threshold + store
+  contact info form, plus a read-only payment-provider status panel.
+- `/admin/audit-log` — paginated, entity-type-filterable log viewer with
+  Persian labels for every action type this phase's code can produce.
+- Shared pieces: `ConfirmButton` (generic confirm-then-run-a-Server-
+  Action button, the same `useTransition` + `router.refresh()` shape
+  Phase 10's `AdminOrderStatusForm` established, now reused across
+  ~6 different delete/toggle flows instead of being redefined per page).
+
+**Tests/checks (this session, full network access):**
+- `npm run typecheck` — clean (after fixing two real bugs it caught: a
+  `*/` sequence inside a block comment in `shipping/methods.ts` that
+  silently broke out of the comment and produced two syntax errors, and
+  a type mismatch between `ActionResult` and `ActionResult<unknown>` in
+  `ProductForm.tsx`).
+- `npm run lint` — clean.
+- `npm run build` — succeeds; all 27 routes compile, including every new
+  `/admin/*` route (verified via the printed route table). First build
+  attempt failed on `/`'s prerender because Postgres had stopped between
+  tool calls in this sandbox — restarted, reseeded, rebuilt clean.
+- `npm run db:generate` + `npm run db:migrate` — generated and applied
+  migration `0006_green_selene.sql` (4 new tables) against a fresh local
+  Postgres with zero errors.
+- `npm run db:seed` — extended this phase to also populate
+  `hero_slides`/`promo_banners` from the same fixtures the homepage used
+  to hardcode; ran clean (6 categories, 11 products, 2 hero slides, 2
+  promo banners).
+- **Direct-to-domain verification** (throwaway `tsx` scripts, written,
+  run, and then deleted before finishing — not left in the repo):
+  every new query function was called against the real seeded database
+  and returned correct data (`listCategoriesForAdmin`,
+  `listProductsForAdmin`, `listLowStockVariants`,
+  `listCustomersForAdmin`, `listCouponsForAdmin`,
+  `listHeroSlidesForAdmin`/`getActiveHeroSlides`,
+  `listPromoBannersForAdmin`/`getActivePromoBanners`, `getSiteSettings`,
+  `getPaymentProviderStatus`, `getAdminDashboardSummary`,
+  `listAuditLogs`/`listAuditLogEntityTypes`, and
+  `listShippingMethods` — confirmed the free-shipping threshold logic
+  correctly zeroes the standard-method fee above the configured
+  threshold and leaves express always-paid). A second script inserted a
+  real `admin`-role user directly, exercised `isCategorySlugTaken`,
+  `categoryHasChildrenOrProducts`, inserted/queried/deleted a real
+  category row, and called `recordAuditLog` against the live
+  `audit_logs` table — all correct, and cleanup left the database in
+  its pre-test state (verified via `select count(*)` afterward: 0
+  users, 6 categories).
+- `curl` HTTP-level checks against `npm run start` (no session cookie):
+  `/` → 200 with real seeded hero/banner content rendering, `/admin` →
+  307 redirect to `/login` (confirms the layout gate fires for a
+  genuinely signed-out request, not just a compiled-away branch),
+  `/login` → 200, `/category/women` → 200, `/sitemap.xml` → 200.
+
+**Known limitations / not done this session:**
+- **Real-browser click-through verification of every new admin form
+  (create/edit/delete product, category, coupon, customer role change,
+  content, settings) has not been done** — same sandbox limitation (no
+  browser automation tool available) every phase since Phase 7 has
+  documented; the `Next-Action` wire protocol Server Actions use when
+  submitted from a real rendered page (as opposed to a plain HTML
+  `<form>` POST or a direct function call) was not exercised end-to-end
+  here either. Direct-to-domain + HTTP-level checks above are what
+  substituted for it.
+- **Newsletter subscribers and reviews/moderation admin screens were
+  deliberately not built** — `newsletter_subscribers` and `reviews`
+  tables don't exist yet; they're Phase 12 scope per the phase plan
+  (§12's task list puts "newsletter real persistence" and "product
+  reviews with moderation" under Phase 12, not 11). Building admin UI
+  for tables that don't exist would mean either fabricating a table
+  Phase 12 should own, or a broken admin page — neither is acceptable
+  per rule A.18. The admin nav does not link to either.
+- **No real per-movement inventory ledger table** — see
+  `inventory/actions.ts`'s header comment for the reasoning; every stock
+  adjustment is fully captured in `audit_logs` (before/after
+  stock + reason), just not in a dedicated `inventory_movements` table
+  with its own schema. A future phase unifying this with checkout's
+  decrement path is a documented, real follow-up, not an oversight.
+- **Category deletion doesn't cascade-reassign products/subcategories**
+  — it's simply blocked (with a clear error) if the category has either.
+  An operator has to manually move products/subcategories elsewhere
+  first. This matches "prefer the simplest production-safe solution"
+  (rule F.1) over building a reassignment UI nobody asked for.
+- Carried over, still outstanding from earlier phases: guest checkout
+  doesn't exist, no `callbackUrl` round-trip through `/login`, and every
+  other real-browser gap documented in Phases 7-10's own "Known
+  limitations" sections.
+
+
 ## Architecture Decisions
 
 (Cumulative — Phase 7 additions only; see git history for Phases 0-6.)
@@ -1374,6 +1594,36 @@ silently ignored):**
   safely reachable, so Phase 11 replaces this layout rather than
   extending around it.
 
+### Phase 11 additions
+- `audit_logs` (general) and `order_status_history` (Phase 10,
+  order-specific) are kept as two separate tables rather than merging —
+  see `audit-logs.ts`'s header comment. An order-status transition now
+  writes to both.
+- Inventory stock adjustments are audited via `audit_logs`, not a
+  dedicated `inventory_movements` ledger — see
+  `inventory/actions.ts`'s header comment for why a half-populated
+  ledger (checkout's own decrement still doesn't use one) would be worse
+  than this. Documented as a real follow-up, not an oversight.
+- `site_settings` is a genuine singleton (one fixed-id row), not a
+  generic key/value settings table — simpler for the small, fixed set of
+  fields this phase actually needed (shipping fees/threshold, store
+  contact info), per rule F.5.
+- Payment provider configuration status is read-only in the admin UI
+  (`process.env.PAYMENT_PROVIDER`, server-side only) — never stored in
+  `site_settings`, never editable from a form, per rule A.13/G.
+- `hero_slides`/`promo_banners` have no image-upload field yet —
+  content stays text/link/ordering-only until a real object-storage/CDN
+  pipeline exists (§3, still not built); adding an `imageUrl` column
+  later is a small additive migration, not a redesign.
+- A `"use server"` file may only export async functions — this forced
+  `site settings` reads (`getSiteSettings`, and the synchronous
+  `getPaymentProviderStatus`) into a plain `settings-queries.ts` module
+  and the one actual mutation into a separate `settings-actions.ts` with
+  the directive. The same read/action file split is used everywhere else
+  admin queries and admin mutations live in already-separate files
+  (`admin-queries.ts` + `admin-actions.ts` per domain).
+
+
 ## Important Assumptions
 
 - Password-based auth (mobile + password) was chosen as this phase's
@@ -1447,6 +1697,16 @@ silently ignored):**
 - No SMS/email provider is configured — `notifyOrderEvent` logs to the
   server console instead of sending anything real (rule A.17), same
   posture as the payment provider.
+
+### Phase 11 addition
+- Two role-elevation safeguards in `updateCustomerRoleAction` (an admin
+  can't demote themselves; the last remaining staff/admin account can't
+  be demoted to `customer`) were judged necessary even though neither
+  TRENDS_PROJECT_CONTEXT.md nor CLAUDE_BUILD_INSTRUCTIONS.txt explicitly
+  asks for them — without them, a single admin mis-click could leave the
+  store with zero accounts able to reach `/admin` at all, a failure mode
+  worse than the minor inconvenience of the guard. Revisit only if a
+  genuine multi-admin operational need conflicts with this.
 
 ## Known Issues / Technical Debt
 
@@ -1539,83 +1799,119 @@ Phase 10 adds:
   verification for cart/wishlist actions (Phase 7), checkout/order-
   placement actions (Phase 8), and coupon/payment actions (Phase 9).
 
+Phase 11 adds:
+
+- **No newsletter-subscribers or reviews/moderation admin screens** —
+  their tables don't exist yet; both are Phase 12 scope (see this
+  phase's write-up's "Known limitations" for the full reasoning). The
+  admin nav has no link to either.
+- **No dedicated `inventory_movements` ledger table** — stock
+  adjustments are fully captured in `audit_logs` (before/after stock +
+  reason), not a separate per-movement schema; see
+  `inventory/actions.ts`'s header comment.
+- **Category deletion doesn't cascade-reassign** — it's blocked (with a
+  clear error) if the category has children or products; an operator
+  must move them manually first.
+- **Real browser/`Next-Action`-wire-protocol verification of every new
+  admin form (product/variant/image/category/coupon/content/settings/
+  customer-role create-edit-delete flows) has not been done** — same
+  sandbox limitation (no browser automation tool available) as every
+  phase since Phase 7; see this phase's "Tests/checks" for exactly what
+  direct-to-domain and real-`curl` HTTP-level verification was done
+  instead.
+
 ## Next Session Instructions
 
-- **Exact next objective: PHASE 11 — Admin/operations**, per
-  CLAUDE_BUILD_INSTRUCTIONS.txt §D. Phase 10 is COMPLETE — do not redo
-  order-history/status-transition/cancellation/notification work; build
-  the real admin area on top of it.
+- **Exact next objective: PHASE 12 — Reviews, content, support,
+  notifications**, per CLAUDE_BUILD_INSTRUCTIONS.txt §D. Phase 11 is
+  COMPLETE — do not redo admin CRUD/dashboard/audit-log work; build the
+  remaining customer-facing experience on top of it.
   1. **First, if browser automation is available in this session's
-     environment, do the real end-to-end verification Phases 7-10 could
-     not:** in an actual rendered browser, place a real order end-to-end
-     (cart → checkout → mock gateway success), then click "لغو سفارش" on
-     an eligible order and confirm the page updates; separately, sign in
-     as an admin/staff user, open `/admin/orders/[orderNumber]`, and
-     click through a real `pending_payment/paid → processing → shipped →
-     delivered` transition in the browser, confirming each
-     `router.refresh()` reflects the new status without a manual reload.
-     Fix anything genuinely broken before building more admin surface on
-     top of it; if no browser automation is available, note that again
-     and continue with the direct-to-domain + real-cookie HTTP-level
-     verification approach every phase since Phase 7 has used.
-  2. Read CLAUDE_BUILD_INSTRUCTIONS.txt's Phase 11 task list and
-     TRENDS_PROJECT_CONTEXT.md §7 "Admin/operations scope" before writing
-     code.
-  3. **Reuse, don't duplicate, this phase's admin work.** `/admin/layout.tsx`
-     already gates every `/admin/*` route on `session.user.role` (admin/
-     staff) via `notFound()` for non-staff — extend this layout into the
-     real dashboard shell/nav Phase 11 needs, rather than creating a
-     second gating mechanism. `/admin/orders` and
-     `/admin/orders/[orderNumber]` already exist (Phase 10, intentionally
-     minimal — see this report's "Known limitations") — Phase 11 should
-     absorb these into its own orders admin surface (adding pagination/
-     filtering/search to `listOrdersForAdmin`, which currently just does
-     `limit(200)` with no `WHERE`/`ORDER BY` options) rather than
-     building a parallel, separate orders page.
-  4. **Products/variants/images/categories/inventory CRUD** — the biggest
-     net-new piece this phase. Follow the ownership/authorization pattern
-     already established: no bare "is admin" boolean check scattered
-     across route handlers — one shared role-check helper (see
-     `isStaffOrAdmin` in `src/domains/orders/admin-actions.ts` for the
-     shape, though it's currently a private, unexported function in that
-     file — worth promoting to a shared `src/domains/auth/roles.ts` or
-     similar once a second file needs it, rather than copy-pasting it).
-     Server-side Zod validation for every CRUD form, per
-     CLAUDE_BUILD_INSTRUCTIONS.txt's non-negotiable rule 9.
-  5. **Customers, coupons (CRUD UI on top of Phase 9's `coupons` table —
-     no schema changes needed, just admin-facing create/edit/deactivate
-     forms), reviews/moderation, hero slides, homepage promotional
-     content, newsletter subscribers, basic settings, audit logs** — per
-     the full Phase 11 task list. Reviews/newsletter tables don't exist
-     yet (Phase 12's scope per the phase plan) — don't build UI for
-     tables that don't exist; coordinate scope carefully against
-     CLAUDE_BUILD_INSTRUCTIONS.txt §D's phase boundaries rather than
-     pulling Phase 12 schema work forward.
-  6. **Audit logs**: TRENDS_PROJECT_CONTEXT.md §12 lists `audit_logs` as
-     a table; Phase 10's `order_status_history` is a narrow,
-     order-specific precedent for "who did what, when" — a general
-     `audit_logs` table (admin user id, action, target entity/id,
-     timestamp, diff/payload) is genuinely new schema work this phase,
-     not an extension of `order_status_history`.
-  7. Run `typecheck`/`lint`/`build` and verify manually: every admin
-     mutation is authorized server-side (not just hidden from a
-     non-admin's nav — confirm with a real signed-in non-staff `curl`
-     request the same way this phase's HTTP checks did for
-     `/admin/orders`), CRUD forms reject invalid input server-side, and
-     sensitive actions are actually recorded in the new audit log.
-  8. Update `PROGRESS.md` the same way this session did.
-- Files/areas to inspect first: `src/app/admin/layout.tsx` (the existing
-  role gate to extend, not replace), `src/app/admin/orders/` (the
-  existing minimal admin surface to fold into the real admin area),
-  `src/domains/orders/admin-actions.ts` (the existing
-  role-check-in-a-Server-Action pattern to replicate for every other
-  admin mutation), `src/lib/db/schema/` (categories/products/
-  product-variants/product-images/coupons — all already exist and just
-  need admin CRUD built on top; no schema changes needed for most of
-  this phase except `audit_logs`).
-- Do not start Phase 12 (reviews/content/support/notifications-as-
-  customer-features) before Phase 11's admin work is done, per
-  CLAUDE_BUILD_INSTRUCTIONS.txt's "do not jump ahead multiple phases."
+     environment, do the real end-to-end verification Phases 7-11 could
+     not:** sign in as admin/staff in an actual rendered browser and
+     click through creating/editing/deleting a category, a product (with
+     a variant and an image), a coupon, a hero slide, a promo banner, an
+     inventory adjustment, a site-settings save, and a customer
+     role-change — confirming each `useActionState`/`router.refresh()`
+     flow actually updates the page from real user interaction, not just
+     a direct function call. Fix anything genuinely broken before
+     building more on top of it; if no browser automation is available,
+     note that again and continue with the direct-to-domain +
+     `curl` HTTP-level verification approach every phase since Phase 7
+     has used.
+  2. Read CLAUDE_BUILD_INSTRUCTIONS.txt's Phase 12 task list and
+     TRENDS_PROJECT_CONTEXT.md §6 "Reviews"/"Notifications" and §7
+     public-content pages before writing code.
+  3. **New schema needed this phase**: `reviews` (rating, text,
+     moderation status, verified-purchase marker, customer ownership —
+     §6 "Reviews") and `newsletter_subscribers` (real persistence for
+     the newsletter signup UI Phase 2 already built but never wired to
+     storage). Both were deliberately left out of Phase 11 — see this
+     report's Phase 11 section's "Known limitations" for why. Follow the
+     same admin-CRUD pattern Phase 11 established
+     (`src/domains/<domain>/{queries,actions,admin-queries,
+     admin-actions}.ts`, shared `isStaffOrAdmin`/`isAdmin` from
+     `src/domains/auth/roles.ts`, `recordAuditLog` from
+     `src/domains/analytics/audit.ts` on every admin mutation) rather
+     than inventing a new pattern.
+  4. **Reviews**: customer-facing submission form on the product detail
+     page (ownership check — a customer can only review a product they
+     actually bought, using `order_items`/`orders` the same way Phase 10
+     already join-queries a customer's own order history), a moderation
+     queue at `/admin/reviews` (add this to `AdminNav`), and a verified-
+     purchase badge on approved reviews. Duplicate-review prevention
+     (one review per customer per product) via a unique index, not just
+     app logic — same "never rely only on application code to enforce
+     uniqueness" rule every prior phase has followed.
+  5. **Public content pages**: FAQ, about, contact, shipping policy,
+     returns/refund policy, privacy policy, terms — real routes with
+     metadata (§8 SEO), not fake/placeholder pages. Content can be
+     static/hardcoded per-page (TRENDS_PROJECT_CONTEXT.md doesn't ask for
+     these to be admin-editable — only hero slides/promo banners/
+     settings were called out in §7's admin scope), but must be real
+     Next.js routes with real Persian copy, not TODOs.
+  6. **Support/contact form**: a real Server Action-backed submission
+     (store it somewhere — either a new lightweight
+     `support_messages`/`contact_submissions` table, or reuse
+     `notifications`'s existing adapter-interface pattern from Phase 6/10
+     to at least log it server-side) — not a fake form that silently does
+     nothing on submit, per rule G "do not use placeholder TODOs as a
+     substitute for required functionality."
+  7. **Newsletter real persistence**: `newsletter_subscribers` table +
+     Server Action wiring the existing homepage newsletter UI (Phase 2,
+     currently non-functional demo markup) to real inserts, plus an
+     `/admin/content`-adjacent (or its own `/admin/newsletter`) subscriber
+     list for the admin nav item Phase 11's `AdminNav` intentionally left
+     unlinked-to-nothing... actually Phase 11's nav does NOT currently
+     have a newsletter-subscribers link at all (only "Categories/
+     Products/Inventory/Orders/Customers/Coupons/Content/Settings/Audit
+     log") — add one once the table/admin page exist, per
+     TRENDS_PROJECT_CONTEXT.md §7's "newsletter subscribers" admin task.
+  8. **Notification abstraction**: extend the existing
+     `src/domains/notifications/provider.ts` stub (console-log-only,
+     Phase 6/9/10 precedent — no real SMS/email provider configured, and
+     Phase 12 should not fabricate one either per rule A.17) to cover
+     review-moderation-result and support-form-received events if that
+     fits the existing interface cleanly; don't invent a second
+     notification system.
+  9. Run `typecheck`/`lint`/`build` and verify manually: review
+     ownership/duplicate checks are server-side (not just hidden UI),
+     newsletter/contact submissions actually persist, public content
+     pages have real metadata and are not accidentally `noindex`.
+  10. Update `PROGRESS.md` the same way this session did.
+- Files/areas to inspect first: `src/components/admin/AdminNav.tsx` (add
+  new nav entries here, don't build a second nav), `src/domains/auth/
+  roles.ts` (reuse `isStaffOrAdmin`/`isAdmin`/`ActionResult`, don't
+  redefine), `src/domains/analytics/audit.ts` (call `recordAuditLog` from
+  every new admin mutation, same as every Phase 11 domain did),
+  `src/app/page.tsx`'s newsletter section markup (Phase 2, currently
+  inert — this is what Phase 12 needs to wire up), `src/domains/
+  notifications/provider.ts` (the existing stub to extend, not replace),
+  `src/domains/orders/queries.ts` (existing pattern for scoping a query
+  to "this customer's own orders," needed for review ownership checks).
+- Do not start Phase 13 (security/performance hardening) before Phase
+  12's customer-experience work is done, per CLAUDE_BUILD_INSTRUCTIONS.txt's
+  "do not jump ahead multiple phases."
 
 ## Commands
 
@@ -1635,8 +1931,10 @@ Phase 10 adds:
 - db studio (browse data): `npm run db:studio` (or `npx drizzle-kit studio`)
 - seed: `npm run db:seed` (or `npx tsx --env-file=.env.local src/lib/db/seed.ts`)
   — wipes and re-populates the catalog tables from
-  `src/domains/catalog/demo-data.ts`. Does not touch `users`/`addresses`/
-  `password_reset_tokens`/`carts`/`orders`/`coupons`/`payments`/etc.
+  `src/domains/catalog/demo-data.ts`, and (as of Phase 11) also
+  wipes/re-populates `hero_slides`/`promo_banners` from the same
+  fixtures. Does not touch `users`/`addresses`/`password_reset_tokens`/
+  `carts`/`orders`/`coupons`/`payments`/`audit_logs`/`site_settings`/etc.
 - To exercise the mock payment gateway locally: set `PAYMENT_PROVIDER=mock`
   in `.env.local`, restart the dev/start server, and place an order —
   checkout will redirect to `/payment/mock/[authority]`, a simulator page
@@ -1668,4 +1966,21 @@ ESLint 9.39.5 + eslint-config-next 16.3.4, drizzle-orm ^0.45.2,
 drizzle-kit ^0.31.10, postgres (porsager driver, latest), tsx 4.23.13,
 PostgreSQL server 16.15, next-auth@beta 5.0.0-beta.32, bcryptjs 3.0.3,
 zod 4.6.2. No new dependencies were added in Phase 9 — coupons/payments
-used only what was already installed (same as Phases 7 and 8).
+used only what was already installed (same as Phases 7 and 8). No new
+dependencies were added in Phase 11 either — every admin CRUD/dashboard/
+audit-log feature used only what Phases 1-10 already installed.
+
+**Note for the next session's environment setup:** this sandbox's
+Postgres service was observed to stop silently between separate tool
+calls at least once this session (the first `npm run build` attempt
+failed on `/`'s prerender with `ECONNREFUSED 127.0.0.1:5432`, even
+though it had been running earlier in the same session) — if a build or
+dev-server command suddenly can't reach the database, first check
+`service postgresql status` and `service postgresql start` again before
+assuming something in the code broke. Similarly, backgrounding
+`npm run start`/`npm run dev` with a plain trailing `&` did not survive
+past the end of that tool call in this sandbox — use
+`setsid nohup <command> > /tmp/out.log 2>&1 < /dev/null &` (note: this
+sandbox's `disown` is unavailable, `setsid`+`nohup` alone was sufficient)
+if the next session needs a long-running server process to stay up for
+`curl`-based HTTP verification across multiple tool calls.

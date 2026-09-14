@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import { db, type DbTransaction } from "@/lib/db/client";
 import {
   cartItems,
@@ -349,12 +349,54 @@ export async function getOrderByOrderNumberForAdmin(orderNumber: string): Promis
   return { ...order, items };
 }
 
-/** Deliberately unpaginated-but-capped for this phase — a real paginated/
- * filterable admin order list is Phase 11's "orders" admin-area task.
- * `limit(200)` keeps this usable without that work while still being a
- * real, live database read (never demo data). */
-export async function listOrdersForAdmin(): Promise<Order[]> {
-  return db.select().from(orders).orderBy(desc(orders.createdAt)).limit(200);
+export type AdminOrderListFilter = {
+  status?: OrderStatus;
+  search?: string;
+  page?: number;
+  pageSize?: number;
+};
+
+export type AdminOrderListPage = {
+  rows: Order[];
+  page: number;
+  pageSize: number;
+  total: number;
+};
+
+/**
+ * Paginated/filterable/searchable admin order list — the Phase 11
+ * "orders" admin task this file's own previous comment (see git
+ * history) pointed to. Search matches `orderNumber` or the snapshotted
+ * `recipientMobile` on the order row itself (not a join to `users`,
+ * since orders keep their own immutable customer snapshot per Phase 8 —
+ * searching the live `users` table could miss an order whose customer
+ * later changed their profile mobile, which searching the snapshot
+ * never does).
+ */
+export async function listOrdersForAdmin({ status, search, page = 1, pageSize = 20 }: AdminOrderListFilter = {}): Promise<AdminOrderListPage> {
+  const safePage = Math.max(1, page);
+  const safePageSize = Math.min(100, Math.max(1, pageSize));
+
+  const conditions = [];
+  if (status) conditions.push(eq(orders.status, status));
+  if (search?.trim()) {
+    const term = `%${search.trim()}%`;
+    conditions.push(or(ilike(orders.orderNumber, term), ilike(orders.recipientMobile, term)));
+  }
+  const where = conditions.length > 0 ? and(...conditions) : undefined;
+
+  const [rows, totalRows] = await Promise.all([
+    db
+      .select()
+      .from(orders)
+      .where(where)
+      .orderBy(desc(orders.createdAt))
+      .limit(safePageSize)
+      .offset((safePage - 1) * safePageSize),
+    db.select({ id: orders.id }).from(orders).where(where),
+  ]);
+
+  return { rows, page: safePage, pageSize: safePageSize, total: totalRows.length };
 }
 
 /** Restocks every line of a cancelled order back onto its variant — the

@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Container } from "@/components/ui/Container";
+import { AdminNav } from "@/components/admin/AdminNav";
 import { getCurrentUser } from "@/domains/auth/actions";
 
 /**
@@ -16,10 +17,14 @@ import { getCurrentUser } from "@/domains/auth/actions";
  * `/admin` is even a real, protected area, vs. a redirect to `/login`
  * (which fires for a genuinely signed-out visitor) that would.
  *
- * Scope note: this is intentionally a minimal shell (just "Orders" for
- * now) — see `src/domains/orders/admin-actions.ts`'s header comment.
- * Phase 11 builds out the real admin dashboard/nav; this exists only so
- * Phase 10's fulfillment work has *somewhere* authorized to live.
+ * Phase 11 update: this was previously a minimal "just Orders" shell
+ * built only so Phase 10's fulfillment work had somewhere authorized to
+ * live. It now fronts the real dashboard/nav every admin domain added
+ * this phase renders behind. Every individual page below this layout
+ * still re-checks role itself in its own Server Actions (defense in
+ * depth, not "the layout already checked it") — this layout's job is
+ * only to keep an unauthorized visitor from ever seeing the admin shell
+ * in the first place.
  */
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   const user = await getCurrentUser();
@@ -27,14 +32,17 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   if (user.role !== "admin" && user.role !== "staff") notFound();
 
   return (
-    <main className="py-[clamp(32px,6vw,64px)]">
+    <main className="py-[clamp(24px,5vw,48px)]">
       <Container className="flex flex-col gap-6">
-        <div className="flex items-center justify-between border-b border-line pb-4">
-          <Link href="/admin/orders" className="text-[1.1rem] font-bold text-ink">
-            مدیریت ترندز — سفارش‌ها
+        <div className="flex items-center justify-between">
+          <Link href="/admin" className="text-[1.1rem] font-bold text-ink">
+            مدیریت ترندز
           </Link>
-          <span className="text-[0.85rem] text-text-secondary">{user.name ?? user.mobile}</span>
+          <span className="text-[0.85rem] text-text-secondary">
+            {user.name ?? user.mobile} · {user.role === "admin" ? "مدیر کل" : "کارمند"}
+          </span>
         </div>
+        <AdminNav />
         {children}
       </Container>
     </main>

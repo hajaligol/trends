@@ -16,3 +16,7 @@ export * from "./coupon-redemptions";
 export * from "./payments";
 export * from "./payment-events";
 export * from "./order-status-history";
+export * from "./audit-logs";
+export * from "./hero-slides";
+export * from "./promo-banners";
+export * from "./site-settings";

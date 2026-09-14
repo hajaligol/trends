@@ -1,21 +1,32 @@
 import { AssetSlot } from "@/components/ui/AssetSlot";
 import { Button } from "@/components/ui/Button";
 import { Container } from "@/components/ui/Container";
-import type { DemoBanner } from "@/domains/catalog/demo-data";
+
+/** Structural type covering both the old `DemoBanner` fixture shape and
+ * the real `promo_banners` DB row (Phase 11) — this component only ever
+ * reads these four fields. */
+type PromoBannerLike = {
+  id: string;
+  tone: "pink" | "blue";
+  title: string;
+  description: string;
+  ctaLabel: string;
+};
 
 // Mirrors .banner-card--pink / .banner-card--blue in the prototype.
-const TONE_BG: Record<DemoBanner["tone"], string> = {
+const TONE_BG: Record<PromoBannerLike["tone"], string> = {
   pink: "bg-pink",
   blue: "bg-blue",
 };
 
 /**
  * Mirrors #collections .banner-grid in the prototype: two pastel banner
- * cards, stacked on mobile and side-by-side from ~768px. CTA buttons are
- * inert (`type="button"`, no href) exactly like the prototype's — real
- * category routes land in Phase 4.
+ * cards, stacked on mobile and side-by-side from ~768px. Banners come
+ * from `promo_banners` (Phase 11, `/admin/content`) via
+ * `src/app/page.tsx`. CTA buttons are inert (`type="button"`, no href)
+ * exactly like the prototype's — real category routes land in Phase 4.
  */
-export function PromoBanners({ banners }: { banners: DemoBanner[] }) {
+export function PromoBanners({ banners }: { banners: PromoBannerLike[] }) {
   return (
     <section id="collections" className="pt-[clamp(10px,3vw,20px)] pb-[clamp(30px,5vw,54px)]">
       <Container className="grid grid-cols-1 gap-5 md:grid-cols-2">

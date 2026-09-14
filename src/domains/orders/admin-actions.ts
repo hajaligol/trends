@@ -8,6 +8,8 @@ import {
   OrderNotFoundError,
 } from "@/domains/orders/queries";
 import type { OrderStatus } from "@/domains/orders/lifecycle";
+import { isStaffOrAdmin, UNAUTHORIZED_ERROR } from "@/domains/auth/roles";
+import { recordAuditLog } from "@/domains/analytics/audit";
 
 /**
  * The one Server Action that lets an admin/staff user move an order
@@ -30,10 +32,6 @@ import type { OrderStatus } from "@/domains/orders/lifecycle";
  * duplicated by it.
  */
 
-function isStaffOrAdmin(role: string | undefined): boolean {
-  return role === "admin" || role === "staff";
-}
-
 export type AdminTransitionResult = { ok: true } | { ok: false; error: string };
 
 export async function adminTransitionOrderStatusAction(
@@ -44,7 +42,7 @@ export async function adminTransitionOrderStatusAction(
 ): Promise<AdminTransitionResult> {
   const session = await auth();
   if (!session?.user || !isStaffOrAdmin(session.user.role)) {
-    return { ok: false, error: "شما اجازه دسترسی به این بخش را ندارید" };
+    return { ok: false, error: UNAUTHORIZED_ERROR };
   }
 
   try {
@@ -58,6 +56,11 @@ export async function adminTransitionOrderStatusAction(
     }
     throw error;
   }
+
+  await recordAuditLog(session.user, "order.status_transition", "order", orderNumber, {
+    toStatus,
+    trackingNumber: trackingNumber.trim() || null,
+  });
 
   revalidatePath(`/admin/orders/${orderNumber}`);
   revalidatePath("/admin/orders");

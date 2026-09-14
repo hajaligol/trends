@@ -43,6 +43,13 @@
       "when": 1789294929903,
       "tag": "0005_faulty_joseph",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1789331565662,
+      "tag": "0006_green_selene",
+      "breakpoints": true
     }
   ]
 }

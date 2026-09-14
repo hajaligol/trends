@@ -35,7 +35,7 @@ export default async function CheckoutPage() {
   if (cart.items.length === 0) redirect("/");
 
   const addresses = await getAddressesForUser(user.id);
-  const shippingMethods = listShippingMethods(cart.subtotalToman);
+  const shippingMethods = await listShippingMethods(cart.subtotalToman);
 
   return (
     <main className="py-[clamp(40px,7vw,80px)]">

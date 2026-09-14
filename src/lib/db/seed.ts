@@ -21,10 +21,12 @@
  *   open until real photography exists.
  */
 import { db } from "./client";
-import { categories, productImages, products, productVariants } from "./schema";
+import { categories, heroSlides, productImages, products, productVariants, promoBanners } from "./schema";
 import {
+  demoBanners,
   demoCategories,
   demoFeaturedProducts,
+  demoHeroSlides,
   demoNewArrivals,
   type DemoArrival,
   type DemoProduct,
@@ -170,6 +172,31 @@ async function seedProducts(categoriesBySlug: Map<string, { id: string }>) {
   }
 }
 
+/**
+ * Seeds `hero_slides`/`promo_banners` (Phase 11's new admin-editable
+ * homepage-content tables) from the exact same fixtures the homepage
+ * used to render straight from `demo-data.ts` — so a fresh
+ * `db:seed` produces a homepage that looks identical to before this
+ * phase, just now backed by editable rows instead of hardcoded arrays.
+ */
+async function seedHomepageContent() {
+  await db.delete(heroSlides);
+  await db.delete(promoBanners);
+
+  await db.insert(heroSlides).values(
+    demoHeroSlides.map((slide, index) => ({ alt: slide.alt, displayOrder: index })),
+  );
+  await db.insert(promoBanners).values(
+    demoBanners.map((banner, index) => ({
+      tone: banner.tone,
+      title: banner.title,
+      description: banner.description,
+      ctaLabel: banner.ctaLabel,
+      displayOrder: index,
+    })),
+  );
+}
+
 async function main() {
   console.log("Seeding catalog tables...");
 
@@ -184,6 +211,9 @@ async function main() {
 
   await seedProducts(categoriesBySlug);
   console.log(`  Inserted ${demoFeaturedProducts.length + demoNewArrivals.length} products.`);
+
+  await seedHomepageContent();
+  console.log(`  Inserted ${demoHeroSlides.length} hero slides and ${demoBanners.length} promo banners.`);
 
   console.log("Done.");
   process.exit(0);

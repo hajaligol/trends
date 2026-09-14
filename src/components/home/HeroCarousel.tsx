@@ -3,7 +3,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AssetSlot } from "@/components/ui/AssetSlot";
 import { toPersianDigits } from "@/lib/utils/persian-digits";
-import type { DemoHeroSlide } from "@/domains/catalog/demo-data";
+
+/** Structural type, not a specific table's row — the carousel only ever
+ * needs an `id` (React key / dot target) and `alt` text; whether the
+ * caller sourced that from `hero_slides` (Phase 11, the real path) or a
+ * future different content source doesn't matter to this component. */
+type HeroSlideLike = { id: string; alt: string };
 
 const AUTOPLAY_DELAY_MS = 5000;
 const SWIPE_THRESHOLD_RATIO = 0.15;
@@ -14,9 +19,10 @@ const SWIPE_THRESHOLD_RATIO = 0.15;
  * reference/prototype.html, reimplemented as a real component with React
  * state/effects instead of the prototype's inline <script>, per
  * CLAUDE_BUILD_INSTRUCTIONS.txt §E ("no hardcoded inline-JS
- * architecture").
+ * architecture"). Slides come from `hero_slides` (Phase 11,
+ * `/admin/content`) via `src/app/page.tsx`, not a hardcoded fixture.
  */
-export function HeroCarousel({ slides }: { slides: DemoHeroSlide[] }) {
+export function HeroCarousel({ slides }: { slides: HeroSlideLike[] }) {
   const slideCount = slides.length;
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
