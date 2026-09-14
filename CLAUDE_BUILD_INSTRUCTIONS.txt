@@ -1,0 +1,756 @@
+TRENDS — CLAUDE DESKTOP BUILD INSTRUCTIONS
+=============================================
+
+You are the primary implementation engineer for the Trends production e-commerce project.
+
+You have:
+1. This instruction file.
+2. `TRENDS_PROJECT_CONTEXT.md`.
+3. The supplied prototype `index.html` (if it is present in the project workspace).
+
+Your job is to turn the prototype into a real production-grade Persian/RTL Iranian clothing e-commerce website.
+
+IMPORTANT: You are working under a free-plan session limit. Work in SMALL, COMPLETE PHASES. Never attempt the entire project in one response/session.
+
+--------------------------------------------------
+A. NON-NEGOTIABLE RULES
+--------------------------------------------------
+
+1. Read `TRENDS_PROJECT_CONTEXT.md` before coding.
+2. Inspect the existing repository before changing anything.
+3. Inspect the prototype carefully before recreating the UI.
+4. Preserve the prototype's design language.
+5. Do not replace the design with a generic template.
+6. Use Next.js + TypeScript + React + App Router.
+7. Use Tailwind CSS plus focused CSS where useful.
+8. Use PostgreSQL + Drizzle ORM unless a documented technical reason requires otherwise.
+9. Use server-side validation for every mutation.
+10. Treat the server/database as authoritative for all commerce values.
+11. Never trust client price, stock, discounts, roles, payment state, or order totals.
+12. Do not store authentication tokens in localStorage.
+13. Never expose secrets to the browser.
+14. Do not implement the future mobile app now.
+15. Do not create microservices.
+16. Do not add Redis unless the current phase has a concrete reason for it.
+17. Do not fabricate live payment credentials or claim a payment integration is live when it is not.
+18. Do not silently invent business requirements that materially affect money, legal policy, or payment behavior. Use sensible defaults and document assumptions.
+19. Do not stop after writing code. Run checks and fix what you can.
+20. At the end of EVERY phase, update or create `PROGRESS.md` in the project root.
+
+--------------------------------------------------
+B. SESSION DISCIPLINE
+--------------------------------------------------
+
+Each session should focus on ONE phase.
+
+At the start of every session:
+
+1. Read:
+   - `TRENDS_PROJECT_CONTEXT.md`
+   - `PROGRESS.md` if it exists
+2. Inspect the current repository state.
+3. Determine which phase is next.
+4. Do not redo completed work unless fixing a defect.
+5. State internally what can realistically fit in this session.
+6. Implement only that phase plus necessary fixes.
+
+At the end:
+
+1. Run appropriate checks.
+2. Inspect the result.
+3. Fix important errors.
+4. Update `PROGRESS.md`.
+5. Clearly mark the phase status:
+   - COMPLETE
+   - COMPLETE WITH FOLLOW-UP
+   - BLOCKED
+6. Record exactly what the next session should do.
+
+Do not spend the entire session explaining. Spend it implementing.
+
+--------------------------------------------------
+C. PROGRESS.MD CONTRACT
+--------------------------------------------------
+
+`PROGRESS.md` must always be useful to a brand-new Claude session.
+
+Use this structure:
+
+# Trends Progress Report
+
+## Current Status
+- Overall status:
+- Current phase:
+- Last completed phase:
+- Next phase:
+- Date:
+
+## Completed
+- ...
+
+## Current Phase
+- Goal:
+- Implemented:
+- Files changed:
+- Database changes:
+- Environment/config changes:
+- Tests/checks:
+- Known limitations:
+
+## Architecture Decisions
+- ...
+
+## Important Assumptions
+- ...
+
+## Known Issues / Technical Debt
+- ...
+
+## Next Session Instructions
+- Exact next objective:
+- Files/areas to inspect:
+- Expected acceptance criteria:
+
+## Commands
+- install:
+- dev:
+- lint:
+- typecheck:
+- test:
+- db migration:
+- seed:
+
+Keep it concise enough to hand to another session.
+
+If the project is not yet runnable, document exactly why and what is needed.
+
+--------------------------------------------------
+D. PHASE PLAN
+--------------------------------------------------
+
+There are 15 phases. Each is deliberately scoped so one free session can finish it.
+
+PHASE 0 — Repository audit + implementation plan
+-----------------------------------------------
+Goal:
+Understand the prototype and current repo before building.
+
+Tasks:
+- Inspect all existing files.
+- Inspect prototype structure, assets, interactions and responsive behavior.
+- Identify missing assets and placeholders.
+- Decide the initial directory architecture.
+- Create/update README if needed.
+- Create `PROGRESS.md`.
+- Do NOT build the whole application.
+
+Acceptance:
+- Clear architecture exists.
+- Prototype visual rules are documented.
+- Phase 1 is actionable.
+- No destructive cleanup.
+
+PHASE 1 — Next.js foundation + design system shell
+---------------------------------------------------
+Goal:
+Create a clean production application foundation.
+
+Tasks:
+- Initialize/configure Next.js App Router + TypeScript.
+- Configure Tailwind.
+- Configure RTL/Persian document behavior.
+- Establish Trends design tokens.
+- Establish typography/font strategy.
+- Establish reusable layout/container/button/card/form primitives as needed.
+- Add header/footer shell.
+- Configure basic lint/typecheck/test infrastructure.
+- Add `.env.example`.
+- Ensure secrets are excluded from git.
+
+Acceptance:
+- App runs.
+- Header/footer resemble prototype.
+- RTL works.
+- No unnecessary client components.
+- Checks pass.
+
+PHASE 2 — Homepage visual migration
+-----------------------------------
+Goal:
+Rebuild the prototype homepage using real React/Next components.
+
+Tasks:
+- Hero carousel.
+- Categories.
+- Featured products section.
+- Promo banners.
+- New arrivals.
+- Benefits strip.
+- Newsletter UI.
+- Footer.
+- Search overlay UI.
+- Cart drawer UI shell.
+- Responsive behavior.
+- Reduced motion.
+- Keyboard/accessibility behavior.
+
+Use placeholder/demo data only where the database is not ready.
+
+Acceptance:
+- Homepage closely matches prototype.
+- Mobile/tablet/desktop work.
+- Interactions work.
+- No hardcoded inline JS architecture.
+- Image handling uses production-appropriate patterns.
+
+PHASE 3 — Database + catalog domain
+------------------------------------
+Goal:
+Create the production catalog model.
+
+Tasks:
+- PostgreSQL connection.
+- Drizzle setup.
+- Initial migrations.
+- categories.
+- products.
+- product variants.
+- images.
+- product attributes needed for clothing.
+- indexes/constraints.
+- seed data based on prototype examples.
+- data access layer/repository/query functions.
+
+Acceptance:
+- Fresh DB can migrate.
+- Seed works.
+- Catalog can be queried from server code.
+- No floating-point money storage.
+- Product/variant uniqueness constraints exist.
+
+PHASE 4 — Storefront catalog pages
+----------------------------------
+Goal:
+Turn the store into a browsable catalog.
+
+Tasks:
+- Category pages.
+- Product listing.
+- Product cards from database.
+- Product detail page.
+- Gallery.
+- variant selection.
+- size/color.
+- price/discount display.
+- stock state.
+- breadcrumbs.
+- related products.
+- pagination.
+- sorting.
+- filters appropriate for clothing.
+- loading/empty/error states.
+
+Acceptance:
+- URLs are clean and stable.
+- Pages are server-rendered where appropriate.
+- Product/variant selection is real.
+- No client-authoritative pricing.
+
+PHASE 5 — Search + SEO foundations
+----------------------------------
+Goal:
+Make products discoverable.
+
+Tasks:
+- Real product search.
+- URL-driven search/filter state.
+- Sensible PostgreSQL search first.
+- Search result pagination.
+- metadata.
+- canonical URLs.
+- Open Graph.
+- sitemap.
+- robots.
+- product structured data where appropriate.
+- 404/not-found behavior.
+- noindex for private/admin pages.
+
+Do not introduce Elasticsearch/Meilisearch/etc. unless the current scale actually requires it.
+
+Acceptance:
+- Search works.
+- Search URLs can be shared.
+- Important storefront pages have useful metadata.
+- No accidental indexing of private areas.
+
+PHASE 6 — Authentication + customer account
+-------------------------------------------
+Goal:
+Implement secure customer identity.
+
+Tasks:
+- Choose/configure a mature auth solution.
+- Registration/login.
+- secure session handling.
+- logout.
+- password reset/recovery if password auth is used.
+- Iranian mobile normalization.
+- OTP-ready abstraction where useful.
+- account profile.
+- addresses.
+- server-side authorization.
+- protected account routes.
+- customer session UI.
+
+Acceptance:
+- Sessions are secure.
+- Auth state cannot be forged client-side.
+- Account ownership checks exist.
+- No auth token in localStorage.
+- Sensitive mutations are protected.
+
+PHASE 7 — Wishlist + cart
+-------------------------
+Goal:
+Make shopping state real.
+
+Tasks:
+- wishlist tables/actions/UI.
+- guest cart.
+- authenticated cart.
+- add/remove/update.
+- variant-aware items.
+- stock validation.
+- price refresh.
+- guest-to-user cart merge.
+- cart drawer/page.
+- quantity controls.
+- empty states.
+
+Acceptance:
+- Cart survives navigation/reload appropriately.
+- Duplicate/invalid cart items are handled.
+- Server calculates authoritative line values.
+- Wishlist persists for logged-in users.
+
+PHASE 8 — Checkout + shipping
+-----------------------------
+Goal:
+Create a real Iranian checkout flow without pretending payment is live.
+
+Tasks:
+- checkout steps.
+- address selection.
+- shipping methods.
+- shipping pricing.
+- free-shipping threshold configuration.
+- order draft/creation logic.
+- server-side totals.
+- coupon integration points.
+- order snapshots.
+- concurrency-safe inventory reservation/decrement strategy.
+- payment abstraction boundary.
+
+Acceptance:
+- Cannot checkout unavailable inventory.
+- Cannot manipulate totals from browser.
+- Order contains immutable purchase-time snapshots.
+- Payment provider interface is ready.
+- No card data is stored.
+
+PHASE 9 — Promotions + payments
+------------------------------
+Goal:
+Implement discount and payment infrastructure.
+
+Tasks:
+- coupons.
+- promotion rules.
+- usage limits.
+- per-user redemption rules.
+- stacking rules.
+- payment records/events.
+- provider adapter interface.
+- one test/mock payment provider.
+- return/callback verification flow.
+- idempotency.
+- payment status transitions.
+- reconciliation-friendly event storage.
+
+For an Iranian gateway:
+- keep provider-specific code behind an adapter.
+- use environment configuration.
+- never invent credentials.
+- clearly mark real gateway integration as "not configured" until actual credentials/configuration exist.
+
+Acceptance:
+- Coupon abuse is blocked server-side.
+- Payment success is verified server-side.
+- Duplicate callbacks do not duplicate orders/payment effects.
+- Payment state is auditable.
+
+PHASE 10 — Orders + fulfillment + customer lifecycle
+----------------------------------------------------
+Goal:
+Make order operations complete.
+
+Tasks:
+- order history.
+- order details.
+- order status timeline.
+- admin order status transitions.
+- shipping/fulfillment abstraction.
+- tracking number field.
+- cancellation rules.
+- return/refund architecture.
+- customer notifications abstraction.
+- email/SMS adapter interfaces.
+- order confirmation/result pages.
+
+Acceptance:
+- Order state transitions are validated.
+- Customer sees useful status.
+- Admin can operate an order safely.
+- Historical order data remains stable if products/prices change.
+
+PHASE 11 — Admin/operations
+---------------------------
+Goal:
+Make the shop operable without editing code.
+
+Tasks:
+- admin authentication/authorization.
+- dashboard.
+- products CRUD.
+- variants.
+- images/media metadata.
+- categories.
+- inventory.
+- orders.
+- customers.
+- coupons.
+- reviews/moderation.
+- hero slides.
+- homepage promotional content.
+- newsletter subscribers.
+- basic settings.
+- audit logs.
+
+Acceptance:
+- Every admin operation is server-authorized.
+- CRUD forms validate on the server.
+- Important actions are audited.
+- Admin cannot accidentally bypass business rules.
+
+PHASE 12 — Reviews, content, support, notifications
+----------------------------------------------------
+Goal:
+Complete the normal customer experience.
+
+Tasks:
+- product reviews with moderation.
+- verified purchase marker.
+- FAQ.
+- about/contact/shipping/returns/privacy/terms pages.
+- support/contact form.
+- newsletter real persistence.
+- notification abstraction.
+- customer-facing success/error/empty/loading states.
+- basic abuse/rate-limit controls.
+
+Acceptance:
+- No fake forms.
+- Public content has routes and metadata.
+- Reviews cannot be posted for arbitrary products/users.
+- Newsletter records persist safely.
+
+PHASE 13 — Security + performance hardening
+-------------------------------------------
+Goal:
+Perform a dedicated production hardening pass.
+
+Tasks:
+- audit all server actions/route handlers.
+- input validation review.
+- authorization review.
+- session/cookie review.
+- CSRF review.
+- rate limiting for sensitive endpoints.
+- security headers.
+- CSP assessment.
+- upload validation.
+- secret handling.
+- dependency vulnerability review.
+- database indexes/query review.
+- N+1 review.
+- caching/revalidation.
+- image optimization.
+- font optimization.
+- bundle/client-JS review.
+- loading/streaming review.
+
+Acceptance:
+- Document findings and fixes.
+- No known critical/high-risk issue knowingly left without documentation.
+- Lighthouse/Core Web Vitals-oriented improvements are made where practical.
+
+PHASE 14 — QA, accessibility, production readiness
+--------------------------------------------------
+Goal:
+Turn the application into a shippable product.
+
+Tasks:
+- unit tests for business-critical functions.
+- integration tests for catalog/cart/checkout/payment/order transitions.
+- end-to-end tests for critical customer flows where feasible.
+- accessibility pass.
+- RTL pass.
+- responsive pass.
+- error boundary pass.
+- 404/500 behavior.
+- seed/demo environment.
+- deployment configuration.
+- production environment checklist.
+- database backup/migration strategy documentation.
+- observability/logging plan.
+- final README.
+- final `PROGRESS.md`.
+
+Critical flows to test:
+1. browse -> product -> cart
+2. guest cart -> login -> merge
+3. login -> wishlist
+4. checkout -> order -> payment result
+5. invalid payment callback
+6. duplicate payment callback
+7. insufficient stock
+8. invalid coupon
+9. admin edits product
+10. unauthorized admin access
+11. mobile navigation/checkout
+12. keyboard navigation of dialogs/drawers
+
+Acceptance:
+- Fresh setup is documented.
+- Production build succeeds.
+- Critical tests pass.
+- No known blocking issue.
+- Progress report says exactly what remains, if anything.
+
+--------------------------------------------------
+E. IMPLEMENTATION RULES
+--------------------------------------------------
+
+### UI
+Use reusable components.
+
+Do not duplicate large JSX blocks.
+
+Use semantic HTML.
+
+Keep the visual language from the prototype:
+- warm neutrals
+- dark ink
+- pastel accents
+- rounded corners
+- generous whitespace
+- fashion/editorial feel
+
+### RTL
+Treat RTL as foundational, not as a final patch.
+
+Prefer logical CSS properties:
+- margin-inline
+- padding-inline
+- inset-inline
+- text-align/start/end
+
+Be careful with:
+- icons
+- carousel direction
+- breadcrumbs
+- price placement
+- drawers
+- pagination
+- keyboard interactions
+
+### Images
+Use optimized image handling.
+
+Do not load massive source images into small cards.
+
+Require:
+- alt text
+- predictable aspect ratio
+- lazy loading where appropriate
+- appropriate priority for above-the-fold hero/LCP media
+- object storage/CDN architecture when external media is introduced
+
+### Database
+Use migrations.
+
+Add foreign keys and useful indexes.
+
+Use transactions for multi-step commerce mutations.
+
+Use unique constraints to enforce invariants where appropriate.
+
+Never rely only on application code to enforce uniqueness.
+
+### Money
+Never use JavaScript floating point for monetary business logic.
+
+Store integers.
+
+Format only at presentation boundaries.
+
+### Concurrency
+Inventory and payment/order operations are concurrency-sensitive.
+
+Use transactions, locking/conditional updates, unique constraints, and idempotency where appropriate.
+
+### Errors
+Do not leak stack traces, SQL, secrets, provider responses, or internal details to customers.
+
+Log useful server-side diagnostics without logging secrets.
+
+### Server Actions
+Use Server Actions where they are a good fit for mutations/forms.
+
+Remember that Server Actions still require:
+- authentication checks
+- authorization checks
+- input validation
+- business-rule validation
+
+Do not treat "server action" as automatically authorized.
+
+### Client components
+Default to Server Components.
+
+Use `"use client"` only for actual client interactivity.
+
+Avoid putting the entire page into one Client Component.
+
+--------------------------------------------------
+F. WHEN YOU ARE UNSURE
+--------------------------------------------------
+
+If a choice is not specified:
+
+1. Prefer the simplest production-safe solution.
+2. Prefer established libraries over homegrown security/auth.
+3. Prefer PostgreSQL constraints over application-only checks.
+4. Prefer server-side authority over client convenience.
+5. Prefer maintainability over cleverness.
+6. Prefer fewer dependencies.
+7. Prefer progressive enhancement where practical.
+8. Document meaningful assumptions in `PROGRESS.md`.
+
+Do not block the phase waiting for non-critical clarification.
+
+--------------------------------------------------
+G. DO NOT DO THESE THINGS
+--------------------------------------------------
+
+- Do not rewrite the visual identity.
+- Do not use MongoDB for the core commerce database.
+- Do not build microservices.
+- Do not build the mobile app.
+- Do not add a heavy UI component library just for convenience.
+- Do not put the entire app behind `"use client"`.
+- Do not put business logic in presentational components.
+- Do not store passwords in plain text.
+- Do not store auth tokens in localStorage.
+- Do not trust browser-submitted totals.
+- Do not mark payments successful solely because a user returned from a gateway.
+- Do not commit `.env` secrets.
+- Do not fake production integrations.
+- Do not use placeholder TODOs as a substitute for required functionality within a completed phase.
+- Do not claim a phase is complete when checks are failing.
+- Do not delete useful existing prototype assets without confirming their role.
+
+--------------------------------------------------
+H. REQUIRED END-OF-PHASE REPORT
+--------------------------------------------------
+
+At the end of each session, update `PROGRESS.md`.
+
+The report must answer:
+
+1. What was implemented?
+2. What files changed?
+3. What database migrations changed?
+4. What commands/checks were run?
+5. Did they pass?
+6. What remains?
+7. What assumptions were made?
+8. What should the NEXT Claude session do first?
+
+Keep the report factual. Do not write marketing prose.
+
+--------------------------------------------------
+I. FINAL QUALITY BAR
+--------------------------------------------------
+
+The final product should feel like a real Iranian fashion store.
+
+A customer should be able to:
+- discover products
+- search/filter
+- inspect variants
+- add items
+- maintain a wishlist
+- create an account
+- save addresses
+- checkout
+- use a configured payment provider
+- receive an order record
+- inspect order history
+- understand shipping/return policies
+- contact support
+
+A store operator should be able to:
+- manage catalog
+- manage variants
+- manage inventory
+- manage orders
+- manage promotions
+- moderate reviews
+- manage homepage promotions
+- view customers
+- audit sensitive operations
+
+The implementation must be:
+- secure
+- fast
+- responsive
+- accessible
+- SEO-ready
+- maintainable
+- migration-friendly
+- future-mobile-friendly at the API/domain level
+
+Do not optimize for "looks finished" at the expense of correctness.
+
+--------------------------------------------------
+J. REFERENCE MATERIAL
+--------------------------------------------------
+
+The project context was informed by:
+- Next.js official documentation and App Router guidance
+- Next.js guidance for Server Actions, authentication, metadata, and image optimization
+- OWASP guidance for authentication, session management, input validation, business logic, and secure product design
+
+When implementing security-sensitive features, consult current official documentation for the chosen library/framework rather than relying on memory.
+
+STARTING INSTRUCTION
+=====================
+
+If no `PROGRESS.md` exists, begin with PHASE 0.
+
+If `PROGRESS.md` exists, read it and continue from the next incomplete phase.
+
+Do not jump ahead multiple phases merely because they are conceptually related.
+
+Finish the current phase, verify it, update `PROGRESS.md`, and stop.
