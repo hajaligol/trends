@@ -201,3 +201,13 @@ export const customerRoleSchema = z.object({
   userId: z.string().uuid(),
   role: z.enum(["customer", "staff", "admin"]),
 });
+
+// ---------------------------------------------------------------------
+// Reviews (Phase 12)
+// ---------------------------------------------------------------------
+
+export const reviewModerationSchema = z.object({
+  reviewId: z.string().uuid(),
+  status: z.enum(["approved", "rejected"]),
+  moderationNote: optionalTrimmed(500),
+});

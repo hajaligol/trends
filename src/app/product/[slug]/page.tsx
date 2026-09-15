@@ -7,6 +7,8 @@ import { ProductGallery } from "@/components/catalog/ProductGallery";
 import { VariantSelector } from "@/components/catalog/VariantSelector";
 import { ProductGrid } from "@/components/catalog/ProductGrid";
 import { getProductDetailBySlug, getRelatedProducts } from "@/domains/catalog/queries";
+import { getApprovedReviewsForProduct } from "@/domains/reviews/queries";
+import { ReviewsSection } from "@/components/catalog/ReviewsSection";
 import { SITE_URL } from "@/lib/site-config";
 
 type ProductPageProps = {
@@ -47,6 +49,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
   if (!product) notFound();
 
   const relatedProducts = await getRelatedProducts(product.categorySlug, product.id);
+  const reviewSummary = await getApprovedReviewsForProduct(product.id);
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -56,6 +59,17 @@ export default async function ProductPage({ params }: ProductPageProps) {
     brand: product.brand ? { "@type": "Brand", name: product.brand } : undefined,
     image: product.images.map((image) => image.url),
     url: `${SITE_URL}/product/${product.slug}`,
+    // Only present when there's at least one approved review — schema.org
+    // recommends omitting `aggregateRating` entirely rather than
+    // fabricating a rating from zero reviews.
+    aggregateRating:
+      reviewSummary.averageRating !== null
+        ? {
+            "@type": "AggregateRating",
+            ratingValue: reviewSummary.averageRating,
+            reviewCount: reviewSummary.approvedCount,
+          }
+        : undefined,
     offers: product.variants.map((variant) => ({
       "@type": "Offer",
       priceCurrency: "IRR",
@@ -131,6 +145,10 @@ export default async function ProductPage({ params }: ProductPageProps) {
             <ProductGrid products={relatedProducts} />
           </section>
         )}
+
+        <div className="mt-16 border-t border-line pt-10">
+          <ReviewsSection productId={product.id} productSlug={product.slug} summary={reviewSummary} />
+        </div>
       </Container>
     </main>
   );

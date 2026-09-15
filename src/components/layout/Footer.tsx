@@ -1,9 +1,12 @@
+import Link from "next/link";
 import { Container } from "@/components/ui/Container";
+import { NewsletterForm } from "@/components/layout/NewsletterForm";
 
 // Mirrors reference/prototype.html <footer class="site-footer">.
-// The newsletter form is presentational only in this phase — it is not
-// wired to a real subscription endpoint yet. Real persistence + a Server
-// Action land in Phase 12 (see TRENDS_PROJECT_CONTEXT.md §6 "Newsletter").
+// Phase 12 wired the newsletter form to a real Server Action
+// (`NewsletterForm`) and replaced the dead `#site-footer` anchor links
+// with real routes (see TRENDS_PROJECT_CONTEXT.md §6 "Newsletter" and
+// CLAUDE_BUILD_INSTRUCTIONS.txt Phase 12's public content-page tasks).
 export function Footer() {
   return (
     <footer id="site-footer" className="border-t border-line bg-white pb-6 pt-[clamp(30px,4vw,46px)]">
@@ -16,25 +19,7 @@ export function Footer() {
             </p>
           </div>
 
-          <form className="flex flex-wrap gap-2.5" aria-label="فرم عضویت در خبرنامه">
-            <label htmlFor="newsletterEmail" className="sr-only">
-              ایمیل
-            </label>
-            <input
-              type="email"
-              id="newsletterEmail"
-              name="email"
-              placeholder="آدرس ایمیل شما"
-              required
-              className="min-w-[220px] rounded-full border border-line bg-bg px-[18px] py-3 text-[0.88rem] focus:outline-2 focus:outline-ink focus:outline-offset-2"
-            />
-            <button
-              type="submit"
-              className="rounded-full bg-ink px-[26px] py-3 text-[0.88rem] text-white"
-            >
-              عضویت
-            </button>
-          </form>
+          <NewsletterForm />
 
           <div className="flex gap-2.5">
             {["اینستاگرام", "تلگرام", "فیسبوک", "ایکس"].map((label) => (
@@ -51,10 +36,14 @@ export function Footer() {
         <div className="flex flex-wrap items-center justify-between gap-4">
           <span className="text-[1.2rem] font-bold">ترندز</span>
           <nav aria-label="لینک‌های فوتر" className="flex flex-wrap gap-[22px] text-[0.85rem] text-text-secondary">
-            <a href="#hero">صفحه اصلی</a>
-            <a href="#site-footer">درباره ما</a>
-            <a href="#site-footer">تماس با ما</a>
-            <a href="#site-footer">سوالات متداول</a>
+            <Link href="/">صفحه اصلی</Link>
+            <Link href="/about">درباره ما</Link>
+            <Link href="/contact">تماس با ما</Link>
+            <Link href="/faq">سوالات متداول</Link>
+            <Link href="/shipping-policy">راهنمای ارسال</Link>
+            <Link href="/returns-policy">بازگشت کالا</Link>
+            <Link href="/privacy-policy">حریم خصوصی</Link>
+            <Link href="/terms">قوانین و مقررات</Link>
           </nav>
           <span className="text-[0.8rem] text-text-secondary">
             © ۱۴۰۴ ترندز. تمامی حقوق محفوظ است.

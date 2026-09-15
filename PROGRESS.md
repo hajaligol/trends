@@ -1,19 +1,19 @@
 # Trends Progress Report
 
 ## Current Status
-- Overall status: Admin/operations (Phase 11) is implemented **and
-  verified** this session — full network access was available. 4 new
-  tables (`audit_logs`, `hero_slides`, `promo_banners`, singleton
-  `site_settings`) were migrated against a fresh local Postgres,
-  `typecheck`/`lint`/`build` all pass clean, the seed script now also
-  populates `hero_slides`/`promo_banners`, and every new query/action
-  module was exercised directly against the real database (not just
-  compiled) via throwaway verification scripts that were deleted again
-  before finishing — see "Tests/checks" below for exactly what ran.
-- Current phase: none in progress — PHASE 11 is COMPLETE.
-- Last completed phase: PHASE 11 — Admin/operations
-- Next phase: PHASE 12 — Reviews, content, support, notifications
-- Date: 2026-09-14
+- Overall status: Reviews/content/support/notifications (Phase 12) is
+  implemented **and verified** this session — full network access was
+  available. 3 new tables (`reviews`, `newsletter_subscribers`,
+  `support_messages`) were migrated against a fresh local Postgres,
+  `typecheck`/`lint`/`build` all pass clean, and every new query/action
+  module was exercised directly against the real database (including the
+  actual exported Server Actions, not just their underlying queries) via
+  throwaway verification scripts that were deleted again before
+  finishing — see "Tests/checks" below for exactly what ran.
+- Current phase: none in progress — PHASE 12 is COMPLETE.
+- Last completed phase: PHASE 12 — Reviews, content, support, notifications
+- Next phase: PHASE 13 — Security + performance hardening
+- Date: 2026-09-15
 
 ## Completed
 
@@ -1465,6 +1465,271 @@ a real local Postgres):
   other real-browser gap documented in Phases 7-10's own "Known
   limitations" sections.
 
+### Phase 12 — Reviews, content, support, notifications (COMPLETE)
+
+**Goal:** product reviews with real moderation and a verified-purchase
+marker, the public content pages the storefront was missing (about,
+contact, FAQ, shipping/returns/privacy/terms), a real Server Action
+behind the contact form and the (previously inert) newsletter form, and
+extending the existing notification stub to cover the new review/support
+events — per CLAUDE_BUILD_INSTRUCTIONS.txt's Phase 12 task list and
+TRENDS_PROJECT_CONTEXT.md §6.
+
+**New schema** (`src/lib/db/schema/`, migration
+`drizzle/migrations/0007_colorful_gladiator.sql`, applied and verified
+against a real, fresh local Postgres):
+- `reviews.ts`: `rating` (1-5, enforced by a real `CHECK` constraint, not
+  just Zod), `title`/`body`, `status` (`pending`/`approved`/`rejected`
+  Postgres enum — the storefront only ever reads `approved` rows),
+  `isVerifiedPurchase`, moderator attribution
+  (`moderatedByUserId`/`moderatedAt`/`moderationNote`). One review per
+  customer per product enforced by a real `uniqueIndex(userId,
+  productId)`, not just an app-level pre-check (rule F.3). **Documented
+  assumption** (see the file's header comment): this store only allows a
+  review to be submitted at all by a customer who actually purchased the
+  product — TRENDS_PROJECT_CONTEXT.md asks for a "verified purchase
+  indicator" and "customer ownership checks" but doesn't say whether
+  non-purchasers may review; requiring a purchase is the safer, more
+  standard reading. `productId`/`userId` both cascade-delete (unlike
+  `order_items`, which deliberately preserves history after a
+  product/variant is deleted) — a review has no independent meaning once
+  either side is gone.
+- `newsletter-subscribers.ts`: `email` (unique), `isActive` (admin-only
+  unsubscribe/reactivate toggle — there is no self-service unsubscribe
+  link yet, since no real outbound email exists to carry one).
+- `support-messages.ts`: `name`/`email`/`mobile`/`subject`/`message`,
+  optional `userId` (attribution only, never authorization — any visitor,
+  signed in or not, can submit), plain boolean `isResolved` (not a
+  multi-state enum — matches `hero_slides`/`promo_banners`'s `isActive`
+  pattern; nothing in TRENDS_PROJECT_CONTEXT.md asks for a richer
+  ticket lifecycle).
+
+**New domain code**, following the exact
+`{queries,actions,admin-queries,admin-actions}.ts` split every prior
+phase's domains use:
+- `src/domains/reviews/queries.ts` — `getApprovedReviewsForProduct`
+  (public, approved-only, computes the average rating),
+  `getUserReviewForProduct` (ownership-scoped — a customer's own review
+  regardless of status), `hasUserPurchasedProduct` (the real
+  purchase-eligibility check: an `order_items`/`orders` join scoped to
+  `userId`+`productId`, counting only `paid`/`processing`/`shipped`/
+  `delivered` orders — the same status set `customers/queries.ts`'s
+  `totalSpentToman` already treats as real revenue; `pending_payment`/
+  `cancelled`/`refunded` don't count).
+- `src/domains/reviews/actions.ts` — `submitReviewAction`: resolves the
+  product by `slug` server-side (never trusts a client-supplied id),
+  re-checks `auth()`, `hasUserPurchasedProduct`, and
+  `getUserReviewForProduct` (not just the UI's conditional render), and
+  falls back gracefully to the same friendly error if a genuine race
+  loses against the unique index.
+- `src/domains/reviews/admin-queries.ts` /
+  `src/domains/reviews/admin-actions.ts` — `listReviewsForAdmin` (all
+  statuses, paginated, status filter), `moderateReviewAction`
+  (`isStaffOrAdmin`-gated, writes `status`/moderator attribution, calls
+  `recordAuditLog`, sends a `review_approved`/`review_rejected`
+  notification to the author). Re-moderating an already-moderated review
+  is allowed on purpose (see the file's header comment) — unlike order
+  status, there's no specified review moderation state machine here, and
+  correcting a mistaken rejection is a normal, low-risk admin action.
+- `src/domains/newsletter/{actions,queries,admin-actions}.ts` —
+  `subscribeNewsletterAction` (no auth required; re-subscribing an
+  unsubscribed email reactivates the same row via `onConflictDoUpdate`,
+  not a duplicate insert), `listSubscribersForAdmin`,
+  `toggleSubscriberActiveAction` (same shape as Phase 11's
+  `toggleCouponActiveAction`).
+- `src/domains/support/{actions,queries,admin-actions}.ts` —
+  `submitSupportMessageAction` (no auth required; records `userId` when
+  the submitter happens to be signed in, purely for admin triage —
+  never used for authorization), `listSupportMessagesForAdmin`,
+  `toggleSupportMessageResolvedAction`.
+- `src/domains/notifications/provider.ts` — **generalized** from
+  order-only (`OrderNotificationEvent`/`notifyOrderEvent`) to
+  `NotificationEvent`/`notifyEvent`, adding `review_approved`/
+  `review_rejected` (sent to the reviewing customer's `mobile`, same
+  shape as `order_status_changed`) and `support_message_received`
+  (store-facing — carries `recipient: "store"` instead of a customer
+  `mobile`). Both pre-existing call sites (`orders/queries.ts`,
+  `payments/queries.ts`) were updated to the new name; the interface/provider
+  shape itself (still a console-log stub — `SMS_PROVIDER_API_KEY` is
+  unset, per rule A.17) did not change. This was the explicit approach
+  the Phase 11 handoff asked for: "extend the existing stub ... if it
+  fits the existing interface cleanly; don't invent a second
+  notification system."
+
+**New routes/pages:**
+- `/about`, `/faq`, `/contact` (real Server Action-backed support form,
+  `ContactForm.tsx`, plus the store's support email/phone from
+  `site_settings` when set), `/shipping-policy` (reads live
+  `standardShippingFeeToman`/`expressShippingFeeToman`/
+  `freeShippingThresholdToman` from `site_settings` rather than
+  hardcoding numbers that could drift from Phase 8's real shipping
+  config), `/returns-policy`, `/privacy-policy`, `/terms` — all with real
+  `title`/`description`/`alternates.canonical` metadata and added to
+  `sitemap.ts`. Every policy page's body includes a one-line disclosure
+  that the copy is generic boilerplate needing real legal review before
+  launch (see "Important Assumptions" below) — not left unstated.
+- `/admin/reviews` (status-filterable moderation queue,
+  `ReviewModerationRow.tsx` — approve/reject inline with an optional
+  note), `/admin/newsletter` (subscriber list + active/unsubscribed
+  toggle), `/admin/support` (submission list + unresolved filter +
+  resolve toggle). All three added to `AdminNav.tsx` and to
+  `AdminDashboardSummary`/`/admin`'s summary cards (pending-review count,
+  unresolved-support-message count), alongside the existing
+  orders/revenue/customers/low-stock cards.
+- Product detail page (`/product/[slug]`): new `ReviewsSection` —
+  approved reviews + average rating (always visible), plus, for a
+  signed-in customer, either their own review's moderation status or a
+  submission form (`ReviewForm.tsx`), decided by the same real
+  server-side reads the Server Action itself re-checks, not a client
+  guess. A signed-out visitor sees a sign-in prompt instead of the form.
+  `Product` JSON-LD gained an `aggregateRating` block, present only when
+  there's at least one approved review (schema.org's own guidance —
+  never fabricate a rating from zero reviews).
+- `Footer.tsx`: the newsletter form (presentational-only since Phase 2)
+  is now `NewsletterForm.tsx`, wired to `subscribeNewsletterAction`. The
+  footer's four `#site-footer` dead anchor links were replaced with real
+  routes to `/about`, `/contact`, `/faq`, plus four more
+  (`/shipping-policy`, `/returns-policy`, `/privacy-policy`, `/terms`)
+  that didn't have footer links before.
+
+**Files changed/added this session:**
+```
+src/lib/db/schema/reviews.ts                              (new)
+src/lib/db/schema/newsletter-subscribers.ts                (new)
+src/lib/db/schema/support-messages.ts                      (new)
+src/lib/db/schema/index.ts                                 (edited — 3 new exports)
+drizzle/migrations/0007_colorful_gladiator.sql              (new, generated)
+drizzle/migrations/meta/*                                   (new, generated)
+src/lib/validation/storefront.ts                            (new — review/newsletter/contact Zod schemas)
+src/lib/validation/admin.ts                                 (edited — reviewModerationSchema)
+src/domains/notifications/provider.ts                       (edited — generalized event union + renamed function)
+src/domains/orders/queries.ts                                (edited — notifyOrderEvent -> notifyEvent call sites)
+src/domains/payments/queries.ts                               (edited — same rename)
+src/domains/reviews/queries.ts                               (new)
+src/domains/reviews/actions.ts                               (new)
+src/domains/reviews/admin-queries.ts                         (new)
+src/domains/reviews/admin-actions.ts                         (new)
+src/domains/newsletter/actions.ts                            (new)
+src/domains/newsletter/queries.ts                            (new)
+src/domains/newsletter/admin-actions.ts                      (new)
+src/domains/support/actions.ts                               (new)
+src/domains/support/queries.ts                               (new)
+src/domains/support/admin-actions.ts                         (new)
+src/domains/admin/dashboard.ts                               (edited — pendingReviewCount/unresolvedSupportMessageCount)
+src/components/catalog/StarRating.tsx                        (new)
+src/components/catalog/ReviewForm.tsx                        (new)
+src/components/catalog/ReviewsSection.tsx                    (new)
+src/components/admin/ReviewModerationRow.tsx                 (new)
+src/components/admin/SubscriberActiveToggle.tsx               (new)
+src/components/admin/SupportMessageResolvedToggle.tsx         (new)
+src/components/admin/AdminNav.tsx                             (edited — 3 new nav entries)
+src/components/layout/NewsletterForm.tsx                      (new)
+src/components/layout/Footer.tsx                              (edited — real NewsletterForm + real links)
+src/components/support/ContactForm.tsx                        (new)
+src/app/product/[slug]/page.tsx                               (edited — ReviewsSection + aggregateRating)
+src/app/admin/page.tsx                                        (edited — 2 new dashboard cards)
+src/app/admin/reviews/page.tsx                                (new)
+src/app/admin/newsletter/page.tsx                             (new)
+src/app/admin/support/page.tsx                                (new)
+src/app/about/page.tsx                                        (new)
+src/app/faq/page.tsx                                          (new)
+src/app/contact/page.tsx                                      (new)
+src/app/shipping-policy/page.tsx                              (new)
+src/app/returns-policy/page.tsx                               (new)
+src/app/privacy-policy/page.tsx                               (new)
+src/app/terms/page.tsx                                        (new)
+src/app/sitemap.ts                                             (edited — 7 new static-page entries)
+```
+
+**Tests/checks — all run this session, full network access available:**
+- `npm run typecheck` — clean.
+- `npm run lint` — clean.
+- `npm run build` — clean; all 7 new static pages prerender as `○`
+  (static) and every new admin/dynamic route lists as `ƒ` (dynamic), as
+  expected for pages behind the `/admin` role gate or reading
+  per-request state.
+- **Fresh-clone migrate+seed cycle**: created a brand-new
+  `trends_fresh` database, ran `drizzle-kit migrate` against it from
+  the very first migration through `0007_colorful_gladiator.sql`, then
+  `npm run db:seed` — both succeeded, and `\dt` confirmed all 24 tables
+  exist including the 3 new ones. Dropped afterward.
+- **Direct-to-domain smoke test** (temporary script, deleted after):
+  15 real-database assertions, including: a `paid` order makes
+  `hasUserPurchasedProduct` true, a `pending_payment` order does **not**
+  (the real DB row, not a mock); a newly-submitted review defaults to
+  `pending` and is invisible in `getApprovedReviewsForProduct` until
+  approved, then visible with a correct average rating; a second review
+  by the same user for the same product is genuinely rejected by the
+  Postgres unique index (not just app logic — the actual `23505` error
+  was captured); a `rating: 6` insert is genuinely rejected by the
+  `CHECK` constraint; newsletter re-subscribe reactivates the same row
+  instead of duplicating; the unresolved-support-message count
+  increments/decrements correctly around insert/resolve.
+- **Server Action-level smoke test** (temporary script, deleted after):
+  called the actual exported `subscribeNewsletterAction` and
+  `submitSupportMessageAction` functions (not reimplemented logic) with
+  real `FormData` — confirmed invalid email is rejected by the real
+  action, a valid (messy-cased/whitespaced) email is normalized and
+  persisted, and an empty required `subject` is rejected by
+  `submitSupportMessageAction`'s real validation. A full successful
+  `submitSupportMessageAction` call (which internally calls `auth()`,
+  reading `next/headers`) could not be completed outside a live HTTP
+  request scope — this is the same documented Next.js Server Action
+  limitation every phase since Phase 7 has carried forward, not a new
+  gap; the insert path itself was already verified directly against the
+  DB in the smoke test above, and the HTTP check below confirms
+  `/contact` itself renders and is reachable.
+- **HTTP-level checks** (`curl` against a real `next dev` server):
+  `/`, `/about`, `/contact`, `/faq`, `/shipping-policy`,
+  `/returns-policy`, `/privacy-policy`, `/terms` → all 200.
+  `/admin`, `/admin/reviews`, `/admin/newsletter`, `/admin/support` (no
+  session cookie) → all 307 redirecting to `/login` (confirms the
+  existing role-gate layout fires for these new routes too, not just a
+  compiled-away branch). `/sitemap.xml` → confirmed all 7 new static
+  pages present as `<loc>` entries. `/product/classic-shirt` → confirmed
+  the reviews section renders (sign-in prompt for a signed-out visitor,
+  "no reviews yet" empty state, and `aggregateRating` correctly absent
+  from the page's JSON-LD since the product has zero approved reviews).
+- Database reset to a clean seeded baseline before finishing (per this
+  project's "clean baseline before delivery" convention) — confirmed
+  `reviews`/`newsletter_subscribers`/`support_messages`/`users`/`orders`
+  all `0` rows in the delivered dev database except the catalog seed
+  data itself; one leftover test row from an earlier failed smoke-test
+  run was caught and deleted manually before the final count check.
+
+**Known limitations / not done this session:**
+- **Real-browser click-through verification of the review/newsletter/
+  contact forms as actually submitted by a rendered page (the
+  `Next-Action` wire protocol) has not been done** — same sandbox
+  limitation every phase since Phase 7 has documented; no browser
+  automation tool is available. Direct-to-domain + Server-Action-level +
+  HTTP-level checks above are what substituted for it.
+- **No self-service newsletter unsubscribe link** — `isActive` can only
+  be toggled by an admin from `/admin/newsletter`. There is no real
+  outbound email system yet to carry a one-click unsubscribe link (see
+  `notifications/provider.ts`'s console-only stub); building a
+  self-service unsubscribe *route* without a way to actually email
+  people a link to it would be a half-feature, so it was left as an
+  admin-only toggle rather than half-built.
+- **No customer-facing "my support messages" or "edit/delete my review"
+  views** — a customer can submit a review or a support message but has
+  no page listing their own past submissions afterward, beyond the
+  product page showing "your review is pending/rejected" for that one
+  product. Not called for anywhere in TRENDS_PROJECT_CONTEXT.md's
+  feature scope; can be added later if requested.
+- **Policy page copy (`/shipping-policy`, `/returns-policy`,
+  `/privacy-policy`, `/terms`) is genuine but generic boilerplate**, not
+  legally reviewed for this specific business — each page says so
+  explicitly in its own body text. Per rule A.18 ("do not silently
+  invent business requirements that materially affect ... legal
+  policy"), this is flagged here rather than presented as finished legal
+  copy.
+- Carried over, still outstanding from earlier phases: guest checkout
+  doesn't exist, no `callbackUrl` round-trip through `/login`, no real
+  per-movement inventory ledger table, category deletion doesn't
+  cascade-reassign, and every other real-browser gap documented in
+  Phases 7-11's own "Known limitations" sections.
+
 
 ## Architecture Decisions
 
@@ -1623,6 +1888,32 @@ a real local Postgres):
   admin queries and admin mutations live in already-separate files
   (`admin-queries.ts` + `admin-actions.ts` per domain).
 
+### Phase 12 additions
+- `reviews.status` (`pending`/`approved`/`rejected`) is the single source
+  of truth for what the storefront shows — same "one authoritative status
+  column, never inferred" discipline `orders.status` established in
+  Phase 8/10. `getApprovedReviewsForProduct` is the *only* public read
+  path; a `pending`/`rejected` review is never exposed to anyone but its
+  own author and admins.
+- The notification event union was renamed/generalized
+  (`OrderNotificationEvent`/`notifyOrderEvent` →
+  `NotificationEvent`/`notifyEvent`) rather than adding a second parallel
+  notification system for review/support events — extending one existing
+  interface was both simpler and exactly what the Phase 11 handoff asked
+  for. The provider itself (console-log stub, no real SMS/email
+  configured) did not change shape.
+- `newsletter_subscribers`/`support_messages` are both simple, mostly-flat
+  tables (one boolean lifecycle flag each) rather than richer
+  ticket/campaign schemas — TRENDS_PROJECT_CONTEXT.md's §12 data-model
+  list calls for exactly these two tables with no further detail, and
+  rule F.5 prefers the simplest schema that fully represents the actual
+  requirement.
+- `/shipping-policy` reads its numbers live from `site_settings`
+  (`standardShippingFeeToman`/`expressShippingFeeToman`/
+  `freeShippingThresholdToman`) instead of hardcoding them a second time
+  — so an admin changing shipping fees from `/admin/settings` (Phase 11)
+  can't silently make this policy page display stale numbers.
+
 
 ## Important Assumptions
 
@@ -1707,6 +1998,20 @@ a real local Postgres):
   store with zero accounts able to reach `/admin` at all, a failure mode
   worse than the minor inconvenience of the guard. Revisit only if a
   genuine multi-admin operational need conflicts with this.
+
+### Phase 12 addition
+- Only a genuine purchaser (a `paid`/`processing`/`shipped`/`delivered`
+  order containing the product) may submit a review at all — there is no
+  "unverified"/anonymous review path. This is the assumption
+  `reviews.ts`'s header comment documents at length; flagged again here
+  since it's a real product-behavior decision, not just an implementation
+  detail. Revisit if the store ever wants to accept general public
+  reviews.
+- Policy-page copy (`/shipping-policy`, `/returns-policy`,
+  `/privacy-policy`, `/terms`) is genuine, reasonable, Iranian-store-
+  appropriate boilerplate, not legally reviewed text — each page says so
+  in its own body per rule A.18. Treat as a real to-do before production
+  launch, not finished legal content.
 
 ## Known Issues / Technical Debt
 
@@ -1804,7 +2109,9 @@ Phase 11 adds:
 - **No newsletter-subscribers or reviews/moderation admin screens** —
   their tables don't exist yet; both are Phase 12 scope (see this
   phase's write-up's "Known limitations" for the full reasoning). The
-  admin nav has no link to either.
+  admin nav has no link to either. **Resolved in Phase 12** —
+  `/admin/newsletter` and `/admin/reviews` now exist; left here
+  unedited as an accurate record of Phase 11's own state.
 - **No dedicated `inventory_movements` ledger table** — stock
   adjustments are fully captured in `audit_logs` (before/after stock +
   reason), not a separate per-movement schema; see
@@ -1820,97 +2127,125 @@ Phase 11 adds:
   direct-to-domain and real-`curl` HTTP-level verification was done
   instead.
 
+Phase 12 adds:
+
+- **No self-service newsletter unsubscribe link** — `isActive` is
+  admin-only-togglable (`/admin/newsletter`); no real outbound email
+  system exists to carry a one-click unsubscribe URL, and building an
+  unusable half-feature seemed worse than an honest admin-only toggle.
+- **No customer-facing "my reviews"/"my support messages" list views** —
+  a customer sees their own review's status inline on that one product's
+  page only, and has no history view of past support submissions. Not
+  requested anywhere in TRENDS_PROJECT_CONTEXT.md's scope.
+- **Policy-page copy is genuine but not legally reviewed** — see
+  "Important Assumptions" → "Phase 12 addition" above; each affected page
+  says so in its own visible body text, not hidden in this file only.
+- **Real browser/`Next-Action`-wire-protocol verification of the review
+  submission form, the moderation approve/reject buttons, and the
+  newsletter/contact forms as actually submitted from a rendered page has
+  not been done** — same sandbox limitation as every phase since Phase 7.
+  This phase went one step further than most prior phases though: it
+  called the actual exported Server Action functions directly (not just
+  their underlying query/db logic) with real `FormData`, which caught
+  real validation-branch behavior a pure DB-level test wouldn't have —
+  see this phase's "Tests/checks" ("Server Action-level smoke test") for
+  exactly what that covered and where it hit the `auth()`/`next/headers`
+  request-scope wall a live HTTP request would not have.
+
 ## Next Session Instructions
 
-- **Exact next objective: PHASE 12 — Reviews, content, support,
-  notifications**, per CLAUDE_BUILD_INSTRUCTIONS.txt §D. Phase 11 is
-  COMPLETE — do not redo admin CRUD/dashboard/audit-log work; build the
-  remaining customer-facing experience on top of it.
+- **Exact next objective: PHASE 13 — Security + performance hardening**,
+  per CLAUDE_BUILD_INSTRUCTIONS.txt §D. Phase 12 is COMPLETE — do not
+  redo reviews/newsletter/support/content work; this phase is a
+  dedicated audit-and-fix pass across everything Phases 1-12 already
+  built, not new customer-facing features.
   1. **First, if browser automation is available in this session's
-     environment, do the real end-to-end verification Phases 7-11 could
-     not:** sign in as admin/staff in an actual rendered browser and
-     click through creating/editing/deleting a category, a product (with
-     a variant and an image), a coupon, a hero slide, a promo banner, an
-     inventory adjustment, a site-settings save, and a customer
-     role-change — confirming each `useActionState`/`router.refresh()`
-     flow actually updates the page from real user interaction, not just
-     a direct function call. Fix anything genuinely broken before
-     building more on top of it; if no browser automation is available,
-     note that again and continue with the direct-to-domain +
-     `curl` HTTP-level verification approach every phase since Phase 7
-     has used.
-  2. Read CLAUDE_BUILD_INSTRUCTIONS.txt's Phase 12 task list and
-     TRENDS_PROJECT_CONTEXT.md §6 "Reviews"/"Notifications" and §7
-     public-content pages before writing code.
-  3. **New schema needed this phase**: `reviews` (rating, text,
-     moderation status, verified-purchase marker, customer ownership —
-     §6 "Reviews") and `newsletter_subscribers` (real persistence for
-     the newsletter signup UI Phase 2 already built but never wired to
-     storage). Both were deliberately left out of Phase 11 — see this
-     report's Phase 11 section's "Known limitations" for why. Follow the
-     same admin-CRUD pattern Phase 11 established
-     (`src/domains/<domain>/{queries,actions,admin-queries,
-     admin-actions}.ts`, shared `isStaffOrAdmin`/`isAdmin` from
-     `src/domains/auth/roles.ts`, `recordAuditLog` from
-     `src/domains/analytics/audit.ts` on every admin mutation) rather
-     than inventing a new pattern.
-  4. **Reviews**: customer-facing submission form on the product detail
-     page (ownership check — a customer can only review a product they
-     actually bought, using `order_items`/`orders` the same way Phase 10
-     already join-queries a customer's own order history), a moderation
-     queue at `/admin/reviews` (add this to `AdminNav`), and a verified-
-     purchase badge on approved reviews. Duplicate-review prevention
-     (one review per customer per product) via a unique index, not just
-     app logic — same "never rely only on application code to enforce
-     uniqueness" rule every prior phase has followed.
-  5. **Public content pages**: FAQ, about, contact, shipping policy,
-     returns/refund policy, privacy policy, terms — real routes with
-     metadata (§8 SEO), not fake/placeholder pages. Content can be
-     static/hardcoded per-page (TRENDS_PROJECT_CONTEXT.md doesn't ask for
-     these to be admin-editable — only hero slides/promo banners/
-     settings were called out in §7's admin scope), but must be real
-     Next.js routes with real Persian copy, not TODOs.
-  6. **Support/contact form**: a real Server Action-backed submission
-     (store it somewhere — either a new lightweight
-     `support_messages`/`contact_submissions` table, or reuse
-     `notifications`'s existing adapter-interface pattern from Phase 6/10
-     to at least log it server-side) — not a fake form that silently does
-     nothing on submit, per rule G "do not use placeholder TODOs as a
-     substitute for required functionality."
-  7. **Newsletter real persistence**: `newsletter_subscribers` table +
-     Server Action wiring the existing homepage newsletter UI (Phase 2,
-     currently non-functional demo markup) to real inserts, plus an
-     `/admin/content`-adjacent (or its own `/admin/newsletter`) subscriber
-     list for the admin nav item Phase 11's `AdminNav` intentionally left
-     unlinked-to-nothing... actually Phase 11's nav does NOT currently
-     have a newsletter-subscribers link at all (only "Categories/
-     Products/Inventory/Orders/Customers/Coupons/Content/Settings/Audit
-     log") — add one once the table/admin page exist, per
-     TRENDS_PROJECT_CONTEXT.md §7's "newsletter subscribers" admin task.
-  8. **Notification abstraction**: extend the existing
-     `src/domains/notifications/provider.ts` stub (console-log-only,
-     Phase 6/9/10 precedent — no real SMS/email provider configured, and
-     Phase 12 should not fabricate one either per rule A.17) to cover
-     review-moderation-result and support-form-received events if that
-     fits the existing interface cleanly; don't invent a second
-     notification system.
-  9. Run `typecheck`/`lint`/`build` and verify manually: review
-     ownership/duplicate checks are server-side (not just hidden UI),
-     newsletter/contact submissions actually persist, public content
-     pages have real metadata and are not accidentally `noindex`.
-  10. Update `PROGRESS.md` the same way this session did.
-- Files/areas to inspect first: `src/components/admin/AdminNav.tsx` (add
-  new nav entries here, don't build a second nav), `src/domains/auth/
-  roles.ts` (reuse `isStaffOrAdmin`/`isAdmin`/`ActionResult`, don't
-  redefine), `src/domains/analytics/audit.ts` (call `recordAuditLog` from
-  every new admin mutation, same as every Phase 11 domain did),
-  `src/app/page.tsx`'s newsletter section markup (Phase 2, currently
-  inert — this is what Phase 12 needs to wire up), `src/domains/
-  notifications/provider.ts` (the existing stub to extend, not replace),
-  `src/domains/orders/queries.ts` (existing pattern for scoping a query
-  to "this customer's own orders," needed for review ownership checks).
-- Do not start Phase 13 (security/performance hardening) before Phase
-  12's customer-experience work is done, per CLAUDE_BUILD_INSTRUCTIONS.txt's
+     environment, do the real end-to-end verification Phases 7-12 could
+     not:** sign in as a customer in an actual rendered browser and
+     click through submitting a review, subscribing to the newsletter,
+     and submitting the contact form; sign in as admin/staff and click
+     through approving/rejecting a review, toggling a newsletter
+     subscriber, and resolving a support message — confirming each
+     `useActionState`/`router.refresh()` flow actually updates the page
+     from real user interaction, not just a direct function call. Fix
+     anything genuinely broken before starting the hardening pass; if no
+     browser automation is available, note that again and continue with
+     the direct-to-domain + Server-Action-level + `curl` HTTP-level
+     verification approach every phase since Phase 7 has used.
+  2. Read CLAUDE_BUILD_INSTRUCTIONS.txt's Phase 13 task list in full
+     before starting — it is a checklist, not a suggestion list: audit
+     every server action/route handler, input validation, authorization,
+     session/cookie handling, CSRF, rate limiting for sensitive
+     endpoints, security headers, CSP, upload validation, secret
+     handling, dependency vulnerabilities, DB indexes/query review, N+1
+     review, caching/revalidation, image/font optimization, bundle/
+     client-JS review, loading/streaming review.
+  3. **This is explicitly an audit-and-document phase, not just a
+     fix-everything phase** — CLAUDE_BUILD_INSTRUCTIONS.txt's Phase 13
+     acceptance criteria is "document findings and fixes... no known
+     critical/high-risk issue knowingly left without documentation," not
+     "every finding must be fixed this session." Given the free-plan
+     session-size constraint (rule "work in SMALL, COMPLETE PHASES"),
+     budget time to actually audit broadly first, fix what's genuinely
+     high-risk and small, and write up anything real but larger-scope
+     (e.g. rate limiting, CSP) as a documented, scoped follow-up rather
+     than skipping the audit to fully implement only 2-3 items.
+  4. **Concrete places worth a close look, based on what Phases 1-12
+     actually built** (not exhaustive — read the Phase 13 task list
+     for the full scope):
+     - **Rate limiting**: nothing in this codebase currently rate-limits
+       anything — not `/login`, not `/register`, not
+       `/forgot-password`, not `submitReviewAction`/
+       `subscribeNewsletterAction`/`submitSupportMessageAction` (all
+       three of which are reachable by a signed-out visitor with no
+       account required). CLAUDE_BUILD_INSTRUCTIONS.txt rule A.16 says
+       "do not add Redis unless the current phase has a concrete
+       reason" — this may finally be that concrete reason, or an
+       in-memory/DB-backed limiter may be enough at this scale; decide
+       and document the reasoning either way.
+     - **Security headers / CSP**: `next.config.ts` has not been
+       audited for `headers()` (CSP, `X-Frame-Options`,
+       `Referrer-Policy`, etc.) in any phase so far — this is genuinely
+       unaudited, not just "fine."
+     - **Upload validation**: no file-upload endpoint has been built in
+       any phase yet (`hero_slides`/`promo_banners`/`product_images` are
+       all URL/text fields, per Phase 11's own documented limitation) —
+       confirm this is still true, and if so, there is nothing to audit
+       here yet; don't invent an upload feature just to have something
+       to harden.
+     - **Session/cookie review**: NextAuth's own defaults were relied on
+       since Phase 6 without a dedicated audit of cookie flags/
+       `maxAge`/rotation — worth actually checking now, not assuming.
+     - **DB indexes/N+1 review**: several admin list pages (`/admin/
+       reviews`, `/admin/newsletter`, `/admin/support`, `/admin/
+       customers`, `/admin/orders`) run a count query alongside the
+       page query for pagination totals — check whether any of these
+       (especially on tables without a covering index for their `WHERE`
+       clause) would be a real problem at production scale, and whether
+       any existing join (e.g. `listReviewsForAdmin`'s product/user
+       joins) is missing an index.
+     - **CSRF**: Server Actions have Next.js's built-in Origin-header
+       CSRF protection; confirm nothing in this codebase bypasses it
+       (e.g. a Route Handler doing a state-changing `GET`, or a
+       same-origin check disabled somewhere) rather than assuming.
+  5. Run `typecheck`/`lint`/`build` after any fix, same as every prior
+     phase — a hardening pass that breaks the build is not a completed
+     hardening pass.
+  6. Update `PROGRESS.md` the same way this session did, with the full
+     findings list (fixed vs. documented-as-follow-up) — this phase's
+     entire deliverable is partly *this document*, not just code.
+- Files/areas to inspect first: `next.config.ts` (headers/CSP — likely
+  untouched since Phase 1), every `src/domains/*/actions.ts` file
+  (there are now ~15 of them across all domains — this phase's job is to
+  actually re-read each one with an attacker's eye, not just skim),
+  `src/lib/auth/config.ts` (session/cookie configuration),
+  `src/domains/reviews/actions.ts` /
+  `src/domains/newsletter/actions.ts` /
+  `src/domains/support/actions.ts` (Phase 12's three newest
+  signed-out-reachable Server Actions — the most obvious rate-limiting
+  candidates, being new and not yet battle-tested).
+- Do not start Phase 14 (QA/accessibility/production readiness) before
+  Phase 13's hardening pass is done, per CLAUDE_BUILD_INSTRUCTIONS.txt's
   "do not jump ahead multiple phases."
 
 ## Commands
@@ -1934,7 +2269,11 @@ Phase 11 adds:
   `src/domains/catalog/demo-data.ts`, and (as of Phase 11) also
   wipes/re-populates `hero_slides`/`promo_banners` from the same
   fixtures. Does not touch `users`/`addresses`/`password_reset_tokens`/
-  `carts`/`orders`/`coupons`/`payments`/`audit_logs`/`site_settings`/etc.
+  `carts`/`orders`/`coupons`/`payments`/`audit_logs`/`site_settings`/
+  `reviews`/`newsletter_subscribers`/`support_messages`/etc. — the 3
+  tables Phase 12 added are, like every non-catalog table before them,
+  left alone by this script on purpose (it's a *catalog* seed, not a
+  full-database reset).
 - To exercise the mock payment gateway locally: set `PAYMENT_PROVIDER=mock`
   in `.env.local`, restart the dev/start server, and place an order —
   checkout will redirect to `/payment/mock/[authority]`, a simulator page
@@ -1968,19 +2307,29 @@ PostgreSQL server 16.15, next-auth@beta 5.0.0-beta.32, bcryptjs 3.0.3,
 zod 4.6.2. No new dependencies were added in Phase 9 — coupons/payments
 used only what was already installed (same as Phases 7 and 8). No new
 dependencies were added in Phase 11 either — every admin CRUD/dashboard/
-audit-log feature used only what Phases 1-10 already installed.
+audit-log feature used only what Phases 1-10 already installed. **No new
+dependencies were added in Phase 12 either** — reviews/newsletter/
+support/content used only what Phases 1-11 already installed.
 
 **Note for the next session's environment setup:** this sandbox's
-Postgres service was observed to stop silently between separate tool
-calls at least once this session (the first `npm run build` attempt
-failed on `/`'s prerender with `ECONNREFUSED 127.0.0.1:5432`, even
-though it had been running earlier in the same session) — if a build or
-dev-server command suddenly can't reach the database, first check
-`service postgresql status` and `service postgresql start` again before
-assuming something in the code broke. Similarly, backgrounding
-`npm run start`/`npm run dev` with a plain trailing `&` did not survive
-past the end of that tool call in this sandbox — use
-`setsid nohup <command> > /tmp/out.log 2>&1 < /dev/null &` (note: this
-sandbox's `disown` is unavailable, `setsid`+`nohup` alone was sufficient)
+Postgres service has now been observed to stop silently between separate
+tool calls **in more than one session** (Phase 11 saw it once; Phase 12
+saw it again, this time mid-build on `/contact`'s prerender with the same
+`ECONNREFUSED 127.0.0.1:5432`) — treat this as a real, recurring
+characteristic of this sandbox, not a one-off. If a build or dev-server
+command suddenly can't reach the database, always check
+`service postgresql status` and `service postgresql start` again first
+before assuming something in the code broke — this has been the actual
+cause both times so far. Similarly, backgrounding `npm run start`/
+`npm run dev` with a plain trailing `&` does not survive past the end of
+that tool call in this sandbox — use
+`setsid nohup <command> > /tmp/out.log 2>&1 < /dev/null &` (this
+sandbox's `disown` is unavailable; `setsid`+`nohup` alone is sufficient)
 if the next session needs a long-running server process to stay up for
-`curl`-based HTTP verification across multiple tool calls.
+`curl`-based HTTP verification across multiple tool calls. Also note:
+this session created and later dropped a scratch `trends_fresh` database
+for the fresh-clone migrate+seed check, and used temporary
+`scripts/tmp-*.ts` verification files that were deleted before finishing
+— the next session should do the same (throwaway scripts, not
+committed/delivered) rather than leaving verification code in the
+repository.

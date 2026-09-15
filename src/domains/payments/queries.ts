@@ -1,7 +1,7 @@
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { orderStatusHistory, orders, paymentEvents, payments, type Payment } from "@/lib/db/schema";
-import { notifyOrderEvent } from "@/domains/notifications/provider";
+import { notifyEvent } from "@/domains/notifications/provider";
 
 /**
  * The only sanctioned place for application code to read/write
@@ -140,9 +140,9 @@ export async function finalizePaymentVerification(
   });
 
   if (outcome.status === "succeeded" && outcome.mobile) {
-    await notifyOrderEvent({ type: "payment_succeeded", mobile: outcome.mobile, orderNumber: outcome.orderNumber });
+    await notifyEvent({ type: "payment_succeeded", mobile: outcome.mobile, orderNumber: outcome.orderNumber });
   } else if (outcome.status === "failed" && outcome.mobile) {
-    await notifyOrderEvent({ type: "payment_failed", mobile: outcome.mobile, orderNumber: outcome.orderNumber });
+    await notifyEvent({ type: "payment_failed", mobile: outcome.mobile, orderNumber: outcome.orderNumber });
   }
 
   const { mobile: _mobile, ...publicOutcome } = outcome;

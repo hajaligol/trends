@@ -50,6 +50,13 @@
       "when": 1789331565662,
       "tag": "0006_green_selene",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1789379997907,
+      "tag": "0007_colorful_gladiator",
+      "breakpoints": true
     }
   ]
 }

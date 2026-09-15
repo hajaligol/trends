@@ -11,7 +11,10 @@ const NAV_ITEMS: { href: string; label: string }[] = [
   { href: "/admin/orders", label: "سفارش‌ها" },
   { href: "/admin/customers", label: "مشتریان" },
   { href: "/admin/coupons", label: "کدهای تخفیف" },
+  { href: "/admin/reviews", label: "دیدگاه‌ها" },
   { href: "/admin/content", label: "محتوای صفحه اصلی" },
+  { href: "/admin/newsletter", label: "خبرنامه" },
+  { href: "/admin/support", label: "پیام‌های پشتیبانی" },
   { href: "/admin/settings", label: "تنظیمات" },
   { href: "/admin/audit-log", label: "گزارش فعالیت‌ها" },
 ];

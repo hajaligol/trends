@@ -20,3 +20,6 @@ export * from "./audit-logs";
 export * from "./hero-slides";
 export * from "./promo-banners";
 export * from "./site-settings";
+export * from "./reviews";
+export * from "./newsletter-subscribers";
+export * from "./support-messages";

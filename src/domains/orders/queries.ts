@@ -16,7 +16,7 @@ import {
 import type { ShippingMethod } from "@/domains/shipping/methods";
 import { CouponInvalidError, recordCouponRedemption, validateCoupon } from "@/domains/promotions/queries";
 import { canAdminTransition, canCustomerCancel, type OrderStatus } from "@/domains/orders/lifecycle";
-import { notifyOrderEvent } from "@/domains/notifications/provider";
+import { notifyEvent } from "@/domains/notifications/provider";
 
 /**
  * The only sanctioned place for application code to read/write `orders`/
@@ -281,8 +281,8 @@ export async function createOrderFromCart(
 
   // Outside the transaction, after commit — a notification failure must
   // never roll back an already-successfully-placed order (see
-  // `notifyOrderEvent`'s own header comment on why it never throws).
-  await notifyOrderEvent({
+  // `notifyEvent`'s own header comment on why it never throws).
+  await notifyEvent({
     type: "order_confirmed",
     mobile: order.recipientMobile,
     orderNumber: order.orderNumber,
@@ -469,7 +469,7 @@ export async function cancelOrderForUser(orderNumber: string, userId: string, re
     return updated;
   });
 
-  await notifyOrderEvent({ type: "order_cancelled", mobile: order.recipientMobile, orderNumber: order.orderNumber });
+  await notifyEvent({ type: "order_cancelled", mobile: order.recipientMobile, orderNumber: order.orderNumber });
   return order;
 }
 
@@ -539,9 +539,9 @@ export async function adminTransitionOrderStatus(
   });
 
   if (order.status === "cancelled") {
-    await notifyOrderEvent({ type: "order_cancelled", mobile: order.recipientMobile, orderNumber: order.orderNumber });
+    await notifyEvent({ type: "order_cancelled", mobile: order.recipientMobile, orderNumber: order.orderNumber });
   } else {
-    await notifyOrderEvent({
+    await notifyEvent({
       type: "order_status_changed",
       mobile: order.recipientMobile,
       orderNumber: order.orderNumber,

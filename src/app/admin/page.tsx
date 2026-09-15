@@ -20,6 +20,8 @@ export default async function AdminDashboardPage() {
     { label: "درآمد این ماه", value: formatToman(summary.revenueThisMonthToman), href: "/admin/orders" },
     { label: "تعداد مشتریان", value: toPersianDigits(summary.totalCustomers), href: "/admin/customers" },
     { label: "کالاهای رو به اتمام", value: toPersianDigits(summary.lowStockVariantCount), href: "/admin/inventory" },
+    { label: "دیدگاه‌های در انتظار بررسی", value: toPersianDigits(summary.pendingReviewCount), href: "/admin/reviews" },
+    { label: "پیام‌های پشتیبانی حل‌نشده", value: toPersianDigits(summary.unresolvedSupportMessageCount), href: "/admin/support" },
   ];
 
   return (
