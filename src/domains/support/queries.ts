@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { count, desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { supportMessages } from "@/lib/db/schema";
 import type { SupportMessage } from "@/lib/db/schema";
@@ -33,13 +33,15 @@ export async function listSupportMessagesForAdmin({
       .orderBy(desc(supportMessages.createdAt))
       .limit(safePageSize)
       .offset((safePage - 1) * safePageSize),
-    db.select({ id: supportMessages.id }).from(supportMessages).where(where),
+    // Real `COUNT(*)` (Phase 13 query-review fix) instead of selecting
+    // every matching message's id just to take `.length`.
+    db.select({ total: count() }).from(supportMessages).where(where),
   ]);
 
-  return { rows, page: safePage, pageSize: safePageSize, total: totalRows.length };
+  return { rows, page: safePage, pageSize: safePageSize, total: totalRows[0]?.total ?? 0 };
 }
 
 export async function countUnresolvedSupportMessages(): Promise<number> {
-  const rows = await db.select({ id: supportMessages.id }).from(supportMessages).where(eq(supportMessages.isResolved, false));
-  return rows.length;
+  const [row] = await db.select({ total: count() }).from(supportMessages).where(eq(supportMessages.isResolved, false));
+  return row?.total ?? 0;
 }

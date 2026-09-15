@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, count, desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { products, reviews, users } from "@/lib/db/schema";
 import type { Review } from "@/lib/db/schema";
@@ -45,8 +45,10 @@ export async function listReviewsForAdmin({ status, page = 1, pageSize = 20 }: A
       .orderBy(desc(reviews.createdAt))
       .limit(safePageSize)
       .offset((safePage - 1) * safePageSize),
+    // Real `COUNT(*)` (Phase 13 query-review fix) instead of selecting
+    // every matching review's id just to take `.length`.
     db
-      .select({ id: reviews.id })
+      .select({ total: count() })
       .from(reviews)
       .where(where ? and(where) : undefined),
   ]);
@@ -61,7 +63,7 @@ export async function listReviewsForAdmin({ status, page = 1, pageSize = 20 }: A
     })),
     page: safePage,
     pageSize: safePageSize,
-    total: totalRows.length,
+    total: totalRows[0]?.total ?? 0,
   };
 }
 
@@ -87,6 +89,6 @@ export async function getReviewForAdmin(id: string): Promise<AdminReviewRow | nu
  * `getAdminDashboardSummary`'s existing "orders awaiting action"/
  * "low-stock count" shape. */
 export async function countPendingReviews(): Promise<number> {
-  const rows = await db.select({ id: reviews.id }).from(reviews).where(eq(reviews.status, "pending"));
-  return rows.length;
+  const [row] = await db.select({ total: count() }).from(reviews).where(eq(reviews.status, "pending"));
+  return row?.total ?? 0;
 }

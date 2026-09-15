@@ -8,6 +8,7 @@ import { reviewSchema } from "@/lib/validation/storefront";
 import type { ActionResult } from "@/domains/auth/roles";
 import { getProductDetailBySlug } from "@/domains/catalog/queries";
 import { getUserReviewForProduct, hasUserPurchasedProduct } from "@/domains/reviews/queries";
+import { checkIpRateLimit } from "@/lib/security/rate-limit";
 
 function fieldErrors(error: { flatten: () => { fieldErrors: Record<string, string[] | undefined> } }) {
   const flat = error.flatten();
@@ -34,6 +35,14 @@ function fieldErrors(error: { flatten: () => { fieldErrors: Record<string, strin
  *    safely via the caught unique-violation below rather than crashing.
  */
 export async function submitReviewAction(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  // Already bounded by "must be signed in" + "must have purchased" +
+  // "one review per product" (the real, structural controls), but a
+  // light IP-based limit is added anyway as defense-in-depth against a
+  // single compromised/scripted account hammering this endpoint across
+  // many products.
+  const rateLimited = await checkIpRateLimit("submit-review", 20, 60 * 60 * 1000);
+  if (rateLimited) return { ok: false, error: rateLimited.error };
+
   const session = await auth();
   if (!session?.user) return { ok: false, error: "برای ثبت دیدگاه ابتدا وارد حساب کاربری خود شوید" };
 

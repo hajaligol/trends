@@ -1,4 +1,4 @@
-import { and, desc, eq, type SQL } from "drizzle-orm";
+import { and, count, desc, eq, type SQL } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { auditLogs } from "@/lib/db/schema";
 import type { SessionUser } from "@/domains/auth/roles";
@@ -71,10 +71,12 @@ export async function listAuditLogs({ entityType, page = 1, pageSize = 50 }: Aud
       .orderBy(desc(auditLogs.createdAt))
       .limit(safePageSize)
       .offset((safePage - 1) * safePageSize),
-    db.select({ id: auditLogs.id }).from(auditLogs).where(where ? and(where) : undefined),
+    // Real `COUNT(*)` (Phase 13 query-review fix) instead of selecting
+    // every matching log row's id just to take `.length`.
+    db.select({ total: count() }).from(auditLogs).where(where ? and(where) : undefined),
   ]);
 
-  return { rows, page: safePage, pageSize: safePageSize, total: totalRows.length };
+  return { rows, page: safePage, pageSize: safePageSize, total: totalRows[0]?.total ?? 0 };
 }
 
 /** Distinct `entityType` values that have ever been logged, used to

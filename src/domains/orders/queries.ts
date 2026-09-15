@@ -1,4 +1,4 @@
-import { and, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import { db, type DbTransaction } from "@/lib/db/client";
 import {
   cartItems,
@@ -393,10 +393,12 @@ export async function listOrdersForAdmin({ status, search, page = 1, pageSize = 
       .orderBy(desc(orders.createdAt))
       .limit(safePageSize)
       .offset((safePage - 1) * safePageSize),
-    db.select({ id: orders.id }).from(orders).where(where),
+    // Real `COUNT(*)` (Phase 13 query-review fix) instead of selecting
+    // every matching order's id just to take `.length`.
+    db.select({ total: count() }).from(orders).where(where),
   ]);
 
-  return { rows, page: safePage, pageSize: safePageSize, total: totalRows.length };
+  return { rows, page: safePage, pageSize: safePageSize, total: totalRows[0]?.total ?? 0 };
 }
 
 /** Restocks every line of a cancelled order back onto its variant — the

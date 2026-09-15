@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { orders, productVariants, users } from "@/lib/db/schema";
 import { countPendingReviews } from "@/domains/reviews/admin-queries";
@@ -31,16 +31,20 @@ export async function getAdminDashboardSummary(): Promise<AdminDashboardSummary>
   startOfMonth.setDate(1);
   startOfMonth.setHours(0, 0, 0, 0);
 
+  // Real `COUNT(*)` aggregates (Phase 13 query-review fix) instead of
+  // selecting every matching row's id just to take `.length` — this
+  // dashboard page is read on every `/admin` visit, so it's the single
+  // highest-traffic place this anti-pattern existed.
   const [awaitingRows, revenueRows, customerRows, lowStockRows, recentOrders, pendingReviewCount, unresolvedSupportMessageCount] =
     await Promise.all([
-      db.select({ id: orders.id }).from(orders).where(inArray(orders.status, [...ACTION_NEEDED_STATUSES])),
+      db.select({ total: count() }).from(orders).where(inArray(orders.status, [...ACTION_NEEDED_STATUSES])),
       db
         .select({ total: sql<number>`coalesce(sum(${orders.totalToman}), 0)` })
         .from(orders)
         .where(and(gte(orders.createdAt, startOfMonth), inArray(orders.status, [...REVENUE_COUNTED_STATUSES]))),
-      db.select({ id: users.id }).from(users).where(eq(users.role, "customer")),
+      db.select({ total: count() }).from(users).where(eq(users.role, "customer")),
       db
-        .select({ id: productVariants.id })
+        .select({ total: count() })
         .from(productVariants)
         .where(and(eq(productVariants.isActive, true), sql`${productVariants.stock} <= ${productVariants.lowStockThreshold}`)),
       db
@@ -53,10 +57,10 @@ export async function getAdminDashboardSummary(): Promise<AdminDashboardSummary>
     ]);
 
   return {
-    ordersAwaitingAction: awaitingRows.length,
+    ordersAwaitingAction: awaitingRows[0]?.total ?? 0,
     revenueThisMonthToman: Number(revenueRows[0]?.total ?? 0),
-    totalCustomers: customerRows.length,
-    lowStockVariantCount: lowStockRows.length,
+    totalCustomers: customerRows[0]?.total ?? 0,
+    lowStockVariantCount: lowStockRows[0]?.total ?? 0,
     pendingReviewCount,
     unresolvedSupportMessageCount,
     recentOrders,

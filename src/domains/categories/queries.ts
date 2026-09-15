@@ -95,6 +95,9 @@ export async function categoryHasChildrenOrProducts(id: string): Promise<boolean
 }
 
 export async function listRootCategoryCount(): Promise<number> {
-  const rows = await db.select({ id: categories.id }).from(categories).where(isNull(categories.parentId));
-  return rows.length;
+  // A real `COUNT(*)` (Phase 13 query-review fix) — the previous
+  // `SELECT id ... ; rows.length` shape transferred every matching row's
+  // id just to count them, which scales with table size for no reason.
+  const [row] = await db.select({ total: count() }).from(categories).where(isNull(categories.parentId));
+  return row?.total ?? 0;
 }

@@ -4,6 +4,20 @@ import { cartItems, carts, productImages, productVariants, products, type Cart }
 import type { StockState } from "@/domains/catalog/queries";
 
 /**
+ * The one error `addItemToCart` throws for an expected, user-facing
+ * condition (product deactivated / out of stock) — a distinct class so
+ * `cart/actions.ts` can `instanceof`-check it and safely surface its
+ * Persian message to the client, the same "only re-throw a known, safe
+ * error type verbatim" discipline every other domain's actions.ts file
+ * uses (`InsufficientStockError`, `CouponInvalidError`, etc.). Any other
+ * error (e.g. a genuine unexpected database failure) is deliberately
+ * NOT this class, so it is never mistaken for a safe, presentable
+ * message (CLAUDE_BUILD_INSTRUCTIONS.txt §11 "safe error messages" —
+ * never leak raw driver/SQL details to a customer).
+ */
+export class ProductUnavailableError extends Error {}
+
+/**
  * The only sanctioned place for application code to read/write `carts`/
  * `cart_items` rows — components/actions call these, never the Drizzle
  * client directly, mirroring `src/domains/catalog/queries.ts` and
@@ -219,10 +233,10 @@ export async function addItemToCart(
 ): Promise<void> {
   const variant = await getSellableVariant(variantId);
   if (!variant || !variant.isActive || !variant.productIsActive) {
-    throw new Error("این محصول در حال حاضر قابل خرید نیست");
+    throw new ProductUnavailableError("این محصول در حال حاضر قابل خرید نیست");
   }
   if (variant.stock <= 0) {
-    throw new Error("این محصول ناموجود است");
+    throw new ProductUnavailableError("این محصول ناموجود است");
   }
 
   const cappedQuantity = Math.max(1, Math.min(quantity, variant.stock));

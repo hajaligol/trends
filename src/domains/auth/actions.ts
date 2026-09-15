@@ -19,6 +19,7 @@ import {
 import { sendPasswordResetLink } from "@/domains/auth/notifications";
 import { mergeGuestCartIntoUserCart } from "@/domains/cart/merge";
 import { readGuestCartId, clearGuestCartId } from "@/domains/cart/session";
+import { checkIpRateLimit } from "@/lib/security/rate-limit";
 
 /**
  * Server Actions for every auth mutation. Every one re-validates its
@@ -67,6 +68,15 @@ function firstFieldErrors(issues: { path: PropertyKey[]; message: string }[]): R
 }
 
 export async function registerAction(_prevState: ActionResult, formData: FormData): Promise<ActionResult> {
+  // Rate-limited by IP, not by the submitted mobile number — a mobile-
+  // keyed limit would let an attacker sidestep it by rotating numbers,
+  // and would also let an attacker exhaust a *victim's* limit by
+  // submitting their number repeatedly. See
+  // `src/lib/security/rate-limit.ts`'s header comment for why an
+  // in-process limiter (not Redis) is the right primitive here.
+  const rateLimited = await checkIpRateLimit("register", 5, 60 * 60 * 1000);
+  if (rateLimited) return { error: rateLimited.error };
+
   const parsed = registerSchema.safeParse({
     mobile: formData.get("mobile"),
     fullName: formData.get("fullName"),
@@ -110,6 +120,14 @@ export async function registerAction(_prevState: ActionResult, formData: FormDat
 }
 
 export async function loginAction(_prevState: ActionResult, formData: FormData): Promise<ActionResult> {
+  // Credential-stuffing/brute-force slowdown — deliberately generous
+  // (10 attempts / 5 minutes / IP) so a customer who mistypes their
+  // password a few times is never locked out, while still bounding an
+  // automated attempt loop. Keyed by IP, not by the submitted mobile
+  // number, for the same reason `registerAction` is (see its comment).
+  const rateLimited = await checkIpRateLimit("login", 10, 5 * 60 * 1000);
+  if (rateLimited) return { error: rateLimited.error };
+
   const parsed = loginSchema.safeParse({
     mobile: formData.get("mobile"),
     password: formData.get("password"),
@@ -159,6 +177,9 @@ export async function requestPasswordResetAction(
   _prevState: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
+  const rateLimited = await checkIpRateLimit("forgot-password", 5, 60 * 60 * 1000);
+  if (rateLimited) return { error: rateLimited.error };
+
   const parsed = forgotPasswordSchema.safeParse({ mobile: formData.get("mobile") });
   if (!parsed.success) {
     return { fieldErrors: firstFieldErrors(parsed.error.issues) };
@@ -175,6 +196,14 @@ export async function requestPasswordResetAction(
 }
 
 export async function resetPasswordAction(_prevState: ActionResult, formData: FormData): Promise<ActionResult> {
+  // A brute-force guess against a specific token is already extremely
+  // unlikely to succeed (the token itself is a high-entropy random
+  // value, only its SHA-256 hash is stored — see `reset-tokens.ts`), but
+  // this bounds automated guessing attempts against this endpoint the
+  // same way every other public auth action here is bounded.
+  const rateLimited = await checkIpRateLimit("reset-password", 10, 60 * 60 * 1000);
+  if (rateLimited) return { error: rateLimited.error };
+
   const parsed = resetPasswordSchema.safeParse({
     token: formData.get("token"),
     password: formData.get("password"),

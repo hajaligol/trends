@@ -10,6 +10,7 @@ import { getProductDetailBySlug, getRelatedProducts } from "@/domains/catalog/qu
 import { getApprovedReviewsForProduct } from "@/domains/reviews/queries";
 import { ReviewsSection } from "@/components/catalog/ReviewsSection";
 import { SITE_URL } from "@/lib/site-config";
+import { safeJsonLd } from "@/lib/utils/safe-json-ld";
 
 type ProductPageProps = {
   params: Promise<{ slug: string }>;
@@ -90,7 +91,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
     <main className="py-[clamp(24px,4vw,40px)]">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: safeJsonLd(jsonLd) }}
       />
       <Container>
         <Breadcrumbs

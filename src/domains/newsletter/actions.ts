@@ -4,6 +4,7 @@ import { db } from "@/lib/db/client";
 import { newsletterSubscribers } from "@/lib/db/schema";
 import { newsletterSubscribeSchema } from "@/lib/validation/storefront";
 import type { ActionResult } from "@/domains/auth/roles";
+import { checkIpRateLimit } from "@/lib/security/rate-limit";
 
 /**
  * Wires the previously-presentational Footer newsletter form
@@ -20,6 +21,13 @@ import type { ActionResult } from "@/domains/auth/roles";
  * here (rule F.3), not a read-then-write check.
  */
 export async function subscribeNewsletterAction(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  // No auth required (by design — see this file's header comment), so
+  // this is one of the few write paths a script can hit with no account
+  // at all; bound it by IP against spam/enumeration same as the other
+  // signed-out-reachable actions in this codebase.
+  const rateLimited = await checkIpRateLimit("newsletter-subscribe", 10, 60 * 60 * 1000);
+  if (rateLimited) return { ok: false, error: rateLimited.error };
+
   const parsed = newsletterSubscribeSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { ok: false, error: "ایمیل معتبر نیست" };
 

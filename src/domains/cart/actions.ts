@@ -5,6 +5,7 @@ import {
   addItemToCart,
   clearCart as clearCartRows,
   getCartSummary,
+  ProductUnavailableError,
   removeCartItem,
   updateCartItemQuantity,
   type CartSummary,
@@ -38,8 +39,16 @@ export async function addToCartAction(variantId: string, quantity: number): Prom
   try {
     await addItemToCart(cartId, variantId, quantity);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "افزودن به سبد خرید ممکن نشد";
-    return { ok: false, error: message };
+    // Only ever surface the one known, expected condition verbatim (rule
+    // A.11/§11 "safe error messages") — anything else (e.g. a genuine
+    // unexpected database failure) rethrows, which Next.js turns into a
+    // generic digest-only error on the client rather than leaking a raw
+    // driver/SQL message. Same discipline as every other domain's
+    // `actions.ts` (`InsufficientStockError`, `CouponInvalidError`, etc.).
+    if (error instanceof ProductUnavailableError) {
+      return { ok: false, error: error.message };
+    }
+    throw error;
   }
 
   return { ok: true, cart: await getCartSummary(cartId) };

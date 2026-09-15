@@ -6,6 +6,7 @@ import { contactSchema } from "@/lib/validation/storefront";
 import { auth } from "@/lib/auth/config";
 import type { ActionResult } from "@/domains/auth/roles";
 import { notifyEvent } from "@/domains/notifications/provider";
+import { checkIpRateLimit } from "@/lib/security/rate-limit";
 
 /**
  * The `/contact` page's Server Action — real persistence, per
@@ -23,6 +24,11 @@ import { notifyEvent } from "@/domains/notifications/provider";
  * always the inserted row itself, which `/admin/support` reads for real.
  */
 export async function submitSupportMessageAction(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  // No auth required (by design), so — like the newsletter form — this
+  // is reachable by any anonymous visitor; bound it by IP against spam.
+  const rateLimited = await checkIpRateLimit("support-message", 5, 60 * 60 * 1000);
+  if (rateLimited) return { ok: false, error: rateLimited.error };
+
   const parsed = contactSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) {
     const flat = parsed.error.flatten();

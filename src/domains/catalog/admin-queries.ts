@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, ilike, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, ilike, sql } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { categories, productImages, productVariants, products } from "@/lib/db/schema";
 import type { Product, ProductImage, ProductVariant } from "@/lib/db/schema";
@@ -73,7 +73,9 @@ export async function listProductsForAdmin({
       .orderBy(desc(products.updatedAt))
       .limit(safePageSize)
       .offset((safePage - 1) * safePageSize),
-    db.select({ id: products.id }).from(products).where(where),
+    // Real `COUNT(*)` (Phase 13 query-review fix) instead of selecting
+    // every matching product's id just to take `.length`.
+    db.select({ total: count() }).from(products).where(where),
   ]);
 
   return {
@@ -85,7 +87,7 @@ export async function listProductsForAdmin({
     })),
     page: safePage,
     pageSize: safePageSize,
-    total: totalRows.length,
+    total: totalRows[0]?.total ?? 0,
   };
 }
 

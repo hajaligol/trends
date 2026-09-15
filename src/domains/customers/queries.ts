@@ -1,4 +1,4 @@
-import { desc, eq, ilike, or, sql } from "drizzle-orm";
+import { count, desc, eq, ilike, or, sql } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { orders, users } from "@/lib/db/schema";
 import { toPublicUser, type PublicUser } from "@/lib/db/schema/users";
@@ -58,7 +58,10 @@ export async function listCustomersForAdmin({
       .orderBy(desc(users.createdAt))
       .limit(safePageSize)
       .offset((safePage - 1) * safePageSize),
-    db.select({ id: users.id }).from(users).where(where),
+    // Real `COUNT(*)` (Phase 13 query-review fix) instead of selecting
+    // every matching row's id just to take `.length` — see this file's
+    // sibling functions below for the same fix applied consistently.
+    db.select({ total: count() }).from(users).where(where),
   ]);
 
   return {
@@ -69,7 +72,7 @@ export async function listCustomersForAdmin({
     })),
     page: safePage,
     pageSize: safePageSize,
-    total: totalRows.length,
+    total: totalRows[0]?.total ?? 0,
   };
 }
 
@@ -92,9 +95,9 @@ export async function getCustomerForAdmin(id: string): Promise<AdminCustomerDeta
 }
 
 export async function countStaffAndAdminUsers(): Promise<number> {
-  const rows = await db
-    .select({ id: users.id })
+  const [row] = await db
+    .select({ total: count() })
     .from(users)
     .where(or(eq(users.role, "admin"), eq(users.role, "staff")));
-  return rows.length;
+  return row?.total ?? 0;
 }
