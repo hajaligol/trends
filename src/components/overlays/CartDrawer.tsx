@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect } from "react";
+import { useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { AssetSlot } from "@/components/ui/AssetSlot";
 import { useUIOverlay } from "@/components/overlays/UIOverlayProvider";
 import { useCart } from "@/components/cart/CartProvider";
+import { useDialogA11y } from "@/lib/hooks/useDialogA11y";
 import { formatToman } from "@/lib/utils/money";
 import { toPersianDigits } from "@/lib/utils/persian-digits";
 
@@ -17,19 +18,19 @@ import { toPersianDigits } from "@/lib/utils/persian-digits";
  * a demo fixture. Checkout itself is Phase 8; the button below is
  * intentionally disabled with an explanatory label rather than linking
  * to a route that doesn't exist yet (rule G — no fake actions).
+ *
+ * `role="dialog"`/`aria-modal` plus `useDialogA11y` (focus trap, initial
+ * focus on the close button, focus returned to whatever opened the
+ * drawer) were added in Phase 14's accessibility pass — the panel
+ * previously closed on Escape but had no dialog semantics and let
+ * keyboard Tab reach the storefront content behind the backdrop.
  */
 export function CartDrawer() {
   const { isCartOpen, closeCart } = useUIOverlay();
   const { cart, isLoading, isMutating, updateQuantity, removeItem } = useCart();
+  const panelRef = useRef<HTMLElement>(null);
 
-  useEffect(() => {
-    if (!isCartOpen) return undefined;
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") closeCart();
-    }
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [isCartOpen, closeCart]);
+  useDialogA11y(isCartOpen, closeCart, panelRef);
 
   const hasUnavailableItems = cart.items.some((item) => !item.isAvailable);
 
@@ -42,6 +43,9 @@ export function CartDrawer() {
         className="fixed inset-0 z-[90] bg-ink/30"
       />
       <aside
+        ref={panelRef}
+        role="dialog"
+        aria-modal={isCartOpen}
         aria-hidden={!isCartOpen}
         aria-label="سبد خرید"
         className={`fixed inset-y-0 right-0 z-[100] flex w-[min(360px,88vw)] flex-col bg-bg p-6 shadow-[-8px_0_30px_rgba(24,38,48,0.12)] transition-transform duration-[250ms] ease-out ${

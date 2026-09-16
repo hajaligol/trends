@@ -1,79 +1,128 @@
 # ترندز (Trends) — Iranian Clothing E-commerce
 
-Production rebuild of the supplied Persian/RTL storefront prototype into a real
-Next.js + PostgreSQL e-commerce application.
+A production-grade, Persian/RTL Next.js + PostgreSQL e-commerce application,
+built incrementally from a supplied HTML/CSS prototype following
+`docs/CLAUDE_BUILD_INSTRUCTIONS.txt`'s 15-phase plan. **Phases 0–14 are
+complete.** See `PROGRESS.md` for the authoritative, detailed status —
+always read it before starting new work; this README is a map, not the
+source of truth.
 
-This repository is being built incrementally, one phase at a time, following
-`docs/CLAUDE_BUILD_INSTRUCTIONS.txt`. See `PROGRESS.md` for current status —
-**always read `PROGRESS.md` before starting new work.**
+## What this is
 
-## Repository layout (target — filled in phase by phase)
+A customer can discover products, search/filter, inspect size/color
+variants, maintain a wishlist, create an account, save Iranian addresses,
+check out, receive an order record, track order status, and read shipping/
+returns/privacy/terms policies. A store operator can manage the catalog,
+inventory, orders, promotions, reviews, homepage content, newsletter
+subscribers, and settings from `/admin`, with every privileged action
+server-authorized and audited.
+
+**Not production-ready to accept real money as-is** — see
+`docs/PRODUCTION_CHECKLIST.md` for the exact, itemized list of what's
+launch-blocking (a real Iranian payment gateway, real shipping fees, legal
+review of policy copy) versus what's a documented, acceptable-for-now
+limitation (single-process deployment topology, no CDN yet).
+
+## Getting started
+
+```bash
+npm install
+cp .env.example .env.local   # fill in DATABASE_URL at minimum
+npm run db:migrate           # apply schema to your PostgreSQL database
+npm run db:seed              # optional — demo catalog data for local dev
+npm run dev                  # http://localhost:3000
+```
+
+Checks:
+
+```bash
+npm run typecheck            # tsc --noEmit
+npm run lint                 # eslint .
+npm test                     # unit tests (no database needed)
+npm run test:integration     # integration tests (needs a real, migrated Postgres — reads DATABASE_URL from .env.local)
+npm run test:all             # both suites
+npm run build                # production build (needs a reachable, migrated DATABASE_URL — see docs/DEPLOYMENT.md)
+```
+
+`npm run db:studio` opens Drizzle Studio against `DATABASE_URL` for direct
+inspection.
+
+## Repository layout
 
 ```
-docs/                    Reference documents (project context, build instructions)
-reference/
-  prototype.html         The original supplied prototype. Design/interaction source
-                          of truth. Not edited — only read for parity checks.
+docs/                        Reference docs: project context, build instructions,
+                              deployment, production checklist, backup/migration
+                              strategy, observability plan (this list, below)
 
 src/
-  app/                    Next.js App Router routes (created in Phase 1+)
+  app/                        Next.js App Router routes — storefront, /account,
+                               /admin, /api. error.tsx / global-error.tsx /
+                               not-found.tsx are the app-wide error/404 boundaries.
   components/
-    ui/                   Generic reusable primitives (Button, Card, Input, ...)
-    layout/               Header, footer, containers, drawers
-  domains/                One folder per business domain (see below). Each domain
-                           owns its own server actions / queries / validation /
-                           business rules. UI components stay presentational and
-                           call into domains, never into the database directly.
+    ui/                        Generic reusable primitives (Button, Container, ...)
+    layout/                    Header, footer
+    overlays/                  Cart drawer, search overlay (modal dialogs — see
+                                src/lib/hooks/useDialogA11y.ts)
+    home/, cart/, admin/, ...  feature-area components
+  domains/                     One folder per business domain — see below. Each
+                                owns its queries/actions/validation; UI components
+                                stay presentational and call into domains, never
+                                into the database directly.
   lib/
-    db/                   Drizzle client + schema (Phase 3)
-    validation/           Shared Zod schemas
-    auth/                 Auth/session helpers
-    utils/                Formatting (money, Persian digits, dates), misc helpers
-  styles/                 Global CSS / design tokens that don't fit Tailwind
+    db/                        Drizzle client + schema + seed script
+    validation/                Shared Zod schemas
+    auth/                      NextAuth v5 config (JWT sessions, no adapter)
+    security/                  Rate limiting
+    hooks/                     Shared client-side hooks (dialog focus trap, etc.)
+    utils/                     Money/phone/Persian-digit formatting, misc helpers
+  styles/                      Global CSS / design tokens
 
-public/assets/            Static media (hero, categories, products, icons).
-                           NOTE: prototype-referenced files (banner-1.webp,
-                           banner-2.webp, category-*.webp) are NOT yet supplied
-                           — see "Missing assets" below.
-
-drizzle/migrations/       SQL migrations (Phase 3+)
-tests/                    unit / integration / e2e (Phase 14, populated earlier
-                           as business-critical logic is written)
+drizzle/migrations/           SQL migrations, 0000–0007 (one set of changes per
+                               schema-changing phase)
+tests/
+  unit/                       Pure-function tests, no database (npm test)
+  integration/                Real-Postgres tests: inventory/coupon race
+                               conditions, payment-callback idempotency,
+                               cross-user ownership (npm run test:integration)
+public/assets/                Product/category/hero images carried over from
+                               the prototype
 ```
 
 ### Domain boundaries (`src/domains/*`)
 
-catalog, categories, inventory, customers, auth, wishlist, cart, checkout,
-addresses, orders, payments, shipping, promotions, reviews, notifications,
-content, newsletter, support, admin, analytics.
+`catalog`, `categories`, `inventory`, `customers`, `auth`, `wishlist`,
+`cart`, `checkout`, `addresses`, `orders`, `payments`, `shipping`,
+`promotions`, `reviews`, `notifications`, `content`, `newsletter`,
+`support`, `admin`, `analytics`, `customer-experience`.
 
-Each domain is expected to eventually contain its own `schema.ts` (Drizzle
-tables it owns), `service.ts` (business rules), `actions.ts` (Server Actions),
-and `validation.ts` (Zod schemas) as those phases are implemented. Empty
-domains currently hold only a `.gitkeep` placeholder.
+## Documentation index
 
-## Status
+- **`PROGRESS.md`** — the authoritative phase-by-phase build log. Read
+  this first, always.
+- **`docs/TRENDS_PROJECT_CONTEXT.md`** — product/business requirements.
+- **`docs/CLAUDE_BUILD_INSTRUCTIONS.txt`** — the 15-phase build plan and
+  non-negotiable engineering rules this codebase follows.
+- **`docs/DEPLOYMENT.md`** — how to actually run this in production,
+  including the single-process deployment constraint and required
+  environment variables.
+- **`docs/PRODUCTION_CHECKLIST.md`** — itemized, honestly-labeled
+  (DONE / BLOCKING / PRE-LAUNCH) production readiness checklist.
+- **`docs/BACKUP_AND_MIGRATIONS.md`** — migration workflow and database
+  backup/restore strategy.
+- **`docs/OBSERVABILITY.md`** — what logging/audit trail exists today
+  versus what a future phase should add (error tracking, health checks,
+  alerting).
 
-Phase 1 (Next.js foundation + design system shell) is complete and was
-verified with a working build. Phase 2 (homepage visual migration) has
-been implemented — hero carousel, categories, featured products, promo
-banners, new arrivals, benefits strip, search overlay, and cart drawer
-are all real components now — but could not be run through
-`npm install`/`build`/`lint`/`typecheck` in the session that wrote it
-(sandbox network restriction). **Run those checks first** before trusting
-this is bug-free; see `PROGRESS.md` for full detail on what was and
-wasn't verified.
+## Known, honestly-documented limitations
 
-## Getting started
-
-```
-npm install
-npm run dev        # http://localhost:3000
-npm run build      # production build
-npm run lint        # eslint .
-npm run typecheck   # tsc --noEmit
-```
-
-Copy `.env.example` to `.env.local` before wiring up anything from Phase 3
-onward (database, auth, payments) — nothing in the app currently reads
-environment variables yet, so this isn't required to run Phase 1's code.
+This codebase has never had browser automation available in any session —
+every phase verified Server Actions and pages via direct-to-domain calls,
+real `FormData` submitted straight to exported Server Action functions, and
+`curl` with real session cookies, rather than clicking through a rendered
+browser. This is real coverage, not a substitute for it — see
+`docs/PRODUCTION_CHECKLIST.md`'s "Known sandbox limitation" section before
+launch. `PROGRESS.md`'s "Known Issues / Technical Debt" section has the
+complete, cumulative, phase-by-phase list of every other known gap (no
+guest checkout, mock-only payment provider, placeholder shipping fees,
+un-reviewed policy copy, and more) — nothing here is hidden or
+undocumented.

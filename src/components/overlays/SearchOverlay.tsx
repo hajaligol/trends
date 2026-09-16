@@ -1,31 +1,26 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
 import { useUIOverlay } from "@/components/overlays/UIOverlayProvider";
+import { useDialogA11y } from "@/lib/hooks/useDialogA11y";
 
 /**
  * Mirrors #searchOverlay in the prototype: focuses the input on open,
  * closes on Escape or backdrop click. Submits as a plain GET form to
  * `/search?q=...` (Phase 5) — no client-side fetch/state needed, the
  * `/search` page itself is what's database-backed and URL-driven.
+ *
+ * Uses the same `useDialogA11y` focus-trap hook as `CartDrawer` (Phase
+ * 14 accessibility pass) — previously had Escape-to-close and initial
+ * input focus but no Tab trap and no focus restored to the search
+ * trigger button on close.
  */
 export function SearchOverlay() {
   const { isSearchOpen, closeSearch } = useUIOverlay();
+  const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    if (!isSearchOpen) return undefined;
-
-    const focusTimer = setTimeout(() => inputRef.current?.focus(), 30);
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") closeSearch();
-    }
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      clearTimeout(focusTimer);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [isSearchOpen, closeSearch]);
+  useDialogA11y(isSearchOpen, closeSearch, containerRef, inputRef);
 
   if (!isSearchOpen) return null;
 
@@ -37,6 +32,7 @@ export function SearchOverlay() {
       className="fixed inset-0 z-[100] flex justify-center bg-ink/35 pt-[min(12vh,120px)]"
     >
       <div
+        ref={containerRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="searchTitle"

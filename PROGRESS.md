@@ -1,27 +1,30 @@
 # Trends Progress Report
 
 ## Current Status
-- Overall status: Security + performance hardening (Phase 13) is
-  implemented **and verified** this session — full network access was
-  available. No schema changes this phase (application-code-only, as
-  expected for a hardening pass). `typecheck`/`lint`/`build` all pass
-  clean; a fresh-migration check and a real `next start` HTTP smoke test
-  (headers + representative page set) were run. See this phase's
-  write-up for the full findings list — several real bugs were found
-  and fixed (not just theoretical hardening), and one larger-scope item
-  (nonce-based strict CSP) is explicitly deferred with reasoning, per
-  CLAUDE_BUILD_INSTRUCTIONS.txt's Phase 13 framing ("document findings
-  and fixes," not "fix everything"). **Post-delivery correction the
-  same day:** the delivered CSP broke `next dev` (missing
-  `'unsafe-eval'`, which dev-mode React/Turbopack genuinely needs) —
-  fixed by making the `Content-Security-Policy` header production-only
-  in `next.config.ts`; see Phase 13 finding #4's "Post-delivery
-  correction" note for the full explanation and how it was verified in
-  both modes.
-- Current phase: none in progress — PHASE 13 is COMPLETE.
-- Last completed phase: PHASE 13 — Security + performance hardening
-- Next phase: PHASE 14 — QA, accessibility, production readiness
-- Date: 2026-09-15
+- Overall status: **All 15 phases complete.** Phase 14 (QA,
+  accessibility, production readiness — the final phase) was implemented
+  and verified this session with full network access available. Added
+  the project's first test suite (Vitest: 66 unit tests + 25 integration
+  tests against a real PostgreSQL, all passing), fixed a real
+  previously-undetected accessibility gap (`CartDrawer` had no dialog
+  semantics or focus trap at all), added the three error boundaries the
+  app was missing (`error.tsx`/`global-error.tsx`/`admin/error.tsx`), and
+  wrote the deployment/production-checklist/backup/observability
+  documentation plus a full README rewrite. `typecheck`/`lint`/`test`/
+  `test:integration`/`build` all pass clean. The project is structurally
+  and technically shippable; it is not yet ready to accept real customer
+  payments for business/operational reasons (no real payment gateway, no
+  real shipping rates, no legal policy review) — see
+  `docs/PRODUCTION_CHECKLIST.md` for the exact, itemized remaining list.
+- Current phase: none in progress — PHASE 14 is COMPLETE WITH FOLLOW-UP
+  (the "follow-up" being real-browser verification, which no session in
+  this project's history has ever had available — see Phase 14's
+  write-up and "Next Session Instructions" below).
+- Last completed phase: PHASE 14 — QA, accessibility, production
+  readiness (the final phase in CLAUDE_BUILD_INSTRUCTIONS.txt's plan)
+- Next phase: none — see "Next Session Instructions" for the prioritized
+  follow-up backlog instead of a numbered phase.
+- Date: 2026-09-16
 
 ## Completed
 
@@ -2176,7 +2179,244 @@ silently ignored):**
   safely reachable, so Phase 11 replaces this layout rather than
   extending around it.
 
-### Phase 11 additions
+### Phase 14 — QA, accessibility, production readiness (COMPLETE WITH FOLLOW-UP)
+Goal: turn the application into a shippable product per
+CLAUDE_BUILD_INSTRUCTIONS.txt's Phase 14 task list — the final phase in
+the 15-phase plan.
+
+**No test runner existed anywhere in this repo before this phase**
+(`tests/unit`, `tests/integration`, `tests/e2e` were empty placeholder
+directories, and `package.json` had no `test` script) — choosing and
+wiring one up was explicitly this phase's own job per the prior session's
+handoff note, not a prerequisite someone else needed to finish first.
+
+**Test infrastructure implemented:**
+- Installed Vitest (`vitest`, plus `vite-tsconfig-paths` during setup,
+  later removed once `resolve.tsconfigPaths: true` in `vitest.config.ts`
+  turned out to cover the same need without the extra dependency — rule
+  F.6). `vitest.config.ts` splits unit vs. integration by directory
+  (`tests/unit/**`, `tests/integration/**`) rather than by tag, and sets
+  `fileParallelism: false` so integration test *files* never race each
+  other's fixtures against the one shared database (individual `it()`s
+  within a single race-condition test still run genuinely concurrently
+  via `Promise.allSettled` — that's the actual thing being tested).
+- `package.json` scripts: `test` (unit only, no DB — safe as a CI/
+  pre-commit default), `test:watch`, `test:integration` (real Postgres,
+  loads `.env.local` via Node's native `--env-file` flag rather than
+  adding a `dotenv-cli` dependency), `test:all` (both).
+- **66 unit tests**, 5 files, all pure functions with zero I/O:
+  `tests/unit/money.test.ts` (Toman formatting, discount-percent edge
+  cases — negative/zero/equal compare-at prices, rounding), `phone.test.ts`
+  (every accepted Iranian mobile input shape, Persian/Arabic-Indic digit
+  conversion, and explicitly the exact cross-format dedup scenario Phase
+  6's bug was about), `order-lifecycle.test.ts` (the full
+  `orders/lifecycle.ts` transition table — every (from, to) status pair,
+  not just the happy path; confirms `paid` is unreachable as an
+  admin-transition target from *any* status), `roles.test.ts`
+  (`isStaffOrAdmin`/`isAdmin`, including fail-closed behavior on
+  tampered/malformed role strings), `validation.test.ts` (the Zod schemas
+  in `lib/validation/storefront.ts` and `lib/validation/auth.ts` —
+  reviews, newsletter, contact, mobile normalization-via-preprocess,
+  password length bounds including bcrypt's 72-char effective limit,
+  address/postal-code normalization, register password-confirmation
+  mismatch).
+- **25 integration tests**, 4 files, against a real local PostgreSQL
+  (migrated + seeded, same database the app itself uses), each with a
+  `tests/integration/helpers.ts` fixture layer (`trends-test-`-prefixed
+  slugs/codes so fixtures are unambiguous in a shared dev database) and
+  an `afterAll` that deletes every row it created, in FK-safe order,
+  verified by direct `psql` row-count checks before/after full suite runs
+  (some bugs in the test files' own cleanup ordering were caught and
+  fixed this way during development — see "What was verified" below):
+  - `inventory-race.test.ts` — critical flow #7 ("insufficient stock":
+    empty cart, zero/depleted stock, a variant deactivated after being
+    added to cart) and the concurrency guarantee `createOrderFromCart`'s
+    own header comment claims: two simultaneous checkouts for 1 unit of
+    stock (`Promise.allSettled` — exactly one succeeds, the other gets a
+    real `InsufficientStockError`, final stock is 0, not negative), and a
+    harder 5-attempts-for-3-units version (exactly 3 succeed, exactly 2
+    rejected, stock ends at exactly 0).
+  - `coupon-validation.test.ts` — critical flow #8 ("invalid coupon"):
+    unknown code, inactive, not-yet-started, expired, below minimum
+    basket, case-insensitive code matching, discount capped at subtotal
+    (never negative order total), percentage discount flooring, per-
+    customer redemption limit, and *total* usage limit (rejects a
+    *different* customer once the limit is spent). Plus a real
+    concurrency test: two simultaneous checkouts racing for a coupon with
+    `usageLimit: 1` — exactly one order gets the discount, exactly one
+    `couponRedemptions` row exists afterward (the `FOR UPDATE` lock
+    documented in `promotions/queries.ts`'s header comment, now verified
+    under an actual race rather than just read as a comment).
+  - `payment-idempotency.test.ts` — critical flow #6 ("duplicate payment
+    callback"): first callback marks the order `paid`; a second identical
+    callback returns `already_processed` and changes nothing (order
+    status, payment status, and the `payment_events` audit trail all
+    stay exactly as they were — asserted with exact event-type counts,
+    not just "no error"); a third callback that flips `success: false`
+    after the payment already succeeded is *also* ignored (can't
+    downgrade a settled payment); a failed-then-retried-success sequence
+    correctly stays failed (no late flip to paid); an unknown reference
+    returns `not_found`; and two *genuinely concurrent* callbacks for the
+    same reference (real `Promise.allSettled`, not sequential awaits)
+    resolve to exactly one `succeeded` + one `already_processed`, with
+    the order ending up `paid` either way.
+  - `ownership.test.ts` — re-verifies the "account ownership checks
+    exist" claim made in every phase since Phase 6/7, this time end to
+    end against real rows for a real second user, not just by code
+    review: a second user cannot read/update/delete a first user's
+    address (all three return null/false, not an error — matching each
+    function's documented "ownership mismatch is structurally
+    unrepresentable as success" contract); setting a new default address
+    unsets the old default *for that user only* (a second user's default
+    is untouched); wishlist add is idempotent and strictly per-user
+    (double-add doesn't duplicate, another user's wishlist is unaffected,
+    removing a product you never wishlisted is a safe no-op); a cart item
+    can't be updated/removed via a different cart's id (both return
+    `false`, the real item's quantity is untouched).
+
+**Accessibility pass and focus-trap fix (`CLAUDE_BUILD_INSTRUCTIONS.txt`'s
+  "keyboard navigation of dialogs/drawers"):** code review of
+  `src/components/overlays/CartDrawer.tsx` and `SearchOverlay.tsx` found
+  a real, previously-undetected gap dating back to Phase 2: `CartDrawer`
+  had a backdrop and an Escape-key handler but **no `role="dialog"`/
+  `aria-modal`, no initial focus movement, and — critically — no focus
+  trap**, meaning a keyboard user tabbing after opening the cart drawer
+  could tab straight through it into storefront links behind the
+  backdrop. `SearchOverlay` had correct dialog semantics and focused its
+  input on open, but likewise had no Tab trap and never returned focus to
+  the search-trigger button on close. Fixed by extracting a shared
+  `src/lib/hooks/useDialogA11y.ts` hook (remembers the previously-focused
+  element on open, moves focus into the dialog, traps Tab/Shift+Tab
+  within the dialog's focusable elements while open, closes on Escape,
+  restores focus to the trigger on close/unmount) and wiring it into both
+  components; `CartDrawer`'s `<aside>` also gained `role="dialog"`/
+  `aria-modal={isCartOpen}`, which it was missing entirely before. The
+  header's mobile-nav toggle (`Header.tsx`) was reviewed and intentionally
+  left as-is — it's a disclosure/dropdown pattern (`aria-expanded` on the
+  trigger, no backdrop, doesn't cover other page content), which doesn't
+  need focus-trap treatment under the same WAI-ARIA reasoning that gives
+  modal dialogs one.
+
+**Error-boundary pass:** `src/app/error.tsx` (root — inside `RootLayout`,
+  so Header/Footer/overlays still render around it; a "تلاش مجدد" retry
+  button plus a link home; shows `error.digest` for support correlation,
+  never `error.message`/stack), `src/app/global-error.tsx` (fires only if
+  `RootLayout` itself throws; Next.js requires it to render its own
+  `<html>`/`<body>` with zero dependency on Tailwind/providers/anything
+  that might itself be what's broken — plain inline styles only), and
+  `src/app/admin/error.tsx` (denser/utilitarian tone matching the rest of
+  `/admin`, a "بازگشت به داشبورد" link instead of home). `not-found.tsx`
+  already existed (Phase 2) and was left unchanged.
+
+**Production documentation (`docs/`):** `DEPLOYMENT.md` (the single-
+  process deployment constraint — this app's rate limiter is an in-memory
+  `Map`, not Redis, so more than one Node process behind a load balancer
+  silently weakens it; every required env var and what actually reads it,
+  confirmed by grepping `process.env.*` rather than assumed; the
+  build-time database dependency, reproduced live this session — see
+  "What was verified" below), `PRODUCTION_CHECKLIST.md` (itemized
+  DONE / BLOCKING / PRE-LAUNCH — explicitly not a wall of unchecked boxes
+  pretending everything is equally unfinished; cross-references the exact
+  file/test that verifies each DONE item), `BACKUP_AND_MIGRATIONS.md`
+  (Drizzle Kit migration workflow/discipline, `pg_dump`/`pg_restore`
+  commands, a restore-drill recommendation using `test:integration`
+  itself as the "did the restore actually work" check), `OBSERVABILITY.md`
+  (what already exists — `audit_logs`/`order_status_history`/
+  `payment_events` as the real durable business-event record, the three
+  new error boundaries' `console.error` calls, Next.js's own automatic
+  server-side error logging — versus what a future phase should add:
+  external error tracking, a `/api/health` endpoint, alerting, structured
+  request-correlated logging). `README.md` was fully rewritten — the
+  previous version was still describing Phase 1's status.
+
+**What was verified this session** (full network access was available):
+- `npm run typecheck` — clean, before and after every change.
+- `npm run lint` — clean, before and after every change.
+- `npm test` — 66/66 unit tests pass.
+- `npm run test:integration` — 25/25 integration tests pass against a
+  freshly migrated+seeded local PostgreSQL 16, run multiple times during
+  development to catch and fix real bugs in the test fixtures' own
+  cleanup ordering (products must be deleted before their category due to
+  the FK; an early version of `inventory-race.test.ts` also had a
+  scenario that was wrong on its own terms — `addItemToCart` already
+  refuses to add a variant with 0 stock, so "stock is 0 at checkout" had
+  to be reached by depleting stock *after* the item was already in the
+  cart, not by creating the fixture with 0 stock outright — fixed by
+  reducing stock via a direct `db.update` after `addItemToCart`
+  succeeds, matching how this can actually happen in production: another
+  checkout or an admin action depleting stock between add-to-cart and
+  this checkout attempt). Verified via direct `psql` row counts that the
+  database returns to exactly its seeded state (6 categories, 11
+  products, 0 users/orders/coupons) after a full suite run — no test
+  pollution left behind.
+- `npm run build` — clean, 37 routes (18 static, 19 dynamic), confirmed
+  the exact same `/contact`-prerender-needs-a-reachable-database failure
+  mode `DEPLOYMENT.md` now documents (this sandbox's Postgres stopped
+  between tool calls mid-session — the same recurring sandbox behavior
+  every phase since Phase 11 has noted; see "Commands" below — and the
+  build failed with an unambiguous `ECONNREFUSED` at the exact
+  query/file/line, not a silent partial build); rebuilt clean once
+  Postgres was restarted.
+- `npm audit`: 4 moderate-severity advisories, unchanged from Phase 13's
+  finding (all `drizzle-kit`'s dev-only `esbuild` dependency — see that
+  phase's write-up). Re-checked, not re-litigated.
+- Removed `@vitejs/plugin-react` after confirming it was never actually
+  needed (installed speculatively while setting up Vitest, superseded by
+  `resolve.tsconfigPaths: true`) — re-ran `npm test` after removing it to
+  confirm nothing depended on it.
+
+**Known limitations, stated plainly (per CLAUDE_BUILD_INSTRUCTIONS.txt §C
+  "if the project is not yet runnable, document exactly why" — this
+  project *is* runnable/buildable/testable, but is not yet ready to take
+  real customer payments):**
+- **Real-browser/`Next-Action`-wire-protocol verification was still not
+  available this session** — same sandbox limitation every phase since
+  Phase 7 has hit; no browser automation tool exists in this environment.
+  The accessibility fix above was implemented and reasoned through
+  carefully (the focus-trap hook's logic is straightforward and the
+  before/after gap was real and specifically identified by reading the
+  actual component code, not guessed at), but was **not** clicked through
+  in a real browser with a screen reader or keyboard-only navigation to
+  confirm it behaves as intended in practice. This is the single most
+  important follow-up for whoever next has browser automation available.
+- **No E2E test suite** (`tests/e2e/` is still an empty placeholder) —
+  Playwright/Cypress was deliberately not installed given the same "no
+  browser automation available to verify it actually drives a real
+  browser correctly" reasoning; installing a framework that can't be
+  exercised in this sandbox would add dependency weight without adding
+  verified coverage. A future session with browser automation should
+  install Playwright and implement the 12 critical flows as real E2E
+  tests, building on the fixture/cleanup patterns already established in
+  `tests/integration/helpers.ts`.
+- **A real Iranian payment gateway, a real SMS/OTP provider, and object
+  storage/CDN for product media are still not configured** — unchanged
+  from every prior phase (rule A.17); see
+  `docs/PRODUCTION_CHECKLIST.md`'s BLOCKING items.
+- **The nonce-based strict CSP Phase 13 deferred is still deferred** —
+  same reasoning (needs `middleware.ts` plus real-browser hydration
+  verification, still unavailable here).
+- Every other carried-over item from Phases 6-13 (no guest checkout, no
+  `callbackUrl` round-trip through `/login`, placeholder shipping fees,
+  un-reviewed policy copy, manual-only refunds, and more) is unchanged —
+  see "Known Issues / Technical Debt" below for the complete cumulative
+  list, none of it silently dropped.
+
+**Is the project genuinely shippable, per CLAUDE_BUILD_INSTRUCTIONS.txt
+  §I's quality bar?** Structurally and technically, yes — every phase in
+  the 15-phase plan is now complete, the full stack builds/tests/lints
+  clean, and the business-critical concurrency/idempotency/ownership
+  guarantees this store depends on (never oversell, never double-apply a
+  coupon or a payment, never let one customer touch another's data) now
+  have real automated tests proving them under real concurrent load, not
+  just code comments asserting them. **It is not yet shippable to accept
+  real customer payments**, for reasons that are entirely business/
+  operational, not code-quality: no real payment gateway, no real
+  shipping rates, no legal review of policy pages. `docs/
+  PRODUCTION_CHECKLIST.md` is the authoritative, itemized answer to
+  "what specifically remains" — read it before making a launch decision,
+  rather than this paragraph's summary.
+
+
 - `audit_logs` (general) and `order_status_history` (Phase 10,
   order-specific) are kept as two separate tables rather than merging —
   see `audit-logs.ts`'s header comment. An order-status transition now
@@ -2257,6 +2497,32 @@ silently ignored):**
   phase) rather than a hand-written `sql\`count(*)\`` template at every
   call site — consistent with an existing in-codebase convention rather
   than introducing a second way to write the same query.
+
+### Phase 14 additions
+- Test-file layout splits by directory (`tests/unit/**` vs.
+  `tests/integration/**`), not by filename suffix/tag — simplest way for
+  `vitest.config.ts` to point two different npm scripts at two disjoint
+  globs, and it makes "does this test need a database" visually obvious
+  from its path alone.
+- Integration-test fixtures are real inserted/deleted rows against the
+  actual schema (`tests/integration/helpers.ts`), not mocks/stubs of the
+  database layer — the entire point of this suite is proving the
+  concurrency guarantees (`FOR UPDATE` locks, conditional `UPDATE ...
+  WHERE stock >= quantity`) hold under real PostgreSQL transaction
+  semantics; a mocked db layer cannot demonstrate a real race condition
+  resolving correctly.
+- `useDialogA11y` (`src/lib/hooks/useDialogA11y.ts`) is one shared hook
+  used by both `CartDrawer` and `SearchOverlay`, not two separate
+  implementations — the focus-trap/Escape/focus-restore behavior is
+  identical dialog semantics regardless of which panel it's protecting,
+  and a bug fix or refinement to the trap logic should only need to
+  happen in one place.
+- Chose Vitest over Jest for the test runner — no existing Jest
+  configuration/convention anywhere in this codebase to be consistent
+  with, native ESM/TypeScript support without a separate `ts-jest`
+  transform step, and it already shares the same underlying transform
+  pipeline (esbuild, via Vite) that `tsx` (already a dependency, used for
+  `db:seed`) also uses — one less distinct toolchain in the project.
 
 ## Important Assumptions
 
@@ -2364,6 +2630,25 @@ silently ignored):**
   meaningfully slow down automated abuse while being generous enough
   that no realistic legitimate customer hits them by mistake. Revisit
   if real production traffic patterns suggest otherwise.
+
+### Phase 14 addition
+- No E2E framework (Playwright/Cypress) was installed, on the assumption
+  that a dependency that can't be exercised in this sandbox (no browser
+  automation available) shouldn't be added speculatively — rule F.6
+  ("prefer fewer dependencies") read together with "don't block waiting
+  for non-critical clarification" cuts the other way here: better to
+  document the gap precisely (see "Known Issues" below and this phase's
+  own write-up) than to add an unusable, unverified framework.
+- Treated "production readiness" and "ready to accept real payments" as
+  two different bars, and scoped this phase's checklist accordingly —
+  CLAUDE_BUILD_INSTRUCTIONS.txt's Phase 14 acceptance criteria ("fresh
+  setup is documented," "production build succeeds," "critical tests
+  pass," "no known blocking issue," "progress report says exactly what
+  remains") are about the codebase's technical readiness, not a business
+  decision about whether real Iranian payment/SMS credentials have been
+  procured. `docs/PRODUCTION_CHECKLIST.md` keeps these visually separate
+  (DONE/PRE-LAUNCH vs. BLOCKING) rather than implying the whole project
+  is equally unfinished.
 
 ## Known Issues / Technical Debt
 
@@ -2530,86 +2815,110 @@ Phase 13 adds:
   views, policy-page copy not legally reviewed, and every phase-since-7's
   browser-verification limitation for every action built before this one.
 
+Phase 14 adds:
+
+- **Real-browser/keyboard verification of the new `useDialogA11y` focus
+  trap has not been done** — same sandbox limitation as every phase since
+  Phase 7. The logic was implemented carefully and reasoned through (see
+  Phase 14's write-up), but "the focus trap correctly cycles Tab through
+  real rendered DOM in a real browser" has not been clicked through with
+  a keyboard, only reviewed as code. **This is now the single highest-
+  value thing for a future session with browser automation to verify
+  first**, given it's a genuine, previously-undetected accessibility gap
+  this phase found and fixed.
+- **No E2E test suite exists** (`tests/e2e/` is still an empty
+  placeholder) — see "Important Assumptions" → Phase 14 addition for why
+  it wasn't started this phase.
+- **Full axe-core/Lighthouse accessibility audit, full cross-viewport
+  responsive audit, and `prefers-reduced-motion` re-audit were not
+  performed** — spot-checked by reading component code (Tailwind
+  responsive/motion-reduce class usage present and consistent), not
+  independently re-verified visually or with automated tooling this
+  phase. See `docs/PRODUCTION_CHECKLIST.md`'s "NOT independently
+  re-verified in a real browser this phase" section.
+- **No CI/CD pipeline exists** (no `.github/workflows` or equivalent) —
+  `docs/DEPLOYMENT.md` documents exactly which commands, in which order,
+  a pipeline should run.
+- **No error-tracking service, health-check endpoint, or alerting is
+  wired in** — `docs/OBSERVABILITY.md` documents what exists today (the
+  `audit_logs`/`order_status_history`/`payment_events` tables as the real
+  durable record, plus `console.error` in the three error boundaries) and
+  the recommended minimum before handling real payments.
+- **No automated/managed database backup job is configured** —
+  `docs/BACKUP_AND_MIGRATIONS.md` documents the strategy and manual
+  `pg_dump`/`pg_restore` commands; wiring an actual scheduled job depends
+  on whichever hosting provider is eventually chosen.
+- Every carried-over item from Phases 6-13 remains outstanding and is
+  unchanged by this phase (see the cumulative list above) — this phase
+  added test coverage and documentation for existing behavior, it did not
+  change checkout/cart/coupon/payment/order business logic itself.
+
 ## Next Session Instructions
 
-- **Exact next objective: PHASE 14 — QA, accessibility, production
-  readiness**, per CLAUDE_BUILD_INSTRUCTIONS.txt §D. Phase 13 is
-  COMPLETE — do not redo the security/performance audit; this is the
-  final phase, turning the application into a shippable product.
-  1. **First, if browser automation is available in this session's
-     environment, use it for two things this codebase has needed since
-     Phase 7 and never had:** (a) the accumulated backlog of "real
-     browser/Server-Action-wire-protocol verification has not been
-     done" items across every phase (see "Known Issues / Technical
-     Debt" above for the full list — cart/wishlist, checkout/order
-     placement, coupon/payment, admin forms, reviews/newsletter/
-     support), and (b) actually clicking through the app with this
-     phase's new security headers active (`npm run build && npm run
-     start`) to confirm nothing in the CSP silently broke hydration/
-     interactivity — this was explicitly *not* verifiable last session
-     for exactly that reason. If no browser automation is available,
-     note that again and continue with the direct-to-domain +
-     Server-Action-level + `curl` HTTP-level verification approach
-     every phase since Phase 7 has used.
-  2. Read CLAUDE_BUILD_INSTRUCTIONS.txt's Phase 14 task list and its 12
-     "critical flows to test" in full before starting — unit tests for
-     business-critical functions, integration tests for catalog/cart/
-     checkout/payment/order transitions, an accessibility pass, an RTL
-     pass, a responsive pass, an error-boundary pass, 404/500 behavior,
-     a seed/demo environment, deployment configuration, a production
-     environment checklist, database backup/migration strategy
-     documentation, an observability/logging plan, and a final
-     README/PROGRESS.md.
-  3. **No test runner is configured in this repo yet** (`test:` in
-     "Commands" below still says "not configured") — Phase 14 is where
-     that needs to actually happen (e.g. Vitest for unit/integration,
-     Playwright if browser automation is available for true E2E).
-     Choosing and wiring up the test framework is itself part of this
-     phase's scope, not a prerequisite someone else needs to do first.
-  4. **No `error.tsx`/`global-error.tsx` exists anywhere in `src/app`**
-     (confirmed via find during Phase 13's audit, not touched since it
-     was explicitly out of that phase's scope) — Phase 14's "error
-     boundary pass" task covers adding these; Next.js's default
-     production error page is minimally acceptable but not what
-     CLAUDE_BUILD_INSTRUCTIONS.txt's §I quality bar describes.
-  5. **Concrete places worth a close look, based on what Phases 1-13
-     actually built** (not exhaustive — read the Phase 14 task list for
-     the full scope):
-     - **Critical flow #6 ("duplicate payment callback")** and **#7
-       ("insufficient stock")** already have real domain-level coverage
-       from Phase 9's own verification — confirm it still holds rather
-       than re-deriving it from scratch, then focus new test-writing
-       effort on flows that only had ad-hoc scratch-script coverage
-       before (see each phase's "Tests/checks" for exactly what was and
-       wasn't covered).
-     - **Critical flow #12 ("keyboard navigation of dialogs/drawers")**
-       — `CartDrawer`/search overlay accessibility behavior was built
-       in Phase 2 and not re-verified since; this is the first phase
-       with an explicit accessibility-pass mandate to actually check it
-       properly (focus trap, `Escape` to close, focus return).
-     - **Nonce-based strict CSP** (Phase 13's one deferred item) is a
-       reasonable candidate to pick up here if browser automation is
-       available this session — see Phase 13's write-up finding #4 and
-       `next.config.ts`'s header comment for exactly what's needed and
-       why it was deferred.
-  6. Run `typecheck`/`lint`/`build` (and now `test`, once configured)
-     after any change, same as every prior phase.
-  7. Update `PROGRESS.md` the same way this session did — this is the
-     project's final phase per CLAUDE_BUILD_INSTRUCTIONS.txt's 15-phase
-     plan, so its "Next Session Instructions" should honestly state
-     whether the project is genuinely shippable afterward or what
-     specifically remains, per CLAUDE_BUILD_INSTRUCTIONS.txt §C's "if
-     the project is not yet runnable, document exactly why."
-- Files/areas to inspect first: `package.json` (no test runner listed
-  yet), `src/app/**` (no `error.tsx`/`not-found.tsx` beyond the root
-  `not-found.tsx` — confirm exactly which segments need their own),
-  every phase's "What was *not* verified this session, and why" note
-  (search this file for that exact phrase) for the authoritative list
-  of what real browser-driven testing still owes this project,
-  `next.config.ts` (if picking up the deferred nonce-CSP follow-up).
-- This is the last phase in CLAUDE_BUILD_INSTRUCTIONS.txt §D's plan —
-  after it, the project should be genuinely shippable per §I's quality
-  bar, or this file should say precisely what still blocks that.
+**All 15 phases in CLAUDE_BUILD_INSTRUCTIONS.txt §D are now COMPLETE.**
+There is no next numbered phase. This section now documents follow-up
+work rather than "the next phase" — read it as a prioritized backlog, not
+a single objective.
+
+- **Exact next objective, in priority order:**
+  1. **If browser automation is available in this session's environment,
+     use it before anything else** — this is the single most valuable
+     thing any future session can do, and no session in this project's
+     history has ever had it available. In priority order once available:
+     (a) verify Phase 14's new `useDialogA11y` focus trap
+     (`CartDrawer`/`SearchOverlay`) actually behaves correctly with a
+     real keyboard — Tab/Shift+Tab cycling, Escape, focus landing on open
+     and returning to the trigger on close; (b) verify the CSP
+     (`next.config.ts`) doesn't silently break hydration/interactivity
+     anywhere (`npm run build && npm run start`, click through
+     representative pages); (c) work through the accumulated backlog of
+     "real browser/Server-Action-wire-protocol verification has not been
+     done" items across every phase (see "Known Issues / Technical Debt"
+     above for the full list — cart/wishlist, checkout/order placement,
+     coupon/payment, admin forms, reviews/newsletter/support, and now
+     Phase 14's own accessibility fix); (d) install Playwright and
+     implement the 12 critical flows from CLAUDE_BUILD_INSTRUCTIONS.txt
+     Phase 14 as real E2E tests in `tests/e2e/` (still an empty
+     placeholder), building on `tests/integration/helpers.ts`'s fixture
+     patterns; (e) if time remains, implement the nonce-based strict CSP
+     Phase 13 deferred (see that phase's finding #4 and
+     `next.config.ts`'s header comment) and verify it in a real browser
+     afterward.
+  2. **If browser automation is still not available**, the highest-value
+     work is closing items in `docs/PRODUCTION_CHECKLIST.md`'s BLOCKING
+     section that don't require a browser: wiring a real Iranian payment
+     gateway once credentials exist (replacing
+     `src/domains/payments/provider.ts`'s mock — the adapter interface is
+     already designed for this), a real SMS/OTP provider, replacing the
+     placeholder shipping fees with real business figures, or starting
+     the observability follow-ups in `docs/OBSERVABILITY.md` (external
+     error tracking, a `/api/health` endpoint — neither needs a browser
+     to build or to verify with `curl`).
+  3. Whatever is picked, run `npm run typecheck && npm run lint && npm
+     test && npm run test:integration && npm run build` after every
+     change, same discipline as every phase before this one — this
+     project's checks have never regressed and there's no reason to start
+     now.
+  4. Update `PROGRESS.md` with the same honesty this and every prior
+     phase used — state plainly what changed, what was and wasn't
+     verified, and whether anything above is now resolved. There is no
+     more "which numbered phase is next" question to answer; the
+     question going forward is "what does this specific business/
+     technical gap need," per the backlog above and
+     `docs/PRODUCTION_CHECKLIST.md`.
+- Files/areas to inspect first: `docs/PRODUCTION_CHECKLIST.md` (the
+  authoritative, itemized list of what's DONE vs. BLOCKING vs.
+  PRE-LAUNCH — read this before anything else), `src/lib/hooks/
+  useDialogA11y.ts` and the two components using it (highest-priority
+  browser-verification target), `tests/e2e/` (empty — where a Playwright
+  suite would go), `src/domains/payments/provider.ts` (where a real
+  gateway adapter would be added, if credentials become available).
+- **Is the project shippable?** Structurally and technically, yes — see
+  Phase 14's write-up above for the full reasoning. Not yet shippable to
+  accept real customer payments, for business/operational reasons (no
+  real payment gateway, no real shipping rates, no legal review of policy
+  pages) that are unrelated to code quality and are itemized exactly in
+  `docs/PRODUCTION_CHECKLIST.md`.
 
 ## Commands
 
@@ -2619,8 +2928,11 @@ Phase 13 adds:
 - start: `npm run start` (after build)
 - lint: `npm run lint` (or `npx eslint .`)
 - typecheck: `npm run typecheck` (or `npx tsc --noEmit`)
-- test: not configured yet (Phase 14, or earlier if business-critical
-  logic needs tests sooner)
+- test (unit, no database): `npm test` (or `npx vitest run tests/unit`)
+- test (integration, needs a real migrated PostgreSQL — reads
+  `DATABASE_URL` from `.env.local`): `npm run test:integration`
+- test (both suites): `npm run test:all`
+- test (watch mode, unit only): `npm run test:watch`
 - db migration (generate): `npm run db:generate` (or
   `npx drizzle-kit generate`) — regenerates SQL from the current schema
   after editing files in `src/lib/db/schema/`.
@@ -2675,7 +2987,12 @@ dependencies were added in Phase 12 either** — reviews/newsletter/
 support/content used only what Phases 1-11 already installed. **No new
 dependencies were added in Phase 13 either** — the rate limiter and
 security headers used only `next/headers`/`next.config.ts`, both already
-part of the installed Next.js version.
+part of the installed Next.js version. **Phase 14 added `vitest`
+(^5.0.1) as the project's only new production/dev dependency** — no test
+runner existed before this phase. `@vitejs/plugin-react` and
+`vite-tsconfig-paths` were installed during setup and then removed once
+`vitest.config.ts`'s built-in `resolve.tsconfigPaths: true` proved
+sufficient on its own; final `package.json` reflects only `vitest` as new.
 
 **Note for the next session's environment setup:** this sandbox's
 Postgres service has now been observed to stop silently between separate
@@ -2713,3 +3030,21 @@ temporary `scripts/tmp-*.ts` verification files that were deleted before
 finishing — the next session should do the same (throwaway scripts, not
 committed/delivered) rather than leaving verification code in the
 repository.
+
+**Phase 14 saw the same Postgres-stops-silently behavior a fourth time**
+(mid-session, between unrelated tool calls, no code change triggered
+it) — `service postgresql start` immediately fixed it, same as every
+prior occurrence, and `npm run build` was simply re-run afterward. This
+is now observed across four separate sessions (Phases 11, 12, 13, 14);
+treat it as certain to recur, not merely likely. Phase 14 also
+discovered leftover `trends-test-*` category/product rows in the local
+database from an early, still-buggy version of its own integration test
+cleanup (wrong FK deletion order caused an `afterAll` to throw partway
+through) — cleaned up manually via `DELETE FROM products WHERE slug LIKE
+'trends-test-product-%'` / same for `categories`, then confirmed the
+fixed test suite tears down cleanly on repeated runs (verified by direct
+`psql` row counts before/after, matching the seeded baseline exactly: 6
+categories, 11 products). If a future session finds unexplained
+`trends-test-*`-prefixed rows in a shared database, this is why, and the
+same cleanup query works.
+
