@@ -19,9 +19,22 @@ export function ProductGallery({
 }) {
   const [activeIndex, setActiveIndex] = useState(0);
 
+  // Caps the image's rendered width (height then follows from the 4/5
+  // ratio) so it can never grow taller than the viewport allows, while
+  // always keeping the true 4/5 shape — rather than distorting the
+  // ratio at large breakpoints the way a max-height-only cap would.
+  // 170px accounts for the sticky header, page padding, and
+  // breadcrumbs above the gallery; the thumbnail row (with images.length
+  // > 1) adds its own height on top, so it gets a bigger allowance.
+  const maxWidthStyle = { maxWidth: "min(100%, calc((100vh - 170px) * 4 / 5))" };
+  const maxWidthWithThumbnailsStyle = { maxWidth: "min(100%, calc((100vh - 260px) * 4 / 5))" };
+
   if (images.length === 0) {
     return (
-      <div className="aspect-[4/5] w-full overflow-hidden rounded-[18px] bg-card-image lg:aspect-auto lg:h-[calc(100vh-170px)] lg:min-h-[420px]">
+      <div
+        style={maxWidthStyle}
+        className="mx-auto aspect-[4/5] w-full overflow-hidden rounded-[18px] bg-card-image"
+      >
         <AssetSlot label={title} rounded="none" className="h-full w-full" />
       </div>
     );
@@ -31,8 +44,11 @@ export function ProductGallery({
   if (!active) return null;
 
   return (
-    <div className="flex flex-col gap-3 lg:h-[calc(100vh-170px)] lg:min-h-[420px]">
-      <div className="relative aspect-[4/5] w-full min-h-0 flex-1 overflow-hidden rounded-[18px] bg-card-image lg:aspect-auto">
+    <div className="flex flex-col gap-3">
+      <div
+        style={images.length > 1 ? maxWidthWithThumbnailsStyle : maxWidthStyle}
+        className="relative mx-auto aspect-[4/5] w-full overflow-hidden rounded-[18px] bg-card-image"
+      >
         <Image
           src={active.url}
           alt={active.altText}
@@ -43,7 +59,7 @@ export function ProductGallery({
         />
       </div>
       {images.length > 1 && (
-        <div className="flex shrink-0 gap-2.5">
+        <div style={maxWidthWithThumbnailsStyle} className="mx-auto flex w-full gap-2.5">
           {images.map((image, index) => (
             <button
               key={image.url}
@@ -51,7 +67,7 @@ export function ProductGallery({
               onClick={() => setActiveIndex(index)}
               aria-current={index === activeIndex}
               aria-label={`تصویر ${index + 1}`}
-              className={`relative h-16 w-16 overflow-hidden rounded-[10px] border transition-colors ${
+              className={`relative h-16 w-16 shrink-0 overflow-hidden rounded-[10px] border transition-colors ${
                 index === activeIndex ? "border-ink" : "border-transparent"
               }`}
             >

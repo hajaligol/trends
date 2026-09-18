@@ -24,7 +24,7 @@ export function ProductCard({ product }: { product: CatalogProductSummary }) {
 
   return (
     <article className="flex flex-col gap-2.5">
-      <div className="group relative aspect-[3/4] overflow-hidden rounded-[14px] bg-card-image">
+      <div className="group relative aspect-[4/5] overflow-hidden rounded-[14px] bg-card-image">
         <Link href={`/product/${product.slug}`} className="absolute inset-0 block">
           {primaryImage ? (
             <Image

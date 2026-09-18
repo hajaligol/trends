@@ -6,6 +6,7 @@ import { Breadcrumbs } from "@/components/catalog/Breadcrumbs";
 import { ProductGallery } from "@/components/catalog/ProductGallery";
 import { VariantSelector } from "@/components/catalog/VariantSelector";
 import { WishlistToggleButton } from "@/components/ui/WishlistButton";
+import { ScrollToTopOnMount } from "@/components/utility/ScrollToTopOnMount";
 import { ProductGrid } from "@/components/catalog/ProductGrid";
 import { getProductDetailBySlug, getRelatedProducts } from "@/domains/catalog/queries";
 import { getApprovedReviewsForProduct } from "@/domains/reviews/queries";
@@ -90,6 +91,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
 
   return (
     <main className="py-[clamp(24px,4vw,40px)]">
+      <ScrollToTopOnMount trackKey={product.slug} />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: safeJsonLd(jsonLd) }}

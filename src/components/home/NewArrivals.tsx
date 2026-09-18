@@ -23,7 +23,7 @@ export function NewArrivals({ arrivals }: { arrivals: CatalogProductSummary[] })
             const primaryImage = arrival.images[0];
             return (
               <article key={arrival.id} className="flex flex-col gap-2">
-                <div className="group relative aspect-square overflow-hidden rounded-[14px] bg-card-image">
+                <div className="group relative aspect-[4/5] overflow-hidden rounded-[14px] bg-card-image">
                   <Link href={`/product/${arrival.slug}`} className="absolute inset-0 block">
                     {primaryImage ? (
                       <Image
