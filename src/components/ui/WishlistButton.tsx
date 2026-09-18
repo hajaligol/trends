@@ -43,7 +43,7 @@ export function WishlistButton({ productId, productName }: { productId: string; 
       }
       aria-pressed={active}
       onClick={handleClick}
-      className="absolute top-2.5 left-2.5 flex h-[38px] w-[38px] items-center justify-center rounded-full border-0 bg-bg/90"
+      className="absolute top-2.5 left-2.5 flex h-[38px] w-[38px] items-center justify-center rounded-full border-0 bg-bg/70"
     >
       <HeartIcon
         style={active ? { fill: "currentColor" } : undefined}
