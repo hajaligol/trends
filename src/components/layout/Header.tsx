@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { Container } from "@/components/ui/Container";
@@ -64,9 +65,16 @@ export function Header() {
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-header-bg">
       <Container className="flex min-h-[68px] items-center justify-between gap-4">
-        <span className="text-[1.55rem] font-bold tracking-wide whitespace-nowrap text-ink">
-          ترندز
-        </span>
+        <Link href="/" className="shrink-0">
+          <Image
+            src="/assets/brand/logo.webp"
+            alt="ترندز"
+            width={1536}
+            height={1024}
+            priority
+            className="h-11 w-auto"
+          />
+        </Link>
 
         <nav aria-label="ناوبری اصلی" className="hidden items-center gap-[30px] lg:flex">
           {NAV_LINKS.map((link, i) => {

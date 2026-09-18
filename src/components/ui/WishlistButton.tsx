@@ -89,7 +89,7 @@ export function WishlistToggleButton({ productId, productName }: { productId: st
         style={active ? { fill: "currentColor" } : undefined}
         className="h-[18px] w-[18px] transition-colors duration-200"
       />
-      {active ? `حذف «${productName}» از علاقه‌مندی‌ها` : `افزودن «${productName}» به علاقه‌مندی‌ها`}
+      {active ? `حذف از علاقه‌مندی‌ها` : `افزودن به علاقه‌مندی‌ها`}
     </button>
   );
 }
