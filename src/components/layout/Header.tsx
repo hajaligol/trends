@@ -103,9 +103,11 @@ export function Header() {
             className="relative flex h-[46px] w-[46px] items-center justify-center rounded-full bg-transparent transition-colors duration-200 hover:bg-ink/6"
           >
             <CartIcon className="h-[30px] w-[30px] text-ink" />
-            <span className="absolute top-0.5 left-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-ink px-0.5 text-[0.62rem] leading-none text-white">
-              {toPersianDigits(cartCount)}
-            </span>
+            {cartCount > 0 && (
+              <span className="absolute top-0.5 left-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-ink px-0.5 text-[0.62rem] leading-none text-white">
+                {toPersianDigits(cartCount)}
+              </span>
+            )}
           </button>
           <Link
             href={accountHref}
