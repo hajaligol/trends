@@ -4,6 +4,7 @@ import { AssetSlot } from "@/components/ui/AssetSlot";
 import { Container } from "@/components/ui/Container";
 import { SectionHead } from "@/components/home/SectionHead";
 import { StockBadge } from "@/components/catalog/StockBadge";
+import { WishlistButton } from "@/components/ui/WishlistButton";
 import type { CatalogProductSummary } from "@/domains/catalog/queries";
 import { formatToman } from "@/lib/utils/money";
 
@@ -22,22 +23,24 @@ export function NewArrivals({ arrivals }: { arrivals: CatalogProductSummary[] })
             const primaryImage = arrival.images[0];
             return (
               <article key={arrival.id} className="flex flex-col gap-2">
-                <Link
-                  href={`/product/${arrival.slug}`}
-                  className="relative block aspect-square overflow-hidden rounded-[14px] bg-card-image"
-                >
-                  {primaryImage ? (
-                    <Image
-                      src={primaryImage.url}
-                      alt={primaryImage.altText}
-                      fill
-                      sizes="(min-width: 1024px) 16vw, (min-width: 640px) 33vw, 50vw"
-                      className="object-cover"
-                    />
-                  ) : (
-                    <AssetSlot label={arrival.title} rounded="none" className="h-full w-full" />
-                  )}
-                </Link>
+                <div className="group relative aspect-square overflow-hidden rounded-[14px] bg-card-image">
+                  <Link href={`/product/${arrival.slug}`} className="absolute inset-0 block">
+                    {primaryImage ? (
+                      <Image
+                        src={primaryImage.url}
+                        alt={primaryImage.altText}
+                        fill
+                        sizes="(min-width: 1024px) 16vw, (min-width: 640px) 33vw, 50vw"
+                        className="object-cover"
+                      />
+                    ) : (
+                      <AssetSlot label={arrival.title} rounded="none" className="h-full w-full" />
+                    )}
+                  </Link>
+                  {/* Sibling of the image link, not nested inside it — a <button>
+                   * inside an <a> is invalid HTML and breaks keyboard/AT navigation. */}
+                  <WishlistButton productId={arrival.id} productName={arrival.title} />
+                </div>
                 <Link href={`/product/${arrival.slug}`} className="text-[0.87rem] font-semibold">
                   {arrival.title}
                 </Link>

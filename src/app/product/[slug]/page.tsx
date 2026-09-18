@@ -5,6 +5,7 @@ import { Container } from "@/components/ui/Container";
 import { Breadcrumbs } from "@/components/catalog/Breadcrumbs";
 import { ProductGallery } from "@/components/catalog/ProductGallery";
 import { VariantSelector } from "@/components/catalog/VariantSelector";
+import { WishlistToggleButton } from "@/components/ui/WishlistButton";
 import { ProductGrid } from "@/components/catalog/ProductGrid";
 import { getProductDetailBySlug, getRelatedProducts } from "@/domains/catalog/queries";
 import { getApprovedReviewsForProduct } from "@/domains/reviews/queries";
@@ -112,6 +113,8 @@ export default async function ProductPage({ params }: ProductPageProps) {
             </div>
 
             <VariantSelector variants={product.variants} />
+
+            <WishlistToggleButton productId={product.id} productName={product.title} />
 
             {product.shortDescription && (
               <p className="text-[0.95rem] leading-7 text-text-secondary">{product.shortDescription}</p>
