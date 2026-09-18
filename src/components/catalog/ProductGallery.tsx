@@ -21,7 +21,7 @@ export function ProductGallery({
 
   if (images.length === 0) {
     return (
-      <div className="aspect-[4/5] w-full overflow-hidden rounded-[18px] bg-card-image">
+      <div className="aspect-[4/5] w-full overflow-hidden rounded-[18px] bg-card-image lg:aspect-auto lg:h-[calc(100vh-170px)] lg:min-h-[420px]">
         <AssetSlot label={title} rounded="none" className="h-full w-full" />
       </div>
     );
@@ -31,8 +31,8 @@ export function ProductGallery({
   if (!active) return null;
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="relative aspect-[4/5] w-full overflow-hidden rounded-[18px] bg-card-image">
+    <div className="flex flex-col gap-3 lg:h-[calc(100vh-170px)] lg:min-h-[420px]">
+      <div className="relative aspect-[4/5] w-full min-h-0 flex-1 overflow-hidden rounded-[18px] bg-card-image lg:aspect-auto">
         <Image
           src={active.url}
           alt={active.altText}
@@ -43,7 +43,7 @@ export function ProductGallery({
         />
       </div>
       {images.length > 1 && (
-        <div className="flex gap-2.5">
+        <div className="flex shrink-0 gap-2.5">
           {images.map((image, index) => (
             <button
               key={image.url}
