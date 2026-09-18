@@ -1,14 +1,16 @@
 "use client";
 
+import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AssetSlot } from "@/components/ui/AssetSlot";
 import { toPersianDigits } from "@/lib/utils/persian-digits";
 
 /** Structural type, not a specific table's row — the carousel only ever
- * needs an `id` (React key / dot target) and `alt` text; whether the
- * caller sourced that from `hero_slides` (Phase 11, the real path) or a
- * future different content source doesn't matter to this component. */
-type HeroSlideLike = { id: string; alt: string };
+ * needs an `id` (React key / dot target), `alt` text, and an optional
+ * `imageUrl`; whether the caller sourced that from `hero_slides` (Phase
+ * 11, the real path) or a future different content source doesn't
+ * matter to this component. */
+type HeroSlideLike = { id: string; alt: string; imageUrl: string | null };
 
 const AUTOPLAY_DELAY_MS = 5000;
 const SWIPE_THRESHOLD_RATIO = 0.15;
@@ -150,9 +152,20 @@ export function HeroCarousel({ slides }: { slides: HeroSlideLike[] }) {
             role="group"
             aria-roledescription="اسلاید"
             aria-label={`${toPersianDigits(index + 1)} از ${toPersianDigits(slideCount)}`}
-            className="h-full w-full shrink-0 basis-full"
+            className="relative h-full w-full shrink-0 basis-full"
           >
-            <AssetSlot label={slide.alt} tone="banner" rounded="none" className="h-full w-full" />
+            {slide.imageUrl ? (
+              <Image
+                src={slide.imageUrl}
+                alt={slide.alt}
+                fill
+                priority={index === 0}
+                sizes="100vw"
+                className="object-cover"
+              />
+            ) : (
+              <AssetSlot label={slide.alt} tone="banner" rounded="none" className="h-full w-full" />
+            )}
           </div>
         ))}
       </div>
@@ -168,7 +181,7 @@ export function HeroCarousel({ slides }: { slides: HeroSlideLike[] }) {
             }}
             className="absolute top-1/2 right-4 z-[2] flex h-[42px] w-[42px] -translate-y-1/2 items-center justify-center rounded-full border-0 bg-bg/90 text-[1.05rem] text-ink transition-colors duration-200 hover:bg-white"
           >
-            →
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#000000" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6" /></svg>
           </button>
           <button
             type="button"
@@ -179,7 +192,7 @@ export function HeroCarousel({ slides }: { slides: HeroSlideLike[] }) {
             }}
             className="absolute top-1/2 left-4 z-[2] flex h-[42px] w-[42px] -translate-y-1/2 items-center justify-center rounded-full border-0 bg-bg/90 text-[1.05rem] text-ink transition-colors duration-200 hover:bg-white"
           >
-            ←
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#000000" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>
           </button>
 
           <div className="absolute bottom-4 left-1/2 z-[2] flex -translate-x-1/2 items-center gap-1.5">

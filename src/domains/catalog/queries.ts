@@ -16,11 +16,12 @@ export type CatalogCategory = {
   id: string;
   slug: string;
   name: string;
+  imageUrl: string | null;
 };
 
 export async function getActiveCategories(): Promise<CatalogCategory[]> {
   const rows = await db
-    .select({ id: categories.id, slug: categories.slug, name: categories.name })
+    .select({ id: categories.id, slug: categories.slug, name: categories.name, imageUrl: categories.imageUrl })
     .from(categories)
     .where(eq(categories.isActive, true))
     .orderBy(asc(categories.displayOrder));
@@ -37,6 +38,7 @@ export async function getCategoryBySlug(slug: string): Promise<CatalogCategoryDe
       id: categories.id,
       slug: categories.slug,
       name: categories.name,
+      imageUrl: categories.imageUrl,
       description: categories.description,
     })
     .from(categories)

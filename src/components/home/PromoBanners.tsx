@@ -1,16 +1,18 @@
+import Image from "next/image";
 import { AssetSlot } from "@/components/ui/AssetSlot";
 import { Button } from "@/components/ui/Button";
 import { Container } from "@/components/ui/Container";
 
 /** Structural type covering both the old `DemoBanner` fixture shape and
  * the real `promo_banners` DB row (Phase 11) — this component only ever
- * reads these four fields. */
+ * reads these fields. */
 type PromoBannerLike = {
   id: string;
   tone: "pink" | "blue";
   title: string;
   description: string;
   ctaLabel: string;
+  imageUrl: string | null;
 };
 
 // Mirrors .banner-card--pink / .banner-card--blue in the prototype.
@@ -44,16 +46,26 @@ export function PromoBanners({ banners }: { banners: PromoBannerLike[] }) {
               </p>
               <Button type="button" variant="ghost">
                 <span>{banner.ctaLabel}</span>
-                <span aria-hidden="true">←</span>
+                <span aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#000000" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg></span>
               </Button>
             </div>
-            <div className="w-full min-h-[200px] md:w-auto md:min-h-[260px] md:flex-1 md:self-stretch">
-              <AssetSlot
-                label={banner.title}
-                tone="banner"
-                rounded="none"
-                className="h-full w-full"
-              />
+            <div className="relative w-full min-h-[200px] md:w-auto md:min-h-[260px] md:flex-1 md:self-stretch">
+              {banner.imageUrl ? (
+                <Image
+                  src={banner.imageUrl}
+                  alt={banner.title}
+                  fill
+                  sizes="(min-width: 768px) 50vw, 100vw"
+                  className="object-cover"
+                />
+              ) : (
+                <AssetSlot
+                  label={banner.title}
+                  tone="banner"
+                  rounded="none"
+                  className="h-full w-full"
+                />
+              )}
             </div>
           </div>
         ))}

@@ -1,9 +1,11 @@
 "use client";
 
+import Image from "next/image";
 import { useActionState, useState } from "react";
 import { FormField } from "@/components/ui/FormField";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { ConfirmButton } from "@/components/admin/ConfirmButton";
+import { ImagePicker } from "@/components/admin/ImagePicker";
 import { createPromoBannerAction, deletePromoBannerAction, updatePromoBannerAction } from "@/domains/content/actions";
 import type { PromoBanner } from "@/lib/db/schema";
 import type { ActionResult } from "@/domains/auth/roles";
@@ -42,6 +44,7 @@ function PromoBannerForm({ banner, onDone }: { banner?: PromoBanner; onDone?: ()
           </select>
         </label>
       </div>
+      <ImagePicker name="imageUrl" folder="banners" label="تصویر بنر" defaultValue={banner?.imageUrl} required />
       <FormField label="توضیحات" name="description" defaultValue={banner?.description} required />
       <div className="grid gap-3 sm:grid-cols-2">
         <FormField label="متن دکمه" name="ctaLabel" defaultValue={banner?.ctaLabel} required />
@@ -81,12 +84,23 @@ export function PromoBannerManager({ banners }: { banners: PromoBanner[] }) {
               key={banner.id}
               className="flex items-center justify-between gap-3 rounded-[var(--radius-md)] border border-line bg-white px-4 py-3 text-[0.85rem]"
             >
-              <div className="flex flex-col gap-0.5">
-                <span>{banner.title}</span>
-                <span className="text-text-secondary">
-                  {banner.tone === "pink" ? "صورتی" : "آبی"} · ترتیب: {banner.displayOrder} ·{" "}
-                  {banner.isActive ? "فعال" : "غیرفعال"}
-                </span>
+              <div className="flex items-center gap-3">
+                {banner.imageUrl ? (
+                  <div className="relative h-12 w-20 shrink-0 overflow-hidden rounded-[var(--radius-sm)] bg-card-image">
+                    <Image src={banner.imageUrl} alt="" fill sizes="80px" className="object-cover" />
+                  </div>
+                ) : (
+                  <div className="flex h-12 w-20 shrink-0 items-center justify-center rounded-[var(--radius-sm)] border border-dashed border-line bg-header text-[0.65rem] text-text-secondary">
+                    بدون تصویر
+                  </div>
+                )}
+                <div className="flex flex-col gap-0.5">
+                  <span>{banner.title}</span>
+                  <span className="text-text-secondary">
+                    {banner.tone === "pink" ? "صورتی" : "آبی"} · ترتیب: {banner.displayOrder} ·{" "}
+                    {banner.isActive ? "فعال" : "غیرفعال"}
+                  </span>
+                </div>
               </div>
               <div className="flex items-center gap-3">
                 <button type="button" onClick={() => setEditingId(banner.id)} className="underline underline-offset-2">

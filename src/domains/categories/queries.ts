@@ -18,6 +18,7 @@ export type AdminCategoryRow = {
   slug: string;
   name: string;
   description: string | null;
+  imageUrl: string | null;
   parentId: string | null;
   parentName: string | null;
   displayOrder: number;
@@ -33,6 +34,7 @@ export async function listCategoriesForAdmin(): Promise<AdminCategoryRow[]> {
       slug: categories.slug,
       name: categories.name,
       description: categories.description,
+      imageUrl: categories.imageUrl,
       parentId: categories.parentId,
       displayOrder: categories.displayOrder,
       isActive: categories.isActive,

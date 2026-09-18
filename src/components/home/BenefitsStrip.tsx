@@ -17,7 +17,9 @@ export function BenefitsStrip({ benefits }: { benefits: DemoBenefit[] }) {
             key={benefit.id}
             className="flex items-center gap-3.5 px-[18px] py-3 first:pt-0 last:pb-0 sm:border-e sm:border-line sm:py-0 sm:last:border-e-0 sm:odd:border-e lg:[&:nth-child(4n)]:border-e-0"
           >
-            <span className="h-[38px] w-[38px] shrink-0 rounded-full bg-ink/[0.07]" />
+            <span className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-full bg-ink/[0.07]">
+              <benefit.icon className="h-[19px] w-[19px]" />
+            </span>
             <div>
               <h4 className="m-0 mb-0.5 text-[0.9rem] font-semibold">{benefit.title}</h4>
               <p className="m-0 text-[0.78rem] text-text-secondary">{benefit.description}</p>

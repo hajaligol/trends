@@ -1,3 +1,7 @@
+import type { ComponentType, SVGProps } from "react";
+import { SupportIcon, PaymentIcon, ReturnIcon, ShippingIcon } from "@/components/ui/icons";
+import { JSXSource } from "react/jsx-dev-runtime";
+
 /**
  * Phase 2 demo/placeholder catalog content.
  *
@@ -134,15 +138,17 @@ export type DemoBenefit = {
   id: string;
   title: string;
   description: string;
+  icon: ComponentType<SVGProps<SVGSVGElement>>;
 };
 
 export const demoBenefits: DemoBenefit[] = [
-  { id: "support", title: "پشتیبانی ۲۴/۷", description: "همیشه در کنار شما" },
-  { id: "secure-payment", title: "پرداخت امن", description: "با درگاه‌های مطمئن" },
-  { id: "easy-return", title: "بازگشت آسان", description: "تا ۳۰ روز" },
+  { id: "support", title: "پشتیبانی تمام‌وقت", description: "همیشه در کنار شما", icon: SupportIcon },
+  { id: "secure-payment", title: "پرداخت امن", description: "با درگاه‌های مطمئن", icon: PaymentIcon },
+  { id: "easy-return", title: "بازگشت آسان", description: "تا ۳۰ روز", icon: ReturnIcon },
   {
     id: "free-shipping",
     title: "ارسال رایگان",
     description: "برای سفارش‌های بالای ۵۰۰ هزار تومان",
+    icon: ShippingIcon
   },
 ];

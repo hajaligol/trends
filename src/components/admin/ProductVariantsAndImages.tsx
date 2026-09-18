@@ -1,9 +1,11 @@
 "use client";
 
+import Image from "next/image";
 import { useActionState, useState } from "react";
 import { FormField } from "@/components/ui/FormField";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { ConfirmButton } from "@/components/admin/ConfirmButton";
+import { ImagePicker } from "@/components/admin/ImagePicker";
 import { VariantForm } from "@/components/admin/VariantForm";
 import { createImageAction, deleteImageAction, deleteVariantAction } from "@/domains/catalog/admin-actions";
 import { formatToman } from "@/lib/utils/money";
@@ -142,13 +144,18 @@ export function ProductVariantsAndImages({
                 key={image.id}
                 className="flex items-center justify-between gap-3 rounded-[var(--radius-md)] border border-line bg-white px-4 py-3 text-[0.85rem]"
               >
-                <div className="flex flex-col gap-0.5 overflow-hidden">
-                  <span className="truncate" dir="ltr">
-                    {image.url}
-                  </span>
-                  <span className="text-text-secondary">
-                    {image.altText} {image.isPrimary ? "· تصویر اصلی" : ""}
-                  </span>
+                <div className="flex items-center gap-3 overflow-hidden">
+                  <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-[var(--radius-sm)] bg-card-image">
+                    <Image src={image.url} alt="" fill sizes="48px" className="object-cover" />
+                  </div>
+                  <div className="flex flex-col gap-0.5 overflow-hidden">
+                    <span className="truncate" dir="ltr">
+                      {image.url}
+                    </span>
+                    <span className="text-text-secondary">
+                      {image.altText} {image.isPrimary ? "· تصویر اصلی" : ""}
+                    </span>
+                  </div>
                 </div>
                 <ConfirmButton action={() => deleteImageAction(image.id)} confirmMessage="این تصویر حذف شود؟" label="حذف" />
               </li>
@@ -176,7 +183,7 @@ function ImageAddForm({ productId, variants }: { productId: string; variants: Pr
       )}
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <FormField label="آدرس تصویر (URL)" name="url" placeholder="/assets/products/example.webp" required />
+        <ImagePicker name="url" folder="products" label="تصویر محصول" required />
         <FormField label="متن جایگزین (alt)" name="altText" required />
       </div>
       <div className="grid gap-3 sm:grid-cols-3">

@@ -16,6 +16,10 @@ import { products } from "./products";
  * supports subcategories (e.g. "مردان" -> "کفش مردانه") without a separate
  * table, per TRENDS_PROJECT_CONTEXT.md §12 ("use the simplest schema that
  * fully represents the requirements").
+ *
+ * `imageUrl` was added by migration `0008` alongside the admin media
+ * upload endpoint (`src/app/api/admin/media/route.ts`). Nullable; the
+ * category circle on the homepage falls back to `AssetSlot` when null.
  */
 export const categories = pgTable(
   "categories",
@@ -24,6 +28,7 @@ export const categories = pgTable(
     slug: text("slug").notNull(),
     name: text("name").notNull(),
     description: text("description"),
+    imageUrl: text("image_url"),
     parentId: uuid("parent_id").references((): AnyPgColumn => categories.id, {
       onDelete: "set null",
     }),

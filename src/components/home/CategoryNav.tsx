@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { AssetSlot } from "@/components/ui/AssetSlot";
 import { Container } from "@/components/ui/Container";
@@ -37,12 +38,24 @@ export function CategoryNav({ categories }: { categories: CatalogCategory[] }) {
                   <span
                     className={`flex h-[76px] w-[76px] items-center justify-center rounded-full transition-transform duration-200 group-hover:-translate-y-[3px] sm:h-[150px] sm:w-[150px] ${SWATCH_BG[swatch]}`}
                   >
-                    <AssetSlot
-                      label={category.name}
-                      tone="banner"
-                      rounded="full"
-                      className="h-[72%] w-[72%]"
-                    />
+                    {category.imageUrl ? (
+                      <span className="relative block h-[72%] w-[72%] overflow-hidden rounded-full">
+                        <Image
+                          src={category.imageUrl}
+                          alt={category.name}
+                          fill
+                          sizes="150px"
+                          className="object-cover"
+                        />
+                      </span>
+                    ) : (
+                      <AssetSlot
+                        label={category.name}
+                        tone="banner"
+                        rounded="full"
+                        className="h-[72%] w-[72%]"
+                      />
+                    )}
                   </span>
                   <span className="text-[0.95rem] font-semibold text-ink">{category.name}</span>
                 </Link>

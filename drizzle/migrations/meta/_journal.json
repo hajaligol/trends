@@ -57,6 +57,13 @@
       "when": 1789379997907,
       "tag": "0007_colorful_gladiator",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1789559995168,
+      "tag": "0008_married_speedball",
+      "breakpoints": true
     }
   ]
 }

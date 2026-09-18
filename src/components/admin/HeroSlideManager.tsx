@@ -1,9 +1,11 @@
 "use client";
 
+import Image from "next/image";
 import { useActionState, useState } from "react";
 import { FormField } from "@/components/ui/FormField";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { ConfirmButton } from "@/components/admin/ConfirmButton";
+import { ImagePicker } from "@/components/admin/ImagePicker";
 import { createHeroSlideAction, deleteHeroSlideAction, updateHeroSlideAction } from "@/domains/content/actions";
 import type { HeroSlide } from "@/lib/db/schema";
 import type { ActionResult } from "@/domains/auth/roles";
@@ -28,6 +30,7 @@ function HeroSlideForm({ slide, onDone }: { slide?: HeroSlide; onDone?: () => vo
           {state.error}
         </p>
       )}
+      <ImagePicker name="imageUrl" folder="hero" label="تصویر اسلاید" defaultValue={slide?.imageUrl} required />
       <FormField label="متن جایگزین (alt)" name="alt" defaultValue={slide?.alt} required />
       <div className="grid gap-3 sm:grid-cols-2">
         <FormField label="لینک دکمه (اختیاری)" name="ctaHref" defaultValue={slide?.ctaHref ?? ""} placeholder="/category/women" />
@@ -66,11 +69,22 @@ export function HeroSlideManager({ slides }: { slides: HeroSlide[] }) {
               key={slide.id}
               className="flex items-center justify-between gap-3 rounded-[var(--radius-md)] border border-line bg-white px-4 py-3 text-[0.85rem]"
             >
-              <div className="flex flex-col gap-0.5">
-                <span>{slide.alt}</span>
-                <span className="text-text-secondary">
-                  ترتیب: {slide.displayOrder} · {slide.isActive ? "فعال" : "غیرفعال"}
-                </span>
+              <div className="flex items-center gap-3">
+                {slide.imageUrl ? (
+                  <div className="relative h-12 w-20 shrink-0 overflow-hidden rounded-[var(--radius-sm)] bg-card-image">
+                    <Image src={slide.imageUrl} alt="" fill sizes="80px" className="object-cover" />
+                  </div>
+                ) : (
+                  <div className="flex h-12 w-20 shrink-0 items-center justify-center rounded-[var(--radius-sm)] border border-dashed border-line bg-header text-[0.65rem] text-text-secondary">
+                    بدون تصویر
+                  </div>
+                )}
+                <div className="flex flex-col gap-0.5">
+                  <span>{slide.alt}</span>
+                  <span className="text-text-secondary">
+                    ترتیب: {slide.displayOrder} · {slide.isActive ? "فعال" : "غیرفعال"}
+                  </span>
+                </div>
               </div>
               <div className="flex items-center gap-3">
                 <button type="button" onClick={() => setEditingId(slide.id)} className="underline underline-offset-2">

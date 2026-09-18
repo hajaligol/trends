@@ -1,30 +1,33 @@
 # Trends Progress Report
 
 ## Current Status
-- Overall status: **All 15 phases complete.** Phase 14 (QA,
-  accessibility, production readiness — the final phase) was implemented
-  and verified this session with full network access available. Added
-  the project's first test suite (Vitest: 66 unit tests + 25 integration
-  tests against a real PostgreSQL, all passing), fixed a real
-  previously-undetected accessibility gap (`CartDrawer` had no dialog
-  semantics or focus trap at all), added the three error boundaries the
-  app was missing (`error.tsx`/`global-error.tsx`/`admin/error.tsx`), and
-  wrote the deployment/production-checklist/backup/observability
-  documentation plus a full README rewrite. `typecheck`/`lint`/`test`/
-  `test:integration`/`build` all pass clean. The project is structurally
-  and technically shippable; it is not yet ready to accept real customer
-  payments for business/operational reasons (no real payment gateway, no
-  real shipping rates, no legal policy review) — see
-  `docs/PRODUCTION_CHECKLIST.md` for the exact, itemized remaining list.
-- Current phase: none in progress — PHASE 14 is COMPLETE WITH FOLLOW-UP
-  (the "follow-up" being real-browser verification, which no session in
-  this project's history has ever had available — see Phase 14's
-  write-up and "Next Session Instructions" below).
+- Overall status: **All 15 phases complete** (unchanged from the Phase 14
+  write-up below). This session was a **user-reported defect fix, not a
+  numbered phase**: the admin panel had no way to browse/upload an image
+  file for hero slides, categories, promo banners, or products — every
+  one of those either had no image field at all or only accepted a
+  pasted URL. Fixed by adding a real (local-disk-backed) admin image
+  upload endpoint and a reusable browse-and-upload picker component,
+  wired into all four admin forms; `hero_slides`/`categories`/
+  `promo_banners` gained a nullable `imageUrl` column (migration `0008`)
+  and their storefront components now render the real image when one
+  exists, falling back to the pre-existing `AssetSlot` placeholder
+  otherwise. See "Defect fix — Admin image upload" under `## Completed`
+  for the full write-up. `typecheck`/`lint`/`test`/`test:integration`/
+  `build` all pass clean; the fix was also exercised over real HTTP
+  (login → upload → auth/path-traversal/spoofed-content/oversized-file
+  rejection, all confirmed) against a real local PostgreSQL. The
+  project's shippability status is otherwise unchanged from Phase 14's
+  assessment — see `docs/PRODUCTION_CHECKLIST.md`.
+- Current phase: none in progress — same as Phase 14's status; this was
+  a defect fix layered on top of the completed 15-phase plan, not a new
+  phase.
 - Last completed phase: PHASE 14 — QA, accessibility, production
-  readiness (the final phase in CLAUDE_BUILD_INSTRUCTIONS.txt's plan)
+  readiness (the final phase in CLAUDE_BUILD_INSTRUCTIONS.txt's plan).
+  This session's admin-image-upload fix is documented separately, below.
 - Next phase: none — see "Next Session Instructions" for the prioritized
   follow-up backlog instead of a numbered phase.
-- Date: 2026-09-16
+- Date: 2026-09-18
 
 ## Completed
 
@@ -2524,6 +2527,271 @@ handoff note, not a prerequisite someone else needed to finish first.
   pipeline (esbuild, via Vite) that `tsx` (already a dependency, used for
   `db:seed`) also uses — one less distinct toolchain in the project.
 
+### Defect fix — Admin image upload (browse-and-upload for hero/categories/banners/products)
+
+**Reported problem:** in the admin panel, there was no way to browse for
+and choose an image file for hero slides, categories, or promo banners
+on the homepage; products could only have an image set by pasting a URL.
+
+**Root cause, confirmed by reading the actual code (not assumed):**
+`hero_slides`/`categories`/`promo_banners` had no image column at all —
+Phase 11's own PROGRESS.md write-up documented this explicitly ("no
+image-upload/URL column yet — there is still no object-storage/CDN
+pipeline"), and the homepage rendered all three through the `AssetSlot`
+placeholder component instead. `product_images.url` already existed as
+a real column, but the admin form for it (`ProductVariantsAndImages.tsx`)
+only exposed a plain "paste a URL" text field. `ProductCard.tsx` even had
+a comment saying the `next/image` rendering path was "wired up and ready
+for when Phase 11's admin media upload lands" — i.e. this was a known,
+previously-documented gap, not a new bug.
+
+**Fix — new admin media upload endpoint + reusable picker component:**
+- `src/app/api/admin/media/route.ts` (new) — a `POST` Route Handler,
+  gated by the same `isStaffOrAdmin` check every other admin mutation
+  uses (re-checked here directly, never trusting that `/admin`'s layout
+  gate was the only thing standing between a request and this endpoint).
+  Accepts a `multipart/form-data` body (`file` + `folder`), validates:
+  - `folder` against a fixed allow-list (`products`/`hero`/`categories`/
+    `banners`) — never a caller-supplied path segment, which forecloses
+    path traversal regardless of what a client sends (verified — see
+    "Tests/checks").
+  - File content by **magic-byte sniffing** (JPEG/PNG/WebP/GIF
+    signatures), never trusting the browser-supplied `File.type` or
+    filename extension (verified with a spoofed-content-type text file
+    renamed `.jpg` — correctly rejected).
+  - Size, capped at 5 MB.
+  Then writes the file to `public/assets/<folder>/` under a fresh
+  `randomUUID()` filename (the original filename, and any
+  attacker-controlled characters in it, never reaches the filesystem)
+  and returns `{ url: "/assets/<folder>/<uuid>.<ext>" }`.
+  Also rate-limited (`checkRateLimit`, keyed by user id + IP,
+  30/minute) as defense-in-depth alongside the auth check.
+  **Local disk storage, not real object storage/CDN** — documented at
+  length in the route's own header comment: TRENDS_PROJECT_CONTEXT.md
+  §3 calls for object storage + a CDN, but no provider/credentials are
+  configured anywhere in this project (`.env.example`'s
+  `STORAGE_BUCKET_URL` etc. are still blank). Per rule F.1 ("prefer the
+  simplest production-safe solution") this stores uploads under
+  `public/assets/<folder>/`, served by Next.js exactly like the
+  prototype's original static assets already are — a real, working fix
+  for the reported problem on the current single-process deployment
+  topology. It stops being sufficient the moment the app runs behind
+  multiple stateless instances with no shared filesystem; swapping the
+  route's `writeFile` call for a real object-storage adapter is then a
+  contained, single-file change, since every caller only ever sees
+  `{ url }` come back from `POST /api/admin/media`, never a filesystem
+  path. Flagged here and in `.env.example`'s updated comment, not
+  silently left implicit (rule A.18).
+- `src/components/admin/ImagePicker.tsx` (new) — a `"use client"`
+  browse-and-upload component: a visible "انتخاب تصویر" button opens the
+  OS file picker, the chosen file uploads immediately to
+  `POST /api/admin/media`, and the returned URL is written into a hidden
+  `<input type="hidden" name={name}>` so the surrounding form's existing
+  Server Action needs **no changes** — it still just reads a URL string
+  from `FormData`, exactly as before. Shows a live thumbnail preview,
+  an upload-in-progress state, and a collapsed "یا آدرس تصویر را وارد
+  کنید" fallback (an operator can still paste/reuse an existing URL
+  without re-uploading it) — browse is the primary path, not the only
+  path.
+
+**Schema/migration** (`drizzle/migrations/0008_married_speedball.sql`,
+generated via `drizzle-kit generate` and applied/verified against a real
+local Postgres): added a nullable `image_url` text column to
+`categories`, `hero_slides`, and `promo_banners`. Nullable (not
+`NOT NULL`) specifically so existing rows created before this migration
+don't break — they simply keep rendering through `AssetSlot` until an
+operator adds an image. `product_images` needed no schema change (its
+`url` column already existed); only its admin form's input type changed.
+
+**Validation** (`src/lib/validation/admin.ts`): added `imageUrl` to
+`categorySchema` (optional — a category can exist without a picture),
+and made it a **required** field on `heroSlideSchema`/`promoBannerSchema`
+(a hero slide or promo banner with no image doesn't make sense on this
+homepage design) — this only affects *creating or editing* a slide/
+banner going forward; existing null-image rows are untouched until
+someone edits them.
+
+**Wired into all four admin forms** (each swapped its URL text field, or
+added a new field where none existed, for `<ImagePicker>`, and each
+admin list view gained a small thumbnail):
+- `src/components/admin/ProductVariantsAndImages.tsx` — replaced the
+  "آدرس تصویر (URL)" text field with `<ImagePicker name="url"
+  folder="products">`; the existing image list now shows a real
+  thumbnail per row.
+- `src/components/admin/HeroSlideManager.tsx` — added
+  `<ImagePicker name="imageUrl" folder="hero" required>`; the slide list
+  now shows a thumbnail (or a "بدون تصویر" placeholder for pre-migration
+  rows) instead of text only.
+- `src/components/admin/PromoBannerManager.tsx` — same pattern,
+  `folder="banners"`.
+- `src/components/admin/CategoryForm.tsx` / `CategoryRow.tsx` — added
+  `<ImagePicker name="imageUrl" folder="categories">` (optional) to the
+  form and a small circular thumbnail to the admin category table.
+
+**Storefront rendering updated to use the real image when present,
+falling back to `AssetSlot` otherwise** (no behavior change for rows
+that still have no image):
+- `src/domains/catalog/queries.ts` — `CatalogCategory`/
+  `CatalogCategoryDetail` gained `imageUrl`; `getActiveCategories`/
+  `getCategoryBySlug` select it.
+- `src/domains/categories/queries.ts` — `AdminCategoryRow`/
+  `listCategoriesForAdmin` gained `imageUrl`.
+- `src/components/home/CategoryNav.tsx` — renders a real circular
+  `next/image` when `category.imageUrl` is set, else the existing
+  `AssetSlot`.
+- `src/components/home/HeroCarousel.tsx` — `HeroSlideLike` gained
+  `imageUrl`; renders a real `fill`-positioned `next/image`
+  (`priority` on the first slide only) when set, else `AssetSlot`.
+  Added `relative` to the slide container (required for `fill` to
+  position correctly) — the only non-additive class change this fix
+  made to an existing element.
+- `src/components/home/PromoBanners.tsx` — `PromoBannerLike` gained
+  `imageUrl`; same real-image-else-`AssetSlot` pattern.
+- `src/components/catalog/ProductCard.tsx` — **unchanged**; it already
+  had the real `next/image` path ready (per its own Phase-11-era
+  comment), it simply had nothing to render before because
+  `product_images` rows could only be created via a pasted URL. No code
+  change was needed here — only the admin form that populates the data
+  it reads.
+
+**Files changed/added this session:**
+```
+src/lib/db/schema/categories.ts                  (edited — imageUrl column)
+src/lib/db/schema/hero-slides.ts                 (edited — imageUrl column)
+src/lib/db/schema/promo-banners.ts               (edited — imageUrl column)
+drizzle/migrations/0008_married_speedball.sql    (new, generated)
+drizzle/migrations/meta/*                        (new, generated)
+src/lib/validation/admin.ts                      (edited — imageUrl on 3 schemas)
+src/app/api/admin/media/route.ts                 (new)
+src/components/admin/ImagePicker.tsx             (new)
+src/components/admin/ProductVariantsAndImages.tsx (edited)
+src/components/admin/HeroSlideManager.tsx        (edited)
+src/components/admin/PromoBannerManager.tsx      (edited)
+src/components/admin/CategoryForm.tsx            (edited)
+src/components/admin/CategoryRow.tsx             (edited)
+src/domains/categories/queries.ts                (edited — imageUrl in AdminCategoryRow)
+src/domains/catalog/queries.ts                   (edited — imageUrl in CatalogCategory(Detail))
+src/components/home/CategoryNav.tsx              (edited)
+src/components/home/HeroCarousel.tsx             (edited)
+src/components/home/PromoBanners.tsx             (edited)
+.env.example                                     (edited — STORAGE_BUCKET_URL comment updated)
+public/assets/banners/.gitkeep                   (new — banners had no asset folder before)
+```
+
+**Database changes:** 1 new migration (`0008_married_speedball.sql`) —
+3 `ALTER TABLE ... ADD COLUMN image_url text` statements (all nullable,
+no data migration needed, no existing rows affected).
+
+**Environment/config changes:** none required to use this fix (no new
+env vars). `.env.example`'s `STORAGE_BUCKET_URL` comment block was
+updated to note that uploads currently land on local disk via the new
+route, and to point at it for whoever wires in real object storage
+later.
+
+**Tests/checks — all run this session against a real local PostgreSQL 16
+instance (freshly installed in this sandbox) and a real `next build` +
+`next start` production server, exactly per this project's established
+verification discipline:**
+- `npx tsc --noEmit` — clean (one real type error caught and fixed along
+  the way: `getCategoryBySlug`'s inline select was missing the new
+  `imageUrl` field, which the shared `CatalogCategory` type now
+  requires — fixed by adding it to that query's column list).
+- `npx eslint src --max-warnings=0` — clean.
+- `npm run db:generate` — generated the migration above from the schema
+  changes; inspected the output SQL before applying it (3 plain
+  `ADD COLUMN`, nothing unexpected).
+- `npm run db:migrate` — applied cleanly (all 9 migrations, `0000`
+  through this session's new `0008`) against a freshly installed local
+  Postgres 16.
+- `npm run db:seed` — succeeded (6 categories, 11 products, 2 hero
+  slides, 2 promo banners) — confirms the new nullable columns don't
+  break the existing seed script.
+- `npm run build` — clean; route table unchanged except the new
+  `ƒ /api/admin/media` entry.
+- `npm test` — 66/66 unit tests pass (unaffected by this change).
+- `npm run test:integration` — 25/25 integration tests pass against the
+  real database (unaffected by this change).
+- **Real HTTP end-to-end verification against `npm run start`** (not
+  just direct-to-domain — this is a Route Handler, not a Server Action,
+  so it's directly `curl`-able without the `Next-Action` wire-protocol
+  limitation every phase since Phase 7 has documented for Server
+  Actions):
+  - Inserted a real `admin`-role test user directly into `users`
+    (bcrypt-hashed password via the project's own `bcryptjs`
+    dependency), logged in via `/api/auth/csrf` →
+    `/api/auth/callback/credentials` (the same real-cookie pattern
+    every prior phase's HTTP checks use), confirmed `/api/auth/session`
+    returns the correct `role: "admin"`.
+  - `GET /admin/content` with the session cookie → `200` (confirms the
+    admin layout's role gate still passes for this account).
+  - `POST /api/admin/media` with a real signature-valid JPEG,
+    `folder=categories`, and the session cookie → `201`, returned
+    `{"url":"/assets/categories/<uuid>.jpg"}`; confirmed via `ls` that
+    the file genuinely landed on disk at that exact path.
+  - `POST /api/admin/media` **with no session cookie** → `403`,
+    `{"error":"شما اجازه دسترسی به این بخش را ندارید"}` — unauthenticated
+    upload correctly rejected.
+  - `POST /api/admin/media` with `folder=../../etc` (path-traversal
+    attempt) → `400`, `{"error":"مقصد فایل نامعتبر است"}` — rejected by
+    the fixed allow-list before ever touching the filesystem.
+  - `POST /api/admin/media` with a plain text file renamed `.jpg` and
+    `Content-Type: image/jpeg` (spoofed extension + spoofed MIME type)
+    → `400`, `{"error":"قالب فایل پشتیبانی نمی‌شود...`} — rejected by
+    the magic-byte signature check, confirming it does not trust either
+    the filename or the declared content type.
+  - `POST /api/admin/media` with a >5 MB file (valid JPEG magic bytes,
+    padded past the size cap) → `400`,
+    `{"error":"حجم فایل نباید بیش از ۵ مگابایت باشد"}`.
+  - Test upload artifact and test admin user removed afterward (the
+    uploaded test file deleted from `public/assets/categories/`; the
+    test user was only ever in this sandbox's ephemeral local Postgres,
+    not part of the delivered database state).
+- **What was *not* verified this session, and why:** the four admin
+  forms' `<ImagePicker>` integration was **not** clicked through in a
+  real rendered browser (select a file via the OS picker, watch the
+  preview appear, submit the surrounding form) — same sandbox
+  limitation every phase since Phase 7 has documented (no browser
+  automation tool available here). What *was* verified instead: the
+  upload endpoint itself works correctly end-to-end over real HTTP
+  (above, including all four rejection paths), the resulting URL shape
+  (`/assets/<folder>/<uuid>.<ext>`) is exactly what each form's hidden
+  input expects, `npm run build`/`typecheck`/`lint` confirm the
+  component compiles and type-checks correctly against each of the four
+  forms it's used in, and the seed/migration/query-layer changes were
+  verified against a real database. A session with browser automation
+  available should click through all four "browse → preview → save"
+  flows once, and should also fold this into the same accumulated
+  browser-verification backlog Phase 14's "Next Session Instructions"
+  already documents.
+
+**Known limitations / follow-ups (not blocking, documented rather than
+silently ignored):**
+- **Uploaded images are not resized/optimized/re-encoded on upload** —
+  a 5 MB source photo is stored and served as-is (through `next/image`,
+  which does optimize *serving*, but the original file on disk is still
+  whatever size was uploaded). Acceptable at this store's current scale;
+  revisit with a real image-processing step (e.g. `sharp`) if upload
+  sizes or storage become a real concern.
+- **No admin UI to delete/replace an orphaned uploaded file** — removing
+  an image from a slide/banner/category/product (via "حذف تصویر" or
+  picking a different one) leaves the old file sitting in
+  `public/assets/<folder>/`; nothing currently garbage-collects
+  unreferenced uploads. Not a correctness or security issue (unreferenced
+  files are inert), but a real disk-usage cleanup task for later if
+  upload volume grows.
+- **Local disk storage does not survive a redeploy on most hosting
+  platforms** (e.g. anything with an ephemeral filesystem) and does not
+  work at all behind more than one stateless server instance with no
+  shared volume — see the route's own header comment and
+  `.env.example`'s updated note. This is the same category of
+  "documented, deliberate, not-yet-built infrastructure" item
+  TRENDS_PROJECT_CONTEXT.md §3 already lists (object storage + CDN);
+  this fix makes the *feature* work correctly today without pretending
+  the long-term infrastructure gap doesn't exist.
+- Real-browser click-through of the four admin forms' file-picker UI is
+  still outstanding — see "What was not verified" above; folded into the
+  existing browser-automation backlog (see "Next Session Instructions").
+
 ## Important Assumptions
 
 - Password-based auth (mobile + password) was chosen as this phase's
@@ -2649,6 +2917,28 @@ handoff note, not a prerequisite someone else needed to finish first.
   procured. `docs/PRODUCTION_CHECKLIST.md` keeps these visually separate
   (DONE/PRE-LAUNCH vs. BLOCKING) rather than implying the whole project
   is equally unfinished.
+
+### Admin image upload defect fix addition
+- Chose **local disk storage** (`public/assets/<folder>/`) over blocking
+  the fix on real object storage/CDN being configured — no provider or
+  credentials exist anywhere in this project yet (§3), and the reported
+  problem ("can't browse and choose an image") is solvable correctly at
+  today's single-process deployment scale without them. Documented at
+  length in `src/app/api/admin/media/route.ts`'s header comment as the
+  specific point (multiple stateless instances, no shared filesystem)
+  at which this choice needs to change, and what the contained fix looks
+  like when it does (swap one `writeFile` call for a real adapter, since
+  every caller only ever sees the returned `{ url }`).
+- Made `imageUrl` **required** on `heroSlideSchema`/`promoBannerSchema`
+  but left it **optional** on `categorySchema` — a business judgment
+  call (rule A.18), not something either source document specifies: a
+  hero slide or promotional banner is a purely visual homepage element
+  with no other content, so one with no image doesn't make sense once an
+  operator is actively creating/editing it; a category can reasonably
+  exist (and already did, extensively, before this fix) without a
+  picture. Existing rows created before this migration keep `imageUrl:
+  null` regardless — the required validation only applies going forward,
+  to a create/edit action's own submission.
 
 ## Known Issues / Technical Debt
 
@@ -2853,6 +3143,27 @@ Phase 14 adds:
   added test coverage and documentation for existing behavior, it did not
   change checkout/cart/coupon/payment/order business logic itself.
 
+Admin image upload defect fix adds:
+
+- **Uploaded images are stored on local disk (`public/assets/`), not
+  real object storage/CDN** — a deliberate, documented choice given no
+  provider is configured (see "Important Assumptions" and the route's
+  own header comment); will not survive a redeploy on an ephemeral
+  filesystem or work behind more than one stateless instance without a
+  shared volume.
+- **No garbage collection of orphaned uploaded files** — replacing/
+  removing an image leaves the old file on disk with nothing referencing
+  it. Not a correctness/security issue, just a disk-usage cleanup task
+  for later.
+- **No image resizing/re-encoding on upload** — files are stored exactly
+  as uploaded (up to 5 MB); `next/image` still optimizes how they're
+  *served*, but a large source file is still a large source file at rest.
+- **Real-browser click-through of all four admin forms' new
+  browse-and-upload UI has not been done** — same sandbox limitation as
+  every phase since Phase 7; see this fix's "Tests/checks" for exactly
+  what real-HTTP verification substituted for it (the endpoint itself,
+  including all rejection paths, was fully exercised over real HTTP).
+
 ## Next Session Instructions
 
 **All 15 phases in CLAUDE_BUILD_INSTRUCTIONS.txt §D are now COMPLETE.**
@@ -2875,8 +3186,10 @@ a single objective.
      "real browser/Server-Action-wire-protocol verification has not been
      done" items across every phase (see "Known Issues / Technical Debt"
      above for the full list — cart/wishlist, checkout/order placement,
-     coupon/payment, admin forms, reviews/newsletter/support, and now
-     Phase 14's own accessibility fix); (d) install Playwright and
+     coupon/payment, admin forms, reviews/newsletter/support, Phase 14's
+     own accessibility fix, and now this session's admin image-upload
+     `<ImagePicker>` forms — click through selecting a real file on all
+     four: hero slide, category, promo banner, product image); (d) install Playwright and
      implement the 12 critical flows from CLAUDE_BUILD_INSTRUCTIONS.txt
      Phase 14 as real E2E tests in `tests/e2e/` (still an empty
      placeholder), building on `tests/integration/helpers.ts`'s fixture
@@ -2910,9 +3223,12 @@ a single objective.
   authoritative, itemized list of what's DONE vs. BLOCKING vs.
   PRE-LAUNCH — read this before anything else), `src/lib/hooks/
   useDialogA11y.ts` and the two components using it (highest-priority
-  browser-verification target), `tests/e2e/` (empty — where a Playwright
-  suite would go), `src/domains/payments/provider.ts` (where a real
-  gateway adapter would be added, if credentials become available).
+  browser-verification target), `src/components/admin/ImagePicker.tsx`
+  and `src/app/api/admin/media/route.ts` (this session's fix — real
+  browser click-through of the four forms using it is the next-highest
+  new item), `tests/e2e/` (empty — where a Playwright suite would go),
+  `src/domains/payments/provider.ts` (where a real gateway adapter would
+  be added, if credentials become available).
 - **Is the project shippable?** Structurally and technically, yes — see
   Phase 14's write-up above for the full reasoning. Not yet shippable to
   accept real customer payments, for business/operational reasons (no
@@ -2953,6 +3269,11 @@ a single objective.
   in `.env.local`, restart the dev/start server, and place an order —
   checkout will redirect to `/payment/mock/[authority]`, a simulator page
   with "success"/"fail" buttons that hit `/api/payments/callback/mock`.
+- Admin image uploads (hero/categories/banners/products, this session's
+  fix) need no configuration — `POST /api/admin/media` (staff/admin only)
+  writes straight to `public/assets/<folder>/` on local disk; no env var
+  to set. `folder` must be one of `products`/`hero`/`categories`/
+  `banners`.
 
 **Local PostgreSQL setup used this session** (Ubuntu 24.04 sandbox with
 `apt-get` access — adjust for whatever environment runs the next

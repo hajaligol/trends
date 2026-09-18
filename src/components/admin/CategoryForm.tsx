@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { FormField } from "@/components/ui/FormField";
 import { SubmitButton } from "@/components/ui/SubmitButton";
+import { ImagePicker } from "@/components/admin/ImagePicker";
 import { createCategoryAction, updateCategoryAction } from "@/domains/categories/actions";
 import type { AdminCategoryRow } from "@/domains/categories/queries";
 import type { ActionResult } from "@/domains/auth/roles";
@@ -41,6 +42,8 @@ export function CategoryForm({
         <FormField label="نام دسته" name="name" defaultValue={category?.name} required />
         <FormField label="نامک (slug)" name="slug" defaultValue={category?.slug} required placeholder="مثال: women-shoes" />
       </div>
+
+      <ImagePicker name="imageUrl" folder="categories" label="تصویر دسته (اختیاری)" defaultValue={category?.imageUrl} />
 
       <FormField label="توضیحات (اختیاری)" name="description" defaultValue={category?.description ?? ""} />
 

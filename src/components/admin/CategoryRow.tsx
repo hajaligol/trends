@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState } from "react";
 import { CategoryForm } from "@/components/admin/CategoryForm";
 import { ConfirmButton } from "@/components/admin/ConfirmButton";
@@ -34,7 +35,18 @@ export function CategoryRow({
 
   return (
     <tr className="border-b border-line last:border-0">
-      <td className="px-4 py-2.5">{category.name}</td>
+      <td className="px-4 py-2.5">
+        <div className="flex items-center gap-2.5">
+          {category.imageUrl ? (
+            <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-full bg-card-image">
+              <Image src={category.imageUrl} alt="" fill sizes="36px" className="object-cover" />
+            </div>
+          ) : (
+            <div className="h-9 w-9 shrink-0 rounded-full border border-dashed border-line bg-header" aria-hidden="true" />
+          )}
+          {category.name}
+        </div>
+      </td>
       <td className="px-4 py-2.5 text-text-secondary" dir="ltr">
         {category.slug}
       </td>

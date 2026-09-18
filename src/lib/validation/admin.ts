@@ -35,6 +35,7 @@ export const categorySchema = z.object({
   name: z.string().trim().min(1, "نام دسته را وارد کنید").max(120),
   slug: slugSchema,
   description: optionalTrimmed(2000),
+  imageUrl: optionalTrimmed(2000),
   parentId: z
     .union([z.string().uuid(), z.literal("")])
     .optional()
@@ -162,6 +163,7 @@ export const couponSchema = z
 
 export const heroSlideSchema = z.object({
   alt: z.string().trim().min(1, "متن جایگزین (alt) را وارد کنید").max(300),
+  imageUrl: z.string().trim().min(1, "تصویر اسلاید را انتخاب کنید").max(2000),
   ctaHref: optionalTrimmed(300),
   displayOrder: z.coerce.number().int().default(0),
   isActive: checkbox,
@@ -170,6 +172,7 @@ export const heroSlideSchema = z.object({
 export const promoBannerSchema = z.object({
   tone: z.enum(["pink", "blue"]),
   title: z.string().trim().min(1, "عنوان را وارد کنید").max(120),
+  imageUrl: z.string().trim().min(1, "تصویر بنر را انتخاب کنید").max(2000),
   description: z.string().trim().min(1, "توضیحات را وارد کنید").max(400),
   ctaLabel: z.string().trim().min(1, "متن دکمه را وارد کنید").max(60),
   ctaHref: optionalTrimmed(300),

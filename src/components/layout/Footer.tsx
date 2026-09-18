@@ -7,6 +7,13 @@ import { NewsletterForm } from "@/components/layout/NewsletterForm";
 // (`NewsletterForm`) and replaced the dead `#site-footer` anchor links
 // with real routes (see TRENDS_PROJECT_CONTEXT.md §6 "Newsletter" and
 // CLAUDE_BUILD_INSTRUCTIONS.txt Phase 12's public content-page tasks).
+const socialIcons = [
+  { label: "اینستاگرام", src: "/assets/icons/instagram.svg" },
+  { label: "تلگرام", src: "/assets/icons/telegram.svg" },
+  { label: "فیسبوک", src: "/assets/icons/facebook.svg" },
+  { label: "ایکس", src: "/assets/icons/x.svg" },
+];
+
 export function Footer() {
   return (
     <footer id="site-footer" className="border-t border-line bg-white pb-6 pt-[clamp(30px,4vw,46px)]">
@@ -22,13 +29,19 @@ export function Footer() {
           <NewsletterForm />
 
           <div className="flex gap-2.5">
-            {["اینستاگرام", "تلگرام", "فیسبوک", "ایکس"].map((label) => (
+            {socialIcons.map(({ label, src }) => (
               <span
                 key={label}
                 role="img"
                 aria-label={label}
-                className="h-[34px] w-[34px] rounded-full bg-ink/6"
-              />
+                className="flex h-[34px] w-[34px] items-center justify-center rounded-full bg-ink/6"
+              >
+                <img
+                  src={src}
+                  alt=""
+                  className="h-[18px] w-[18px] object-contain"
+                />
+              </span>
             ))}
           </div>
         </div>
