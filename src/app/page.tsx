@@ -2,12 +2,13 @@ import type { Metadata } from "next";
 import { HeroCarousel } from "@/components/home/HeroCarousel";
 import { CategoryTiles } from "@/components/home/CategoryTiles";
 import { FeaturedProducts } from "@/components/home/FeaturedProducts";
+import { TopSellingProducts } from "@/components/home/TopSellingProducts";
 import { PromoBanners } from "@/components/home/PromoBanners";
 import { NewArrivals } from "@/components/home/NewArrivals";
 import { BenefitsStrip } from "@/components/home/BenefitsStrip";
 import { Container } from "@/components/ui/Container";
 import { demoBenefits } from "@/domains/catalog/demo-data";
-import { getFeaturedProducts, getNewArrivals } from "@/domains/catalog/queries";
+import { getFeaturedProducts, getNewArrivals, getTopSellingProducts } from "@/domains/catalog/queries";
 import { getActiveHeroSlides, getActivePromoBanners, getHomeCategoryTiles } from "@/domains/content/queries";
 
 export const metadata: Metadata = {
@@ -28,9 +29,10 @@ export const metadata: Metadata = {
  * scope creep for content nobody has asked to change.
  */
 export default async function HomePage() {
-  const [categoryTiles, featuredProducts, newArrivals, heroSlides, promoBanners] = await Promise.all([
+  const [categoryTiles, featuredProducts, topSellingProducts, newArrivals, heroSlides, promoBanners] = await Promise.all([
     getHomeCategoryTiles(),
     getFeaturedProducts(),
+    getTopSellingProducts(),
     getNewArrivals(),
     getActiveHeroSlides(),
     getActivePromoBanners(),
@@ -48,6 +50,7 @@ export default async function HomePage() {
 
       <CategoryTiles tiles={categoryTiles} />
       <FeaturedProducts products={featuredProducts} />
+      <TopSellingProducts products={topSellingProducts} />
       {promoBanners.length > 0 && <PromoBanners banners={promoBanners} />}
       <NewArrivals arrivals={newArrivals} />
       <BenefitsStrip benefits={demoBenefits} />

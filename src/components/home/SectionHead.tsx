@@ -1,6 +1,10 @@
+import type { ReactNode } from "react";
+
 type SectionHeadProps = {
   eyebrow: string;
   title: string;
+  /** Optional decorative icon shown before the title. */
+  icon?: ReactNode;
   viewAllHref: string;
   viewAllLabel?: string;
 };
@@ -10,6 +14,7 @@ type SectionHeadProps = {
 export function SectionHead({
   eyebrow,
   title,
+  icon,
   viewAllHref,
   viewAllLabel = "مشاهده همه",
 }: SectionHeadProps) {
@@ -17,7 +22,14 @@ export function SectionHead({
     <div className="mb-[34px] flex flex-wrap items-end justify-between gap-4">
       <div>
         <p className="text-[0.88rem] text-text-secondary">{eyebrow}</p>
-        <h2 className="m-0 mt-1.5 text-[clamp(1.4rem,2.6vw,1.95rem)] font-bold">{title}</h2>
+        <h2 className="m-0 mt-1.5 flex items-center gap-2.5 text-[clamp(1.4rem,2.6vw,1.95rem)] font-bold">
+          {icon && (
+            <span aria-hidden="true" className="flex shrink-0">
+              {icon}
+            </span>
+          )}
+          {title}
+        </h2>
       </div>
       <a
         href={viewAllHref}

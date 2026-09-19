@@ -3,6 +3,7 @@ import Link from "next/link";
 import { AssetSlot } from "@/components/ui/AssetSlot";
 import { Container } from "@/components/ui/Container";
 import { SectionHead } from "@/components/home/SectionHead";
+import { StarIcon } from "@/components/ui/icons";
 import { StockBadge } from "@/components/catalog/StockBadge";
 import { WishlistButton } from "@/components/ui/WishlistButton";
 import type { CatalogProductSummary } from "@/domains/catalog/queries";
@@ -17,7 +18,12 @@ export function NewArrivals({ arrivals }: { arrivals: CatalogProductSummary[] })
   return (
     <section id="new-arrivals" className="py-[clamp(30px,5vw,54px)]">
       <Container>
-        <SectionHead eyebrow="تازه‌ترین‌ها" title="جدیدترین محصولات" viewAllHref="#new-arrivals" />
+        <SectionHead
+          eyebrow="تازه‌ترین‌ها"
+          title="جدیدترین محصولات"
+          icon={<StarIcon className="h-[1.1em] w-[1.1em] text-brand" />}
+          viewAllHref="#new-arrivals"
+        />
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
           {arrivals.map((arrival) => {
             const primaryImage = arrival.images[0];

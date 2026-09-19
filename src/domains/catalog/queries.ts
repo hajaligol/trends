@@ -1,7 +1,7 @@
 import { cache } from "react";
 import { and, asc, desc, eq, ilike, inArray, ne, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/lib/db/client";
-import { categories, productImages, products, productVariants } from "@/lib/db/schema";
+import { categories, orderItems, orders, productImages, products, productVariants } from "@/lib/db/schema";
 import { discountPercent } from "@/lib/utils/money";
 import {
   buildCategoryTree,
@@ -307,6 +307,43 @@ export async function getProductSummariesByIds(ids: string[]): Promise<CatalogPr
 
 export async function getNewArrivals(): Promise<CatalogProductSummary[]> {
   return loadProductSummaries(eq(products.isNewArrival, true));
+}
+
+/** Order statuses whose units count as "sold". `pending_payment` (not yet
+ * paid), `cancelled` and `refunded` are deliberately excluded so an
+ * abandoned or reversed order can't push a product up the ranking. */
+const SALES_COUNTING_STATUSES = ["paid", "processing", "shipped", "delivered"] as const;
+
+/**
+ * Best sellers for the homepage: active products ranked by total units
+ * sold across paid-or-later orders (`order_items.quantity`, summed over
+ * every variant of the product), best first. Ties break on product id so
+ * the order is stable between requests.
+ *
+ * Returns **only products that have actually sold** — it never pads the
+ * list with unsold products, so an empty array (no paid orders yet) is a
+ * normal result and the homepage hides the section.
+ */
+export async function getTopSellingProducts(limit = 5): Promise<CatalogProductSummary[]> {
+  const unitsSold = sql<number>`sum(${orderItems.quantity})::int`;
+
+  const ranked = await db
+    .select({ productId: orderItems.productId, unitsSold })
+    .from(orderItems)
+    .innerJoin(orders, eq(orders.id, orderItems.orderId))
+    .innerJoin(products, eq(products.id, orderItems.productId))
+    .where(and(inArray(orders.status, [...SALES_COUNTING_STATUSES]), eq(products.isActive, true)))
+    .groupBy(orderItems.productId)
+    .orderBy(desc(unitsSold), asc(orderItems.productId))
+    .limit(limit);
+
+  const rankedIds = ranked.map((row) => row.productId).filter((id): id is string => id !== null);
+  if (rankedIds.length === 0) return [];
+
+  // `loadProductSummaries` orders by createdAt; restore the sales ranking.
+  const summaries = await loadProductSummaries(inArray(products.id, rankedIds));
+  const rankById = new Map(rankedIds.map((id, index) => [id, index]));
+  return summaries.sort((a, b) => (rankById.get(a.id) ?? 0) - (rankById.get(b.id) ?? 0));
 }
 
 export type CatalogProductDetail = CatalogProductSummary & {

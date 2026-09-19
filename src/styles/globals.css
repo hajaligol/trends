@@ -79,6 +79,26 @@ body {
   outline-offset: 3px;
 }
 
+/* "Featured" section flame badge (see FeaturedProducts.tsx). The existing
+   prefers-reduced-motion block below freezes both animations. */
+@keyframes flame-flicker {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  25% { transform: scale(1.06, 1.1) rotate(-2.5deg); }
+  50% { transform: scale(0.97, 1.03) rotate(1.5deg); }
+  75% { transform: scale(1.04, 1.08) rotate(-1deg); }
+}
+@keyframes flame-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(91, 15, 165, 0.32), 0 10px 26px -8px rgba(91, 15, 165, 0.5); }
+  50% { box-shadow: 0 0 0 12px rgba(91, 15, 165, 0), 0 10px 26px -8px rgba(91, 15, 165, 0.5); }
+}
+.flame-flicker {
+  animation: flame-flicker 2.4s ease-in-out infinite;
+  transform-origin: 50% 90%;
+}
+.flame-badge-pulse {
+  animation: flame-glow 2.4s ease-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
