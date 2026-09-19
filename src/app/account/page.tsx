@@ -4,11 +4,12 @@ import type { ReactNode } from "react";
 import { getCurrentUser } from "@/domains/auth/actions";
 import { findUserById } from "@/domains/auth/queries";
 import { getAddressesForUser } from "@/domains/addresses/queries";
-import { listOrdersForUser } from "@/domains/orders/queries";
+import { getOrderItemPreviews, listOrdersForUser } from "@/domains/orders/queries";
 import { getWishlistedProductIds } from "@/domains/wishlist/queries";
 import { AccountPageHeader } from "@/components/account/AccountPageHeader";
 import { EmptyState } from "@/components/account/EmptyState";
 import { OrderStatusBadge } from "@/components/account/OrderStatusBadge";
+import { OrderThumbnails } from "@/components/account/OrderThumbnails";
 import { formatPersianDate, formatPersianMonthYear } from "@/components/account/format";
 import {
   DashboardAddressesIcon,
@@ -90,6 +91,8 @@ export default async function AccountPage() {
 
   const inProgressCount = orders.filter((order) => IN_PROGRESS_STATUSES.has(order.status)).length;
   const recentOrders = orders.slice(0, 4); // already newest first
+  // Ids come from the user-scoped read above, so previews are ownership-safe.
+  const itemsByOrder = await getOrderItemPreviews(recentOrders.map((order) => order.id));
 
   const details: Array<{ label: string; value: ReactNode }> = [
     { label: "نام", value: user.fullName ?? "—" },
@@ -114,12 +117,11 @@ export default async function AccountPage() {
       />
 
       {/* Welcome banner */}
-      <section className="relative isolate overflow-hidden rounded-[var(--radius-lg)] border border-brand/15 bg-gradient-to-br from-[#f7f0fc] via-[#ede1f7] to-[#e2d4ec] p-[clamp(20px,3vw,32px)]">
+      {/* <section className="relative isolate overflow-hidden rounded-[var(--radius-lg)] border border-brand/15 bg-gradient-to-br from-[#f7f0fc] via-[#ede1f7] to-[#e2d4ec] p-[clamp(20px,3vw,32px)]">
         <div aria-hidden="true" className="pointer-events-none absolute -top-16 -end-10 -z-10 h-56 w-56 rounded-full bg-brand/20 blur-3xl" />
         <div aria-hidden="true" className="pointer-events-none absolute -bottom-20 -start-10 -z-10 h-56 w-56 rounded-full bg-[#c79ae8]/45 blur-3xl" />
-        <p className="m-0 text-[0.88rem] text-text-secondary">خوش آمدید</p>
         <h2 className="m-0 mt-1 text-[clamp(1.3rem,2.6vw,1.8rem)] font-bold">
-          سلام{user.fullName ? `، ${user.fullName}` : ""}
+          {user.fullName ? ` ${user.fullName}` : ""} عزیز، خوش آمدید!
         </h2>
         <p className="m-0 mt-2 max-w-xl text-[0.92rem] leading-7 text-ink/75">
           {orders.length > 0
@@ -142,7 +144,7 @@ export default async function AccountPage() {
             سفارش‌های من
           </Link>
         </div>
-      </section>
+      </section> */}
 
       {/* Stats */}
       <section aria-label="خلاصه حساب" className="grid grid-cols-2 gap-4 xl:grid-cols-4">
@@ -209,11 +211,14 @@ export default async function AccountPage() {
                     href={`/order/${order.orderNumber}`}
                     className="-mx-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-xl px-2 py-3.5 transition-colors duration-200 hover:bg-ink/[0.03]"
                   >
-                    <div className="flex flex-col gap-1">
-                      <span dir="ltr" className="text-right text-[0.92rem] font-semibold">
-                        {order.orderNumber}
-                      </span>
-                      <span className="text-[0.8rem] text-text-secondary">{formatPersianDate(order.createdAt)}</span>
+                    <div className="flex items-center gap-3.5">
+                      <OrderThumbnails items={itemsByOrder.get(order.id) ?? []} max={2} />
+                      <div className="flex flex-col gap-1">
+                        <span dir="ltr" className="text-right text-[0.92rem] font-semibold">
+                          {order.orderNumber}
+                        </span>
+                        <span className="text-[0.8rem] text-text-secondary">{formatPersianDate(order.createdAt)}</span>
+                      </div>
                     </div>
                     <OrderStatusBadge status={order.status} />
                     <span className="text-[0.92rem] font-semibold">{formatToman(order.totalToman)}</span>

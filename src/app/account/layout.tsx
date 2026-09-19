@@ -54,7 +54,7 @@ export default async function AccountLayout({ children }: { children: ReactNode 
                   type="submit"
                   className="flex w-full items-center gap-3 whitespace-nowrap rounded-xl px-3.5 py-2.5 text-start text-[0.92rem] text-red-600 transition-colors duration-200 hover:bg-red-50"
                 >
-                  <DashboardLogoutIcon className="h-[22px] w-[22px] shrink-0 text-ink" aria-hidden="true" />
+                  <DashboardLogoutIcon className="h-[22px] w-[22px] shrink-0 text-red-600" aria-hidden="true" />
                   خروج از حساب کاربری
                 </button>
               </form>

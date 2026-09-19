@@ -9,7 +9,7 @@ export function AddAddressPanel() {
 
   if (!open) {
     return (
-      <Button type="button" variant="ghost" onClick={() => setOpen(true)} className="border border-line">
+      <Button type="button" variant="brand" onClick={() => setOpen(true)} className="self-start">
         + افزودن آدرس جدید
       </Button>
     );
@@ -17,14 +17,7 @@ export function AddAddressPanel() {
 
   return (
     <div className="rounded-[var(--radius-lg)] border border-line bg-white p-5">
-      <AddressForm onDone={() => setOpen(false)} />
-      <button
-        type="button"
-        onClick={() => setOpen(false)}
-        className="mt-3 text-[0.82rem] text-text-secondary underline underline-offset-2"
-      >
-        انصراف
-      </button>
+      <AddressForm onDone={() => setOpen(false)} onCancel={() => setOpen(false)} />
     </div>
   );
 }

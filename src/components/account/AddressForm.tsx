@@ -5,11 +5,21 @@ import type { Address } from "@/lib/db/schema";
 import { createAddressAction, updateAddressAction } from "@/domains/addresses/actions";
 import type { ActionResult } from "@/domains/auth/actions";
 import { FormField } from "@/components/ui/FormField";
+import { Button } from "@/components/ui/Button";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 
 const initialState: ActionResult = undefined;
 
-export function AddressForm({ address, onDone }: { address?: Address; onDone?: () => void }) {
+export function AddressForm({
+  address,
+  onDone,
+  onCancel,
+}: {
+  address?: Address;
+  onDone?: () => void;
+  /** When given, a secondary «انصراف» button is shown beside the submit button. */
+  onCancel?: () => void;
+}) {
   const action = address ? updateAddressAction.bind(null, address.id) : createAddressAction;
   const [state, formAction] = useActionState(action, initialState);
 
@@ -100,7 +110,21 @@ export function AddressForm({ address, onDone }: { address?: Address; onDone?: (
         آدرس پیش‌فرض من
       </label>
 
-      <SubmitButton pendingLabel="در حال ذخیره...">{address ? "ذخیره تغییرات" : "افزودن آدرس"}</SubmitButton>
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <div className="sm:flex-1">
+          <SubmitButton variant="brand" pendingLabel="در حال ذخیره...">{address ? "ذخیره تغییرات" : "افزودن آدرس"}</SubmitButton>
+        </div>
+        {onCancel ? (
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={onCancel}
+            className="justify-center border border-line hover:bg-ink/5 sm:w-36"
+          >
+            انصراف
+          </Button>
+        ) : null}
+      </div>
     </form>
   );
 }

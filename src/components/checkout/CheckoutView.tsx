@@ -196,16 +196,10 @@ export function CheckoutView({
 
           {showAddAddress ? (
             <div className="rounded-[var(--radius-lg)] border border-line bg-white p-5">
-              <AddressForm onDone={handleAddressAdded} />
-              {addresses.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setShowAddAddress(false)}
-                  className="mt-3 text-[0.82rem] text-text-secondary underline underline-offset-2"
-                >
-                  انصراف
-                </button>
-              )}
+              <AddressForm
+                onDone={handleAddressAdded}
+                onCancel={addresses.length > 0 ? () => setShowAddAddress(false) : undefined}
+              />
             </div>
           ) : (
             <button

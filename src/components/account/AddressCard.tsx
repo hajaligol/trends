@@ -14,14 +14,7 @@ export function AddressCard({ address }: { address: Address }) {
   if (editing) {
     return (
       <div className="rounded-[var(--radius-lg)] border border-line bg-white p-5 shadow-[0_14px_34px_-24px_rgba(24,38,48,0.3)]">
-        <AddressForm address={address} onDone={() => setEditing(false)} />
-        <button
-          type="button"
-          onClick={() => setEditing(false)}
-          className="mt-3 text-[0.82rem] text-text-secondary underline underline-offset-2"
-        >
-          انصراف
-        </button>
+        <AddressForm address={address} onDone={() => setEditing(false)} onCancel={() => setEditing(false)} />
       </div>
     );
   }

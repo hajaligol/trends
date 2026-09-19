@@ -1,4 +1,4 @@
-import { and, count, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import { db, type DbTransaction } from "@/lib/db/client";
 import {
   cartItems,
@@ -308,6 +308,46 @@ export async function getOrderForUser(orderNumber: string, userId: string): Prom
 
 export async function listOrdersForUser(userId: string): Promise<Order[]> {
   return db.select().from(orders).where(eq(orders.userId, userId)).orderBy(desc(orders.createdAt));
+}
+
+/** The few fields an order summary needs to show what was ordered. Read
+ * from the `order_items` snapshot columns (frozen at purchase time), so it
+ * stays correct even if the product is later renamed or deleted. */
+export type OrderItemPreview = Pick<OrderItem, "id" | "productTitle" | "productSlug" | "imageUrl" | "quantity">;
+
+/**
+ * Item previews (thumbnail + title) for a set of orders, grouped by order
+ * id, in the order the items were added — one batched query instead of one
+ * per order. **Ownership:** this takes order ids, not a user id, so callers
+ * must pass only ids that came from a user-scoped read such as
+ * `listOrdersForUser(userId)`; it never accepts ids from request input.
+ */
+export async function getOrderItemPreviews(orderIds: string[]): Promise<Map<string, OrderItemPreview[]>> {
+  const byOrder = new Map<string, OrderItemPreview[]>();
+  if (orderIds.length === 0) return byOrder;
+
+  const rows = await db
+    .select({
+      id: orderItems.id,
+      orderId: orderItems.orderId,
+      productTitle: orderItems.productTitle,
+      productSlug: orderItems.productSlug,
+      imageUrl: orderItems.imageUrl,
+      quantity: orderItems.quantity,
+    })
+    .from(orderItems)
+    .where(inArray(orderItems.orderId, orderIds))
+    .orderBy(asc(orderItems.createdAt), asc(orderItems.id));
+
+  for (const { orderId, ...preview } of rows) {
+    const bucket = byOrder.get(orderId);
+    if (bucket) {
+      bucket.push(preview);
+    } else {
+      byOrder.set(orderId, [preview]);
+    }
+  }
+  return byOrder;
 }
 
 /** Ownership-scoped, same shape as everything else in this file — a
