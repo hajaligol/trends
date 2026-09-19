@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import { getCurrentUser } from "@/domains/auth/actions";
 import { getWishlistProductsForUser } from "@/domains/wishlist/queries";
 import { ProductGrid } from "@/components/catalog/ProductGrid";
+import { AccountPageHeader } from "@/components/account/AccountPageHeader";
+import { DashboardWishlistIcon } from "@/components/ui/dashboard-icons";
+import { toPersianDigits } from "@/lib/utils/persian-digits";
 
 export const metadata: Metadata = {
   title: "علاقه‌مندی‌های من",
@@ -24,7 +27,15 @@ export default async function WishlistPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="m-0 text-[1.4rem] font-bold">علاقه‌مندی‌های من</h1>
+      <AccountPageHeader
+        icon={<DashboardWishlistIcon className="h-6 w-6" />}
+        title="علاقه‌مندی‌های من"
+        description={
+          products.length > 0
+            ? `${toPersianDigits(products.length)} محصول ذخیره‌شده`
+            : "محصولات مورد علاقه‌تان را اینجا نگه دارید"
+        }
+      />
       <ProductGrid products={products} emptyMessage="هنوز محصولی به علاقه‌مندی‌ها اضافه نکرده‌اید." />
     </div>
   );
