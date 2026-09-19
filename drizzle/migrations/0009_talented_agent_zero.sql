@@ -1,0 +1,2 @@
+CREATE INDEX "categories_parent_id_idx" ON "categories" USING btree ("parent_id");--> statement-breakpoint
+ALTER TABLE "categories" ADD CONSTRAINT "categories_no_self_parent_check" CHECK ("categories"."parent_id" IS NULL OR "categories"."parent_id" <> "categories"."id");

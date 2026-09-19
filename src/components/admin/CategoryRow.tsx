@@ -5,14 +5,14 @@ import { useState } from "react";
 import { CategoryForm } from "@/components/admin/CategoryForm";
 import { ConfirmButton } from "@/components/admin/ConfirmButton";
 import { deleteCategoryAction } from "@/domains/categories/actions";
-import type { AdminCategoryRow as AdminCategoryRowType } from "@/domains/categories/queries";
+import type { AdminCategoryRow as AdminCategoryRowType, CategoryOption } from "@/domains/categories/queries";
 
 export function CategoryRow({
   category,
   parentOptions,
 }: {
   category: AdminCategoryRowType;
-  parentOptions: { id: string; name: string }[];
+  parentOptions: CategoryOption[];
 }) {
   const [isEditing, setIsEditing] = useState(false);
 
@@ -36,7 +36,8 @@ export function CategoryRow({
   return (
     <tr className="border-b border-line last:border-0">
       <td className="px-4 py-2.5">
-        <div className="flex items-center gap-2.5">
+        {/* Indented by tree depth so the table reads as an outline. */}
+        <div className="flex items-center gap-2.5" style={{ marginInlineStart: `${(category.depth - 1) * 22}px` }}>
           {category.imageUrl ? (
             <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-full bg-card-image">
               <Image src={category.imageUrl} alt="" fill sizes="36px" className="object-cover" />
@@ -44,14 +45,21 @@ export function CategoryRow({
           ) : (
             <div className="h-9 w-9 shrink-0 rounded-full border border-dashed border-line bg-header" aria-hidden="true" />
           )}
-          {category.name}
+          <span className={category.depth === 1 ? "font-bold" : category.depth === 2 ? "font-semibold" : undefined}>
+            {category.name}
+          </span>
         </div>
       </td>
       <td className="px-4 py-2.5 text-text-secondary" dir="ltr">
         {category.slug}
       </td>
       <td className="px-4 py-2.5 text-text-secondary">{category.parentName ?? "—"}</td>
-      <td className="px-4 py-2.5">{category.productCount}</td>
+      <td
+        className="px-4 py-2.5"
+        title={`${category.productCount} محصول مستقیماً در همین دسته`}
+      >
+        {category.subtreeProductCount}
+      </td>
       <td className="px-4 py-2.5">
         <span
           className={`rounded-full px-3 py-1 text-[0.75rem] ${

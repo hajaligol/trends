@@ -9,6 +9,7 @@ import { productImageSchema, productSchema, productVariantSchema } from "@/lib/v
 import { isStaffOrAdmin, UNAUTHORIZED_ERROR, type ActionResult } from "@/domains/auth/roles";
 import { recordAuditLog } from "@/domains/analytics/audit";
 import { isProductSlugTaken, isVariantSkuTaken } from "@/domains/catalog/admin-queries";
+import { getProductCategoryError } from "@/domains/categories/queries";
 
 /**
  * Admin products/variants/images CRUD. Price/stock/discount fields go
@@ -45,6 +46,10 @@ export async function createProductAction(_prev: ActionResult<{ id: string }>, f
     return { ok: false, error: "این نامک قبلاً استفاده شده است" };
   }
 
+  // Products live on the type level of the category tree only.
+  const categoryError = await getProductCategoryError(parsed.data.categoryId);
+  if (categoryError) return { ok: false, error: categoryError };
+
   const [created] = await db.insert(products).values(parsed.data).returning({ id: products.id });
   if (!created) return { ok: false, error: "خطا در ایجاد محصول" };
 
@@ -70,6 +75,9 @@ export async function updateProductAction(_prev: ActionResult, formData: FormDat
   if (await isProductSlugTaken(parsed.data.slug, id)) {
     return { ok: false, error: "این نامک قبلاً استفاده شده است" };
   }
+
+  const categoryError = await getProductCategoryError(parsed.data.categoryId);
+  if (categoryError) return { ok: false, error: categoryError };
 
   await db
     .update(products)

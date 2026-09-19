@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getProductForAdmin } from "@/domains/catalog/admin-queries";
-import { listCategoryOptions } from "@/domains/categories/queries";
+import { listLeafCategoryOptions } from "@/domains/categories/queries";
 import { ProductForm } from "@/components/admin/ProductForm";
 import { ProductVariantsAndImages } from "@/components/admin/ProductVariantsAndImages";
 import { DeleteProductButton } from "@/components/admin/DeleteProductButton";
@@ -10,7 +10,7 @@ export const metadata = { title: "ویرایش محصول", robots: { index: fal
 
 export default async function EditProductPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [product, categoryOptions] = await Promise.all([getProductForAdmin(id), listCategoryOptions()]);
+  const [product, categoryOptions] = await Promise.all([getProductForAdmin(id), listLeafCategoryOptions()]);
   if (!product) notFound();
 
   return (

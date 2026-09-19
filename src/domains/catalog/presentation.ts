@@ -85,10 +85,18 @@ export function buildSearchHref(state: SearchQueryState): string {
 const SWATCH_BY_SLUG: Record<string, CategorySwatch> = {
   men: "sage",
   women: "blush",
-  shoes: "blue",
-  accessories: "yellow",
-  hats: "lavender",
-  sunglasses: "aqua",
+  kids: "yellow",
+};
+
+/** Tailwind background class per swatch (literal strings, so Tailwind's
+ * source scan picks them up). Mirrors the prototype's pastel circles. */
+export const SWATCH_BG_CLASS: Record<CategorySwatch, string> = {
+  sage: "bg-sage",
+  blush: "bg-blush",
+  blue: "bg-blue",
+  yellow: "bg-yellow",
+  lavender: "bg-lavender",
+  aqua: "bg-aqua",
 };
 
 const SWATCH_FALLBACK_ORDER: CategorySwatch[] = [
@@ -101,10 +109,11 @@ const SWATCH_FALLBACK_ORDER: CategorySwatch[] = [
 ];
 
 /**
- * Looks up the swatch for a known category slug, falling back to a
- * deterministic cycle through the palette (keyed by `fallbackIndex`, e.g.
- * the category's position in a list) for any category slug added later
- * that isn't in `SWATCH_BY_SLUG` yet.
+ * Looks up the swatch for a known top-level category slug, falling back
+ * to a deterministic cycle through the palette (keyed by `fallbackIndex`,
+ * e.g. the category's position in a list) for everything else — which
+ * is how the four groups under an audience (لباس/کفش/کیف/اکسسوری) get
+ * four different pastels on the category page tiles.
  */
 export function swatchForCategorySlug(slug: string, fallbackIndex = 0): CategorySwatch {
   const known = SWATCH_BY_SLUG[slug];

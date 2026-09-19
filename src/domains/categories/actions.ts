@@ -8,7 +8,12 @@ import { categories } from "@/lib/db/schema";
 import { categorySchema } from "@/lib/validation/admin";
 import { isStaffOrAdmin, UNAUTHORIZED_ERROR, type ActionResult } from "@/domains/auth/roles";
 import { recordAuditLog } from "@/domains/analytics/audit";
-import { categoryHasChildrenOrProducts, isCategorySlugTaken } from "@/domains/categories/queries";
+import {
+  categoryHasChildrenOrProducts,
+  isCategorySlugTaken,
+  loadCategoryRowsForValidation,
+} from "@/domains/categories/queries";
+import { PARENT_VALIDATION_MESSAGES, validateCategoryParent } from "@/domains/categories/tree";
 
 /**
  * Admin category CRUD. Every action re-checks `session.user.role`
@@ -16,6 +21,17 @@ import { categoryHasChildrenOrProducts, isCategorySlugTaken } from "@/domains/ca
  * standing between a request and this mutation) — the same defense-in-
  * depth stance `orders/admin-actions.ts` already established.
  */
+
+/**
+ * The category tree feeds the header/footer menu in the **root layout**, so
+ * a category change has to refresh every page that layout wraps, not just
+ * the homepage (`revalidatePath("/")` alone would leave the menu on other
+ * statically rendered pages stale until the next deploy).
+ */
+function revalidateCategoryTree() {
+  revalidatePath("/admin/categories");
+  revalidatePath("/", "layout");
+}
 
 function fieldErrors(error: { flatten: () => { fieldErrors: Record<string, string[] | undefined> } }) {
   const flat = error.flatten();
@@ -34,11 +50,13 @@ export async function createCategoryAction(_prev: ActionResult, formData: FormDa
     return { ok: false, error: "این نامک قبلاً استفاده شده است" };
   }
 
+  const parentError = validateCategoryParent(await loadCategoryRowsForValidation(), null, parsed.data.parentId);
+  if (parentError) return { ok: false, error: PARENT_VALIDATION_MESSAGES[parentError] };
+
   const [created] = await db.insert(categories).values(parsed.data).returning({ id: categories.id });
   await recordAuditLog(session.user, "category.create", "category", created?.id ?? null, parsed.data);
 
-  revalidatePath("/admin/categories");
-  revalidatePath("/");
+  revalidateCategoryTree();
   return { ok: true };
 }
 
@@ -52,12 +70,14 @@ export async function updateCategoryAction(_prev: ActionResult, formData: FormDa
   const parsed = categorySchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { ok: false, error: fieldErrors(parsed.error) };
 
-  if (parsed.data.parentId === id) {
-    return { ok: false, error: "یک دسته نمی‌تواند والد خودش باشد" };
-  }
   if (await isCategorySlugTaken(parsed.data.slug, id)) {
     return { ok: false, error: "این نامک قبلاً استفاده شده است" };
   }
+
+  // Rejects self-parenting, moving a category under its own descendant
+  // (which would create a cycle) and anything deeper than three levels.
+  const parentError = validateCategoryParent(await loadCategoryRowsForValidation(), id, parsed.data.parentId);
+  if (parentError) return { ok: false, error: PARENT_VALIDATION_MESSAGES[parentError] };
 
   await db
     .update(categories)
@@ -66,8 +86,7 @@ export async function updateCategoryAction(_prev: ActionResult, formData: FormDa
 
   await recordAuditLog(session.user, "category.update", "category", id, parsed.data);
 
-  revalidatePath("/admin/categories");
-  revalidatePath("/");
+  revalidateCategoryTree();
   return { ok: true };
 }
 
@@ -85,7 +104,6 @@ export async function deleteCategoryAction(id: string): Promise<ActionResult> {
   await db.delete(categories).where(eq(categories.id, id));
   await recordAuditLog(session.user, "category.delete", "category", id);
 
-  revalidatePath("/admin/categories");
-  revalidatePath("/");
+  revalidateCategoryTree();
   return { ok: true };
 }

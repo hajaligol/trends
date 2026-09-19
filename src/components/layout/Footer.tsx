@@ -1,6 +1,8 @@
 import Link from "next/link";
+import Image from "next/image";
 import { Container } from "@/components/ui/Container";
 import { NewsletterForm } from "@/components/layout/NewsletterForm";
+import type { NavCategory } from "@/domains/categories/tree";
 
 // Mirrors reference/prototype.html <footer class="site-footer">.
 // Phase 12 wired the newsletter form to a real Server Action
@@ -14,7 +16,7 @@ const socialIcons = [
   { label: "ایکس", src: "/assets/icons/x.svg" },
 ];
 
-export function Footer() {
+export function Footer({ categories }: { categories: NavCategory[] }) {
   return (
     <footer id="site-footer" className="border-t border-line bg-white pb-6 pt-[clamp(30px,4vw,46px)]">
       <Container>
@@ -36,15 +38,38 @@ export function Footer() {
                 aria-label={label}
                 className="flex h-[34px] w-[34px] items-center justify-center rounded-full bg-ink/6"
               >
-                <img
-                  src={src}
-                  alt=""
-                  className="h-[18px] w-[18px] object-contain"
-                />
+                <Image src={src} alt="" width={18} height={18} className="h-[18px] w-[18px] object-contain" />
               </span>
             ))}
           </div>
         </div>
+
+        {categories.length > 0 && (
+          // Audience > group links: real, always-in-the-HTML crawl paths
+          // into the category tree (the header menu only renders its
+          // panels on demand).
+          <nav
+            aria-label="دسته‌بندی‌ها"
+            className="mb-6 grid gap-x-8 gap-y-6 border-b border-line pb-[clamp(26px,4vw,38px)] sm:grid-cols-3"
+          >
+            {categories.map((root) => (
+              <div key={root.slug}>
+                <h3 className="m-0 mb-2.5 text-[0.95rem] font-bold">
+                  <Link href={`/category/${root.slug}`}>{root.name}</Link>
+                </h3>
+                <ul className="m-0 flex list-none flex-col gap-1.5 p-0 text-[0.85rem] text-text-secondary">
+                  {root.children.map((group) => (
+                    <li key={group.slug}>
+                      <Link href={`/category/${group.slug}`} className="hover:text-ink">
+                        {group.name}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </nav>
+        )}
 
         <div className="flex flex-wrap items-center justify-between gap-4">
           <span className="text-[1.2rem] font-bold">ترندز</span>

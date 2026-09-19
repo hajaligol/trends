@@ -9,6 +9,8 @@ import { SITE_NAME, SITE_URL } from "@/lib/site-config";
 import { AuthSessionProvider } from "@/components/auth/AuthSessionProvider";
 import { CartProvider } from "@/components/cart/CartProvider";
 import { WishlistProvider } from "@/components/wishlist/WishlistProvider";
+import { getCategoryTree } from "@/domains/catalog/queries";
+import { toNavTree } from "@/domains/categories/tree";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -24,11 +26,17 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // The header/footer menus render the live category tree. A failed read
+  // is deliberately not swallowed: rendering (or, worse, statically
+  // baking in) a site with an empty menu would be a quieter and much
+  // harder-to-notice failure than an error.
+  const navCategories = toNavTree(await getCategoryTree());
+
   return (
     <html lang="fa" dir="rtl">
       <body>
@@ -36,9 +44,9 @@ export default function RootLayout({
           <CartProvider>
             <WishlistProvider>
               <UIOverlayProvider>
-                <Header />
+                <Header categories={navCategories} />
                 {children}
-                <Footer />
+                <Footer categories={navCategories} />
                 <SearchOverlay />
                 <CartDrawer />
               </UIOverlayProvider>

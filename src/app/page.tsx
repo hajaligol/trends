@@ -7,7 +7,7 @@ import { NewArrivals } from "@/components/home/NewArrivals";
 import { BenefitsStrip } from "@/components/home/BenefitsStrip";
 import { Container } from "@/components/ui/Container";
 import { demoBenefits } from "@/domains/catalog/demo-data";
-import { getActiveCategories, getFeaturedProducts, getNewArrivals } from "@/domains/catalog/queries";
+import { getRootCategories, getFeaturedProducts, getNewArrivals } from "@/domains/catalog/queries";
 import { getActiveHeroSlides, getActivePromoBanners } from "@/domains/content/queries";
 
 export const metadata: Metadata = {
@@ -29,7 +29,7 @@ export const metadata: Metadata = {
  */
 export default async function HomePage() {
   const [categories, featuredProducts, newArrivals, heroSlides, promoBanners] = await Promise.all([
-    getActiveCategories(),
+    getRootCategories(),
     getFeaturedProducts(),
     getNewArrivals(),
     getActiveHeroSlides(),

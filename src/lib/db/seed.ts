@@ -1,8 +1,8 @@
 /**
- * Seeds the catalog tables (categories/products/product_variants) from the
- * Phase 2 demo-data fixtures in `src/domains/catalog/demo-data.ts`, so the
- * database has the same content the homepage already renders from those
- * fixtures. Run with `npm run db:seed`.
+ * Seeds the catalog tables: the full category taxonomy from
+ * `src/domains/categories/taxonomy.ts`, plus products/product_variants
+ * from the Phase 2 demo-data fixtures in `src/domains/catalog/demo-data.ts`
+ * (so the homepage renders the same content it always did). Run with `npm run db:seed`.
  *
  * This script is intentionally idempotent-by-truncation: it wipes the
  * catalog tables (in FK-safe order) and re-inserts, rather than trying to
@@ -22,9 +22,10 @@
  */
 import { db } from "./client";
 import { categories, heroSlides, productImages, products, productVariants, promoBanners } from "./schema";
+import { syncCategoryTaxonomy } from "@/domains/categories/sync";
+import { CATEGORY_TAXONOMY, DEMO_PRODUCT_CATEGORY_SLUG } from "@/domains/categories/taxonomy";
 import {
   demoBanners,
-  demoCategories,
   demoFeaturedProducts,
   demoHeroSlides,
   demoNewArrivals,
@@ -49,40 +50,16 @@ function parseTomanPrice(display: string): number {
 
 /**
  * The demo fixtures don't carry a category per product (they were written
- * for a flat homepage grid, not a browsable catalog), so this is a Phase 3
- * assumption: each demo product is assigned to the single most plausible
- * category by name, documented here and in PROGRESS.md rather than left
- * implicit. Real category assignment is an admin/catalog-management
- * concern from Phase 11 onward.
+ * for a flat homepage grid, not a browsable catalog), so each demo product
+ * is filed under one leaf ("type") category of the three-level taxonomy —
+ * see `DEMO_PRODUCT_CATEGORY_SLUG` in `src/domains/categories/taxonomy.ts`.
+ * Real category assignment is an admin/catalog-management concern.
  */
-const PRODUCT_CATEGORY_SLUG: Record<string, string> = {
-  "classic-shirt": "men",
-  "womens-knit": "women",
-  "minimal-sneaker": "shoes",
-  "daily-hoodie": "men",
-  "trench-coat": "women",
-  backpack: "accessories",
-  "classic-cap": "hats",
-  "fabric-pants": "men",
-  hoodie: "men",
-  "denim-jacket": "men",
-  "plain-tshirt": "men",
-};
-
 async function seedCategories() {
-  const rows = await db
-    .insert(categories)
-    .values(
-      demoCategories.map((category, index) => ({
-        slug: category.id,
-        name: category.label,
-        displayOrder: index,
-      })),
-    )
-    .returning();
-
-  const bySlug = new Map(rows.map((row) => [row.slug, row]));
-  return bySlug;
+  // Starts from an empty `categories` table (see `main()`), so the sync
+  // simply creates the whole tree: 3 audiences > 12 groups > all types.
+  const result = await syncCategoryTaxonomy(db);
+  return result.idBySlug;
 }
 
 /**
@@ -108,7 +85,7 @@ function variantsFor(
   return [{ size: "M", color: "پیش‌فرض", colorHex: null }];
 }
 
-async function seedProducts(categoriesBySlug: Map<string, { id: string }>) {
+async function seedProducts(categoriesBySlug: Map<string, string>) {
   const allDemoProducts: Array<{
     id: string;
     name: string;
@@ -132,11 +109,11 @@ async function seedProducts(categoriesBySlug: Map<string, { id: string }>) {
   ];
 
   for (const demoProduct of allDemoProducts) {
-    const categorySlug = PRODUCT_CATEGORY_SLUG[demoProduct.id];
-    const category = categorySlug ? categoriesBySlug.get(categorySlug) : undefined;
-    if (!category) {
+    const categorySlug = DEMO_PRODUCT_CATEGORY_SLUG[demoProduct.id];
+    const categoryId = categorySlug ? categoriesBySlug.get(categorySlug) : undefined;
+    if (!categoryId) {
       throw new Error(
-        `No category mapping for demo product "${demoProduct.id}" — update PRODUCT_CATEGORY_SLUG in seed.ts.`,
+        `No category mapping for demo product "${demoProduct.id}" — update DEMO_PRODUCT_CATEGORY_SLUG in taxonomy.ts.`,
       );
     }
 
@@ -147,7 +124,7 @@ async function seedProducts(categoriesBySlug: Map<string, { id: string }>) {
       .values({
         slug: demoProduct.id,
         title: demoProduct.name,
-        categoryId: category.id,
+        categoryId,
         isFeatured: demoProduct.isFeatured,
         isNewArrival: demoProduct.isNewArrival,
       })
@@ -207,7 +184,12 @@ async function main() {
   await db.delete(categories);
 
   const categoriesBySlug = await seedCategories();
-  console.log(`  Inserted ${categoriesBySlug.size} categories.`);
+  const groupCount = CATEGORY_TAXONOMY.filter((node) => node.depth === 2).length;
+  console.log(
+    `  Inserted ${categoriesBySlug.size} categories (3 audiences, ${groupCount} groups, ${
+      categoriesBySlug.size - 3 - groupCount
+    } types).`,
+  );
 
   await seedProducts(categoriesBySlug);
   console.log(`  Inserted ${demoFeaturedProducts.length + demoNewArrivals.length} products.`);

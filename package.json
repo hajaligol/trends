@@ -12,6 +12,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
     "db:seed": "tsx --env-file=.env.local src/lib/db/seed.ts",
+    "db:sync-categories": "tsx --env-file=.env.local src/lib/db/sync-categories.ts",
     "test": "vitest run tests/unit",
     "test:watch": "vitest tests/unit",
     "test:integration": "node --env-file=.env.local node_modules/.bin/vitest run tests/integration",

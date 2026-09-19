@@ -1,7 +1,17 @@
-import { and, asc, desc, eq, ilike, inArray, ne, or, type SQL } from "drizzle-orm";
+import { cache } from "react";
+import { and, asc, desc, eq, ilike, inArray, ne, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { categories, productImages, products, productVariants } from "@/lib/db/schema";
 import { discountPercent } from "@/lib/utils/money";
+import {
+  buildCategoryTree,
+  collectSubtreeIds,
+  findCategoryPath,
+  flattenCategoryTree,
+  getCategoryTrail,
+  type CategoryNode,
+  type CategoryRow,
+} from "@/domains/categories/tree";
 import type { ProductSort } from "./presentation";
 
 /**
@@ -19,32 +29,84 @@ export type CatalogCategory = {
   imageUrl: string | null;
 };
 
-export async function getActiveCategories(): Promise<CatalogCategory[]> {
-  const rows = await db
-    .select({ id: categories.id, slug: categories.slug, name: categories.name, imageUrl: categories.imageUrl })
-    .from(categories)
-    .where(eq(categories.isActive, true))
-    .orderBy(asc(categories.displayOrder));
-  return rows;
+/** Minimal link-shaped category reference (breadcrumbs, menus). */
+export type CategoryLink = { slug: string; name: string };
+
+function toCatalogCategory(node: CategoryNode): CatalogCategory {
+  return { id: node.id, slug: node.slug, name: node.name, imageUrl: node.imageUrl };
 }
 
-export type CatalogCategoryDetail = CatalogCategory & {
-  description: string | null;
-};
-
-export async function getCategoryBySlug(slug: string): Promise<CatalogCategoryDetail | null> {
-  const [row] = await db
+/**
+ * Every category row, active or not, in a single query. `cache()`d so the
+ * root layout (header/footer menu), the page body and `generateMetadata`
+ * of one request share one round trip. The table is tiny (a couple of
+ * hundred rows for the full three-level taxonomy) — see `tree.ts`.
+ */
+const loadAllCategoryRows = cache(async (): Promise<CategoryRow[]> => {
+  return db
     .select({
       id: categories.id,
       slug: categories.slug,
       name: categories.name,
-      imageUrl: categories.imageUrl,
       description: categories.description,
+      imageUrl: categories.imageUrl,
+      parentId: categories.parentId,
+      displayOrder: categories.displayOrder,
+      isActive: categories.isActive,
     })
-    .from(categories)
-    .where(and(eq(categories.slug, slug), eq(categories.isActive, true)))
-    .limit(1);
-  return row ?? null;
+    .from(categories);
+});
+
+/**
+ * The storefront category tree: audience > group > type, active only. An
+ * inactive category hides its whole branch (see `buildCategoryTree`). The
+ * header/footer menus, the homepage circles, category pages and the
+ * sitemap all read from this one function.
+ */
+export const getCategoryTree = cache(async (): Promise<CategoryNode[]> => {
+  return buildCategoryTree(await loadAllCategoryRows(), { activeOnly: true });
+});
+
+/** The top-level audiences (مردانه/زنانه/بچگانه), for the homepage circles. */
+export async function getRootCategories(): Promise<CatalogCategory[]> {
+  return (await getCategoryTree()).map(toCatalogCategory);
+}
+
+export type CatalogCategoryDetail = CatalogCategory & {
+  description: string | null;
+  /** 1 = audience, 2 = group, 3 = type. */
+  depth: number;
+  /** Ancestors, root first, **excluding** this category. */
+  trail: CategoryLink[];
+  /** Direct active sub-categories (empty for a type category). */
+  children: CatalogCategory[];
+  /** This category's siblings **including itself**; empty for a root. Lets
+   * a type page offer "other types in this group" navigation. */
+  siblings: CatalogCategory[];
+};
+
+/** Resolves a slug against the active tree: the category itself, its
+ * ancestor path and the ids of everything beneath it. */
+async function resolveActiveCategory(slug: string) {
+  const tree = await getCategoryTree();
+  const path = findCategoryPath(tree, slug);
+  if (!path) return null;
+  const node = path[path.length - 1]!;
+  const parent = path.length > 1 ? path[path.length - 2]! : null;
+
+  const detail: CatalogCategoryDetail = {
+    ...toCatalogCategory(node),
+    description: node.description,
+    depth: node.depth,
+    trail: path.slice(0, -1).map((ancestor) => ({ slug: ancestor.slug, name: ancestor.name })),
+    children: node.children.map(toCatalogCategory),
+    siblings: parent ? parent.children.map(toCatalogCategory) : [],
+  };
+  return { detail, subtreeIds: collectSubtreeIds(node), parent };
+}
+
+export async function getCategoryBySlug(slug: string): Promise<CatalogCategoryDetail | null> {
+  return (await resolveActiveCategory(slug))?.detail ?? null;
 }
 
 /** Simple on-hand-stock badge state. See `product-variants.ts`'s header
@@ -253,6 +315,11 @@ export type CatalogProductDetail = CatalogProductSummary & {
   brand: string | null;
   tags: string[];
   categoryName: string;
+  /** Full breadcrumb path of the product's category, root first and the
+   * product's own (type) category last — e.g. مردانه › لباس مردانه ›
+   * پیراهن مردانه. Built from *all* categories (not just active ones) so
+   * the breadcrumb stays complete even if a branch was later switched off. */
+  categoryTrail: CategoryLink[];
   seoTitle: string | null;
   seoDescription: string | null;
   /** Full active-variant list (not just the summary's derived fields) —
@@ -273,6 +340,7 @@ export async function getProductDetailBySlug(slug: string): Promise<CatalogProdu
       tags: products.tags,
       seoTitle: products.seoTitle,
       seoDescription: products.seoDescription,
+      categoryId: products.categoryId,
       categorySlug: categories.slug,
       categoryName: categories.name,
     })
@@ -282,6 +350,11 @@ export async function getProductDetailBySlug(slug: string): Promise<CatalogProdu
     .limit(1);
 
   if (!row) return null;
+
+  const categoryTrail = getCategoryTrail(await loadAllCategoryRows(), row.categoryId).map((category) => ({
+    slug: category.slug,
+    name: category.name,
+  }));
 
   const [variantRows, imageRows] = await Promise.all([
     db
@@ -308,17 +381,34 @@ export async function getProductDetailBySlug(slug: string): Promise<CatalogProdu
     seoTitle: row.seoTitle,
     seoDescription: row.seoDescription,
     categoryName: row.categoryName,
+    categoryTrail,
     variants,
   };
 }
 
-/** Other active products from the same category, for a product page's
- * "related products" rail. Small, fixed-size result — no pagination. */
+/**
+ * "You may also like" rail for a product page: other active products from
+ * the same type category first (newest first), topped up from the rest of
+ * its group (e.g. other men's clothing) so a sparsely-stocked type still
+ * gets a full rail. Small, fixed-size result — no pagination.
+ */
 export async function getRelatedProducts(
   categorySlug: string,
   excludeProductId: string,
   limit = 4,
 ): Promise<CatalogProductSummary[]> {
+  const allRows = await loadAllCategoryRows();
+  const own = allRows.find((row) => row.slug === categorySlug);
+  if (!own) return [];
+
+  // Widen to the parent group's subtree when there is one; a category
+  // with no parent (legacy root-level product) just uses its own subtree.
+  // Built from all rows, not the active-only tree: a product stays
+  // purchasable while its category's visibility is a separate concern.
+  const scopeId = own.parentId ?? own.id;
+  const scopeNode = flattenCategoryTree(buildCategoryTree(allRows)).find((node) => node.id === scopeId);
+  const scopeIds = scopeNode ? collectSubtreeIds(scopeNode) : [own.id];
+
   const rows = await db
     .select({
       id: products.id,
@@ -329,9 +419,10 @@ export async function getRelatedProducts(
     .from(products)
     .innerJoin(categories, eq(categories.id, products.categoryId))
     .where(
-      and(eq(categories.slug, categorySlug), eq(products.isActive, true), ne(products.id, excludeProductId)),
+      and(inArray(products.categoryId, scopeIds), eq(products.isActive, true), ne(products.id, excludeProductId)),
     )
-    .orderBy(desc(products.createdAt))
+    // Same-category matches sort ahead of the rest of the group.
+    .orderBy(desc(sql`(${products.categoryId} = ${own.id})`), desc(products.createdAt))
     .limit(limit);
 
   if (rows.length === 0) return [];
@@ -412,6 +503,9 @@ export async function searchProducts(params: {
           ilike(products.title, pattern),
           ilike(products.shortDescription, pattern),
           ilike(products.brand, pattern),
+          // Category name too, so "کفش" or "هودی زنانه" finds products
+          // whose own title doesn't repeat the word.
+          ilike(categories.name, pattern),
         ),
       ),
     );
@@ -472,11 +566,15 @@ export async function getSitemapEntries(): Promise<{
   categories: Array<{ slug: string; updatedAt: Date }>;
   products: Array<{ slug: string; updatedAt: Date }>;
 }> {
+  // Only categories actually reachable in the storefront tree: a child
+  // of a switched-off category 404s, so it must not be in the sitemap.
+  const visibleSlugs = new Set(flattenCategoryTree(await getCategoryTree()).map((node) => node.slug));
   const [categoryRows, productRows] = await Promise.all([
     db
       .select({ slug: categories.slug, updatedAt: categories.updatedAt })
       .from(categories)
-      .where(eq(categories.isActive, true)),
+      .where(eq(categories.isActive, true))
+      .then((rows) => rows.filter((row) => visibleSlugs.has(row.slug))),
     db
       .select({ slug: products.slug, updatedAt: products.updatedAt })
       .from(products)
@@ -522,8 +620,9 @@ export async function getProductsByCategorySlug(params: {
   size?: string;
   color?: string;
 }): Promise<CategoryProductsResult | null> {
-  const category = await getCategoryBySlug(params.slug);
-  if (!category) return null;
+  const resolved = await resolveActiveCategory(params.slug);
+  if (!resolved) return null;
+  const { detail: category, subtreeIds } = resolved;
 
   const sort = params.sort ?? "newest";
 
@@ -537,7 +636,9 @@ export async function getProductsByCategorySlug(params: {
     })
     .from(products)
     .innerJoin(categories, eq(categories.id, products.categoryId))
-    .where(and(eq(products.categoryId, category.id), eq(products.isActive, true)));
+    // Audience/group pages list everything beneath them, not just products
+    // filed directly on that category (products live on the type level).
+    .where(and(inArray(products.categoryId, subtreeIds), eq(products.isActive, true)));
 
   if (productRows.length === 0) {
     return {

@@ -10,7 +10,13 @@ export default async function AdminCategoriesPage() {
   return (
     <div className="flex flex-col gap-8">
       <section className="flex flex-col gap-4">
-        <h1 className="text-[1.15rem] font-bold text-ink">دسته‌بندی‌ها</h1>
+        <div>
+          <h1 className="text-[1.15rem] font-bold text-ink">دسته‌بندی‌ها</h1>
+          <p className="mt-1 max-w-prose text-[0.82rem] leading-6 text-text-secondary">
+            ساختار سه‌سطحی: مخاطب (مردانه/زنانه/بچگانه) › گروه (لباس، کفش، کیف، اکسسوری) › نوع (مثلاً پیراهن).
+            محصولات فقط در دسته‌های نوع (سطح سوم) ثبت می‌شوند و صفحه‌ی دسته‌های بالاتر، محصولات زیرمجموعه‌ی خود را نشان می‌دهد.
+          </p>
+        </div>
         <div className="overflow-x-auto rounded-[var(--radius-lg)] border border-line">
           <table className="w-full min-w-[720px] text-[0.85rem]">
             <thead>
@@ -18,7 +24,7 @@ export default async function AdminCategoriesPage() {
                 <th className="px-4 py-2.5 text-start font-medium">نام</th>
                 <th className="px-4 py-2.5 text-start font-medium">نامک</th>
                 <th className="px-4 py-2.5 text-start font-medium">والد</th>
-                <th className="px-4 py-2.5 text-start font-medium">تعداد محصول</th>
+                <th className="px-4 py-2.5 text-start font-medium">تعداد محصول (با زیردسته‌ها)</th>
                 <th className="px-4 py-2.5 text-start font-medium">وضعیت</th>
                 <th className="px-4 py-2.5 text-start font-medium">عملیات</th>
               </tr>

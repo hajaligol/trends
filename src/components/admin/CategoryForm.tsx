@@ -5,7 +5,8 @@ import { FormField } from "@/components/ui/FormField";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { ImagePicker } from "@/components/admin/ImagePicker";
 import { createCategoryAction, updateCategoryAction } from "@/domains/categories/actions";
-import type { AdminCategoryRow } from "@/domains/categories/queries";
+import type { AdminCategoryRow, CategoryOption } from "@/domains/categories/queries";
+import { collectDescendantIdsFromFlat, MAX_CATEGORY_DEPTH } from "@/domains/categories/tree";
 import type { ActionResult } from "@/domains/auth/roles";
 
 const initialState: ActionResult = { ok: true };
@@ -16,11 +17,21 @@ export function CategoryForm({
   onDone,
 }: {
   category?: AdminCategoryRow;
-  parentOptions: { id: string; name: string }[];
+  parentOptions: CategoryOption[];
   onDone?: () => void;
 }) {
   const action = category ? updateCategoryAction : createCategoryAction;
   const [state, formAction] = useActionState(action, initialState);
+
+  // Offer only parents that keep the tree valid: not the category itself
+  // or anything beneath it (that would be a cycle), and nothing already at
+  // the deepest level (it couldn't have children). The server re-checks
+  // all of this (`validateCategoryParent`) — this is just to not offer
+  // choices that are guaranteed to be rejected.
+  const unavailable = category ? collectDescendantIdsFromFlat(parentOptions, category.id) : new Set<string>();
+  const selectableParents = parentOptions.filter(
+    (option) => !unavailable.has(option.id) && option.depth < MAX_CATEGORY_DEPTH,
+  );
 
   return (
     <form
@@ -56,13 +67,11 @@ export function CategoryForm({
             className="w-full rounded-[var(--radius-md)] border border-line bg-white px-4 py-3 text-[0.92rem] text-ink outline-none focus:outline-2 focus:outline-ink"
           >
             <option value="">— بدون والد —</option>
-            {parentOptions
-              .filter((option) => option.id !== category?.id)
-              .map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.name}
-                </option>
-              ))}
+            {selectableParents.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.name}
+              </option>
+            ))}
           </select>
         </label>
         <FormField label="ترتیب نمایش" name="displayOrder" type="number" defaultValue={String(category?.displayOrder ?? 0)} />

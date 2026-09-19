@@ -1,10 +1,10 @@
-import { listCategoryOptions } from "@/domains/categories/queries";
+import { listLeafCategoryOptions } from "@/domains/categories/queries";
 import { ProductForm } from "@/components/admin/ProductForm";
 
 export const metadata = { title: "محصول جدید", robots: { index: false, follow: false } };
 
 export default async function NewProductPage() {
-  const categoryOptions = await listCategoryOptions();
+  const categoryOptions = await listLeafCategoryOptions();
 
   return (
     <div className="flex max-w-2xl flex-col gap-6">

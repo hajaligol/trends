@@ -2,17 +2,31 @@
 
 ## Current Status
 - Overall status: **All 15 phases complete** (unchanged from the Phase 14
-  write-up below). This session was a **user-reported defect fix, not a
-  numbered phase**: the admin panel had no way to browse/upload an image
-  file for hero slides, categories, promo banners, or products — every
-  one of those either had no image field at all or only accepted a
-  pasted URL. Fixed by adding a real (local-disk-backed) admin image
-  upload endpoint and a reusable browse-and-upload picker component,
-  wired into all four admin forms; `hero_slides`/`categories`/
-  `promo_banners` gained a nullable `imageUrl` column (migration `0008`)
-  and their storefront components now render the real image when one
-  exists, falling back to the pre-existing `AssetSlot` placeholder
-  otherwise. See "Defect fix — Admin image upload" under `## Completed`
+  write-up below). This session was a **user-requested change, not a
+  numbered phase**: the flat category list (مردان / زنان / کفش‌ها /
+  اکسسوری‌ها / کلاه / عینک آفتابی) was replaced by a **three-level
+  category tree** — three audiences (مردانه / زنانه / بچگانه), each with
+  four groups (لباس / کفش / کیف / اکسسوری + audience), each with its own
+  product types (پیراهن, تیشرت, کاپشن, پافر, ...; 176 types, 191
+  categories in total). Storefront navigation (header mega-menu, mobile
+  menu, footer, homepage circles, category pages, breadcrumbs), search,
+  sitemap and the admin category/product screens were all updated to
+  match. Migration `0009` adds a `parent_id` index and a no-self-parent
+  CHECK. See "Change request — Three-level category system" under
+  `## Completed`. `typecheck`/`lint`/`test` (95)/`test:integration` (41)/
+  `build` all pass; also exercised over real HTTP (storefront pages,
+  admin login → categories/products pages) against a real local
+  PostgreSQL. Shippability is otherwise unchanged from Phase 14's
+  assessment — see `docs/PRODUCTION_CHECKLIST.md`.
+- Current phase: none in progress.
+- Last completed phase: PHASE 14 — QA, accessibility, production
+  readiness. The category-system change and the earlier admin-image-upload
+  fix are documented separately under `## Completed`.
+- Next phase: none — see "Next Session Instructions" for the follow-up
+  backlog.
+- Date: 2026-09-19
+
+## Completed`
   for the full write-up. `typecheck`/`lint`/`test`/`test:integration`/
   `build` all pass clean; the fix was also exercised over real HTTP
   (login → upload → auth/path-traversal/spoofed-content/oversized-file
@@ -2527,6 +2541,108 @@ handoff note, not a prerequisite someone else needed to finish first.
   pipeline (esbuild, via Vite) that `tsx` (already a dependency, used for
   `db:seed`) also uses — one less distinct toolchain in the project.
 
+### Change request — Three-level category system (مردانه / زنانه / بچگانه)
+
+**Requested:** replace the whole category system with three main
+categories (مردانه، زنانه، بچگانه); each has four sub-categories (لباس،
+کفش، کیف، اکسسوری + audience); each of those has its own list of product
+types (e.g. men's clothing: shirt, t-shirt, jacket, pants, hoodie, puffer,
+...).
+
+**Model.** Same `categories` table (self-referencing `parent_id`), now
+used as a fixed-depth tree: audience (1) > group (2) > type (3). The
+canonical tree is **`src/domains/categories/taxonomy.ts`** (pure data, no
+imports): 3 audiences, 12 groups, 176 types = 191 categories. Adding a type
+= one `[key, label]` line there + `npm run db:sync-categories`.
+- Slugs stay single, globally unique URL segments so `/category/[slug]`
+  and the unique index are unchanged: `men`, `men-clothing`,
+  `men-clothing-shirts`. (`men`/`women` keep their old slugs; `kids` is new.)
+- Type names carry the audience word (`پیراهن مردانه`) because they are
+  shown out of context (page titles, search, admin picker, product
+  breadcrumbs). A few (`لباس نوزاد`, `کفش نوزاد`, `اکسسوری نوزاد`) skip it.
+- **Products attach to type (leaf) categories only** — enforced
+  server-side in `createProductAction`/`updateProductAction`
+  (`getProductCategoryError`). Audience/group pages list everything
+  beneath them (`inArray(products.categoryId, subtreeIds)`).
+- An inactive category hides its **whole branch** in the storefront
+  (`buildCategoryTree(..., { activeOnly: true })`).
+
+**New files:** `src/domains/categories/{taxonomy,tree,sync}.ts`,
+`src/lib/db/sync-categories.ts`, `src/components/layout/{CategoryMegaMenu,
+MobileCategoryMenu,nav-styles}`, `src/components/catalog/SubcategoryNav.tsx`,
+`tests/unit/{category-taxonomy,category-tree}.test.ts`,
+`tests/integration/category-tree.test.ts`,
+`drizzle/migrations/0009_talented_agent_zero.sql`.
+- `tree.ts` — pure helpers (build/flatten tree, trail, subtree ids,
+  `validateCategoryParent`, `toNavTree`), cycle-safe.
+- `sync.ts` — `syncCategoryTaxonomy` (idempotent upsert by slug, one
+  transaction; sets name/parent/order/description, **never touches
+  `isActive`/`imageUrl`**, never deletes), `auditCategoryAssignments`,
+  `deactivateCategoriesOutsideTaxonomy` (opt-in).
+
+**Changed:** `src/domains/catalog/queries.ts` (`getCategoryTree`,
+`getRootCategories` replaces `getActiveCategories`, `getCategoryBySlug`
+now returns depth/trail/children/siblings, category listing aggregates the
+subtree, product detail returns `categoryTrail`, related products top up
+from the parent group, search also matches category names, sitemap only
+lists reachable categories), `src/app/layout.tsx` (now `async`; reads the
+tree for header+footer), `Header.tsx` (desktop mega-menu + mobile nested
+`<details>` menu; hardcoded /category/men|women|accessories links removed),
+`Footer.tsx` (audience > group links), `CategoryNav.tsx` (3 homepage
+circles), category page (full breadcrumb + `SubcategoryNav`: group tiles on
+an audience page, type pills on a group page, sibling pills on a type page),
+product page breadcrumb, `presentation.ts` (swatches men/women/kids),
+`seed.ts` (uses the taxonomy; the 11 demo products are spread over all
+three audiences), `demo-data.ts` (`demoCategories` removed), admin
+category actions/queries/form/row/page (tree-ordered table with indent and
+subtree product counts; parent picker excludes self/descendants/level-3;
+server-side `validateCategoryParent`: no cycles, max 3 levels), admin
+product form (leaf-only picker grouped in `<optgroup>`s), admin product
+list (category filter includes descendants), `package.json`
+(`db:sync-categories`).
+
+**Database:** migration `0009` — `categories_parent_id_idx` +
+`categories_no_self_parent_check` CHECK. Data is *not* changed by the
+migration; use `db:seed` (dev, wipes catalog) or `db:sync-categories`
+(existing DB, non-destructive).
+
+**Migrating an existing database:** `npm run db:migrate` then
+`npm run db:sync-categories`. It prints (a) old categories outside the new
+taxonomy (`shoes`, `hats`, ... — left alone unless
+`-- --deactivate-outside` is passed, which only sets `isActive=false`) and
+(b) products still filed on a category that now has children (e.g. on the
+old `men`). Re-filing those products (which gender for an old «کفش‌ها»
+product?) is a merchandising decision — done in `/admin/products`. Verified
+against a simulated legacy database (6 old categories + 2 products):
+189 created / 2 updated, second run 0/0/191 unchanged, report and
+deactivate flag behaved as described.
+
+**Tests/checks (real local PostgreSQL 16, `next build` + `next start`):**
+- `npm run typecheck` clean; `npm run lint` 0 errors (1 pre-existing
+  `<img>` warning in `Footer.tsx`); `npm test` 95 pass (+29 new);
+  `npm run test:integration` 41 pass (new file covers sync idempotency and
+  isActive/imageUrl preservation, drift repair, root/group/type listings,
+  inactive-branch hiding, search by category name, related-products
+  top-up, leaf rule, self-parent CHECK, assignment audit);
+  `npm run build` clean, `/` still `○ (Static)`.
+- HTTP: `/`, `/category/{men,men-clothing,men-clothing-shirts,kids,...}`
+  200 with correct breadcrumbs/tiles/pills and aggregated products
+  (men = 7 demo products, kids = 1); old `/category/shoes` → 404 +
+  noindex; `/product/classic-shirt` breadcrumb مردانه › لباس مردانه ›
+  پیراهن مردانه; sitemap lists 191 category URLs; search "کفش" finds the
+  sneaker via its category; as a real admin session: `/admin/categories`
+  renders 191 rows in tree order with depth indentation and subtree
+  counts, `/admin/products/new` shows 176 leaf options in 12 optgroups,
+  `/admin/products?category=<audience id>` filters the subtree (a
+  garbage id returns an empty list, not an error).
+- **Not verified (same standing gap as every phase — no browser
+  automation in the sandbox):** the mega-menu's hover/focus/Escape
+  behaviour, the mobile `<details>` menu, and the category/product
+  **Server Actions** (create/update category, create/update product) over
+  the real Next-Action wire protocol. Their validation logic is covered by
+  unit/integration tests (`validateCategoryParent`,
+  `getProductCategoryError`), the wiring is thin.
+
 ### Defect fix — Admin image upload (browse-and-upload for hero/categories/banners/products)
 
 **Reported problem:** in the admin panel, there was no way to browse for
@@ -2940,7 +3056,58 @@ silently ignored):**
   null` regardless — the required validation only applies going forward,
   to a create/edit action's own submission.
 
+### Category-system change addition
+
+- The taxonomy contents (which types exist for each audience/group, the
+  Persian labels, e.g. `لباس نماز و چادر` under women's clothing, kids'
+  `لباس نوزاد`) are my proposal, not a supplied list — edit
+  `taxonomy.ts` freely and re-run `db:sync-categories`. Types are
+  audience-specific (women's has manteau/tunic/skirt/dress types, men's
+  has suit/tie types, ...), not a mechanical copy.
+- Kids is one audience (no separate boys/girls level), per the request.
+- Products may only be filed on leaf categories; a legacy product on a
+  non-leaf category keeps working but must be re-filed to be edited in
+  the admin form.
+- Max depth is 3; the admin refuses deeper nesting and cycles.
+- Empty categories are shown in menus (the store is expected to fill the
+  tree; hiding empty ones would make the structure invisible right now).
+
 ## Known Issues / Technical Debt
+
+**Category-system change (this session):**
+- **No redirects for retired category URLs.** `/category/shoes`,
+  `/category/accessories`, `/category/hats`, `/category/sunglasses` now
+  404 (on a fresh seed they no longer exist). Any hero slide / promo banner
+  `ctaHref` or external link pointing at them must be updated
+  (`/admin/content`); `/category/men` and `/category/women` still exist
+  and now show the whole audience. Add 301s if old URLs were public.
+- **Header/footer now read the DB in the root layout.** Every statically
+  prerendered page bakes in the menu at build time (needs a reachable DB
+  at build, as the homepage already did). Admin category edits call
+  `revalidatePath("/", "layout")`, but `db:seed` / `db:sync-categories`
+  run outside Next, so an already-built production site must be
+  restarted/redeployed to show a re-synced tree.
+- **Empty categories appear in menus.** Only 11 demo products exist
+  across 191 categories. A "hide categories with no products" option
+  (or product counts in the menu) is the obvious next refinement once
+  real stock is loaded.
+- **Products in an inactive category stay visible** in search and on
+  their product page (pre-existing behaviour — category visibility never
+  gated products); only category listings/menus/sitemap honour it. The
+  product breadcrumb may therefore link to a category page that 404s.
+- Admin `/admin/categories` is one 191-row indented table (no search /
+  collapse); there is no bulk "move products from category A to B" tool
+  (relevant when migrating a legacy catalog — see the sync report).
+- Header mega-menu and mobile `<details>` menu are unverified in a real
+  browser (no automation available); WCAG 1.4.13 behaviours (hover,
+  focus, Escape, click-to-close) are implemented but untested. The panel
+  is only rendered while open, so the full tree is in the RSC props of
+  every page (~200 short strings) but not in the initial HTML.
+- Category URLs are flat slugs (`/category/men-clothing-shirts`), not
+  nested paths. Fine for SEO and simple; switching to nested URLs would
+  mean a catch-all route and per-parent slug uniqueness.
+
+**Earlier:**
 
 (Cumulative — see Phase 5's write-up for pre-existing items: `ILIKE`
 search vs. full-text, category OG images, `Product` JSON-LD currency
@@ -3171,6 +3338,12 @@ There is no next numbered phase. This section now documents follow-up
 work rather than "the next phase" — read it as a prioritized backlog, not
 a single objective.
 
+- **Most recent change to know about:** the three-level category system
+  (see `## Completed` → "Change request — Three-level category system").
+  If the store already has real products: run `npm run db:migrate`, then
+  `npm run db:sync-categories`, then re-file the products it lists.
+  With browser automation available, first click through the new
+  header mega-menu (hover, Tab, Escape) and the mobile menu.
 - **Exact next objective, in priority order:**
   1. **If browser automation is available in this session's environment,
      use it before anything else** — this is the single most valuable
@@ -3255,8 +3428,14 @@ a single objective.
 - db migration (apply): `npm run db:migrate` (or `npx drizzle-kit migrate`)
   — applies pending migrations in `drizzle/migrations/` to `DATABASE_URL`.
 - db studio (browse data): `npm run db:studio` (or `npx drizzle-kit studio`)
+- sync categories (existing DB, non-destructive): `npm run db:sync-categories`
+  — upserts the three-level taxonomy from
+  `src/domains/categories/taxonomy.ts` and reports legacy categories /
+  products needing re-filing; add `-- --deactivate-outside` to hide old
+  categories. Never deletes or moves products.
 - seed: `npm run db:seed` (or `npx tsx --env-file=.env.local src/lib/db/seed.ts`)
-  — wipes and re-populates the catalog tables from
+  — wipes and re-populates the catalog tables (the 191-category taxonomy
+  + 11 demo products; before the category change: 6 flat categories) from
   `src/domains/catalog/demo-data.ts`, and (as of Phase 11) also
   wipes/re-populates `hero_slides`/`promo_banners` from the same
   fixtures. Does not touch `users`/`addresses`/`password_reset_tokens`/

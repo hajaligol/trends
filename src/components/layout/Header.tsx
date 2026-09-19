@@ -8,26 +8,60 @@ import { Container } from "@/components/ui/Container";
 import { CartIcon, AccountIcon, SearchIcon } from "@/components/ui/icons";
 import { useUIOverlay } from "@/components/overlays/UIOverlayProvider";
 import { useCart } from "@/components/cart/CartProvider";
+import { CategoryMegaMenu } from "@/components/layout/CategoryMegaMenu";
+import { MobileCategoryMenu } from "@/components/layout/MobileCategoryMenu";
+import { navLinkClass } from "@/components/layout/nav-styles";
+import type { NavCategory } from "@/domains/categories/tree";
 import { toPersianDigits } from "@/lib/utils/persian-digits";
 
-// Nav links mirror reference/prototype.html .main-nav / .mobile-nav, with
-// two Phase 4 updates: "مردان"/"زنان"/"اکسسوری‌ها" now point at their real
-// /category/[slug] routes instead of the homepage's #categories anchor
-// (which only ever made sense while those categories had no pages of
-// their own), and "صفحه اصلی" points at "/" instead of "#hero" so it
-// works as an actual home link from category/product pages too.
+// Nav mirrors reference/prototype.html .main-nav / .mobile-nav, with the
+// category links now driven by the real three-level category tree
+// (مردانه / زنانه / بچگانه, each opening a menu of groups and types — see
+// `CategoryMegaMenu` / `MobileCategoryMenu`) instead of hardcoded
+// /category/men, /category/women, /category/accessories entries.
+// "صفحه اصلی" points at "/" so it works as a home link from any page;
 // "فروشگاه" stays on the homepage's #featured anchor — there's no
-// all-categories catalog page in scope yet.
-const NAV_LINKS = [
+// all-categories catalog page in scope.
+type PlainLink = { href: string; label: string };
+
+const LEADING_LINKS: PlainLink[] = [
   { href: "/", label: "صفحه اصلی" },
   { href: "#featured", label: "فروشگاه" },
-  { href: "/category/men", label: "مردان" },
-  { href: "/category/women", label: "زنان" },
-  { href: "/category/accessories", label: "اکسسوری‌ها" },
-  { href: "#site-footer", label: "درباره ما" },
 ];
+const TRAILING_LINKS: PlainLink[] = [{ href: "#site-footer", label: "درباره ما" }];
+const SECTION_LINKS = [...LEADING_LINKS, ...TRAILING_LINKS];
 
-export function Header() {
+function renderDesktopLink(link: PlainLink, key: string, activeId: string) {
+  const className = navLinkClass(activeId === link.href.replace("#", ""));
+  return (
+    <div key={key} className="flex items-center">
+      {link.href.startsWith("/") ? (
+        <Link href={link.href} className={className}>
+          {link.label}
+        </Link>
+      ) : (
+        <a href={link.href} className={className}>
+          {link.label}
+        </a>
+      )}
+    </div>
+  );
+}
+
+function renderMobileLink(link: PlainLink, key: string, onNavigate: () => void) {
+  const className = "rounded-md px-2 py-2.5 text-[0.95rem] text-ink hover:bg-ink/5";
+  return link.href.startsWith("/") ? (
+    <Link key={key} href={link.href} onClick={onNavigate} className={className}>
+      {link.label}
+    </Link>
+  ) : (
+    <a key={key} href={link.href} onClick={onNavigate} className={className}>
+      {link.label}
+    </a>
+  );
+}
+
+export function Header({ categories }: { categories: NavCategory[] }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeId, setActiveId] = useState("hero");
   const { openSearch, openCart } = useUIOverlay();
@@ -45,7 +79,7 @@ export function Header() {
   // homepage currently has these section ids; on other routes this
   // simply finds nothing to observe.
   useEffect(() => {
-    const sectionIds = Array.from(new Set(NAV_LINKS.map((link) => link.href.replace("#", ""))));
+    const sectionIds = Array.from(new Set(SECTION_LINKS.map((link) => link.href.replace("#", ""))));
     const sections = sectionIds
       .map((id) => document.getElementById(id))
       .filter((el): el is HTMLElement => el !== null);
@@ -62,6 +96,8 @@ export function Header() {
     return () => observer.disconnect();
   }, []);
 
+  const closeMenu = () => setMenuOpen(false);
+
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-header-bg">
       <Container className="flex min-h-[68px] items-center justify-between gap-4">
@@ -76,22 +112,10 @@ export function Header() {
           />
         </Link>
 
-        <nav aria-label="ناوبری اصلی" className="hidden items-center gap-[30px] lg:flex">
-          {NAV_LINKS.map((link, i) => {
-            const isActive = activeId === link.href.replace("#", "");
-            const className = `relative py-1.5 text-[0.93rem] text-ink after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:origin-center after:rounded-sm after:bg-ink after:transition-transform after:duration-200 hover:after:scale-x-100 ${
-              isActive ? "after:scale-x-100" : "after:scale-x-0"
-            }`;
-            return link.href.startsWith("/") ? (
-              <Link key={`${link.href}-${i}`} href={link.href} className={className}>
-                {link.label}
-              </Link>
-            ) : (
-              <a key={`${link.href}-${i}`} href={link.href} className={className}>
-                {link.label}
-              </a>
-            );
-          })}
+        <nav aria-label="ناوبری اصلی" className="hidden items-stretch gap-[30px] self-stretch lg:flex">
+          {LEADING_LINKS.map((link, i) => renderDesktopLink(link, `lead-${i}`, activeId))}
+          <CategoryMegaMenu categories={categories} />
+          {TRAILING_LINKS.map((link, i) => renderDesktopLink(link, `trail-${i}`, activeId))}
         </nav>
 
         <div className="flex items-center gap-2.5">
@@ -157,27 +181,9 @@ export function Header() {
           menuOpen ? "flex" : "hidden"
         }`}
       >
-        {NAV_LINKS.map((link, i) =>
-          link.href.startsWith("/") ? (
-            <Link
-              key={`mobile-${link.href}-${i}`}
-              href={link.href}
-              onClick={() => setMenuOpen(false)}
-              className="rounded-md px-2 py-2.5 text-[0.95rem] text-ink hover:bg-ink/5"
-            >
-              {link.label}
-            </Link>
-          ) : (
-            <a
-              key={`mobile-${link.href}-${i}`}
-              href={link.href}
-              onClick={() => setMenuOpen(false)}
-              className="rounded-md px-2 py-2.5 text-[0.95rem] text-ink hover:bg-ink/5"
-            >
-              {link.label}
-            </a>
-          ),
-        )}
+        {LEADING_LINKS.map((link, i) => renderMobileLink(link, `lead-${i}`, closeMenu))}
+        {menuOpen && <MobileCategoryMenu categories={categories} onNavigate={closeMenu} />}
+        {TRAILING_LINKS.map((link, i) => renderMobileLink(link, `trail-${i}`, closeMenu))}
       </nav>
     </header>
   );

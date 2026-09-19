@@ -29,7 +29,10 @@ limitation (single-process deployment topology, no CDN yet).
 npm install
 cp .env.example .env.local   # fill in DATABASE_URL at minimum
 npm run db:migrate           # apply schema to your PostgreSQL database
-npm run db:seed              # optional — demo catalog data for local dev
+npm run db:seed              # optional — demo data + the full category tree (wipes the catalog!)
+# Existing database that already has products? Use this instead — it only adds/updates
+# categories (مردانه/زنانه/بچگانه > لباس/کفش/کیف/اکسسوری > types) and never deletes anything:
+# npm run db:sync-categories
 npm run dev                  # http://localhost:3000
 ```
 

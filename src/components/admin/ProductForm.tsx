@@ -7,6 +7,8 @@ import { SubmitButton } from "@/components/ui/SubmitButton";
 import { createProductAction, updateProductAction } from "@/domains/catalog/admin-actions";
 import type { AdminProductDetail } from "@/domains/catalog/admin-queries";
 import type { ActionResult } from "@/domains/auth/roles";
+import type { CategoryOption } from "@/domains/categories/queries";
+import { CATEGORY_PATH_SEPARATOR } from "@/domains/categories/tree";
 
 const createInitialState: ActionResult<{ id: string }> = { ok: true, data: { id: "" } };
 const updateInitialState: ActionResult = { ok: true };
@@ -16,7 +18,7 @@ export function ProductForm({
   categoryOptions,
 }: {
   product?: AdminProductDetail;
-  categoryOptions: { id: string; name: string }[];
+  categoryOptions: CategoryOption[];
 }) {
   if (product) {
     return <ProductEditFields product={product} categoryOptions={categoryOptions} />;
@@ -24,7 +26,7 @@ export function ProductForm({
   return <ProductCreateFields categoryOptions={categoryOptions} />;
 }
 
-function ProductCreateFields({ categoryOptions }: { categoryOptions: { id: string; name: string }[] }) {
+function ProductCreateFields({ categoryOptions }: { categoryOptions: CategoryOption[] }) {
   const router = useRouter();
   const [state, formAction] = useActionState(createProductAction, createInitialState);
 
@@ -49,7 +51,7 @@ function ProductEditFields({
   categoryOptions,
 }: {
   product: AdminProductDetail;
-  categoryOptions: { id: string; name: string }[];
+  categoryOptions: CategoryOption[];
 }) {
   const [state, formAction] = useActionState(updateProductAction, updateInitialState);
 
@@ -62,13 +64,25 @@ function ProductEditFields({
   );
 }
 
+/** Groups tree-ordered options by their parent path, keeping order. */
+function groupCategoryOptions(options: CategoryOption[]): Array<{ group: string; options: CategoryOption[] }> {
+  const groups: Array<{ group: string; options: CategoryOption[] }> = [];
+  for (const option of options) {
+    const label = option.group ?? "دسته‌ها";
+    const last = groups[groups.length - 1];
+    if (last && last.group === label) last.options.push(option);
+    else groups.push({ group: label, options: [option] });
+  }
+  return groups;
+}
+
 function ProductFields({
   state,
   categoryOptions,
   product,
 }: {
   state: { ok: boolean; error?: string };
-  categoryOptions: { id: string; name: string }[];
+  categoryOptions: CategoryOption[];
   product?: AdminProductDetail;
 }) {
   return (
@@ -96,10 +110,16 @@ function ProductFields({
             <option value="" disabled>
               انتخاب دسته
             </option>
-            {categoryOptions.map((option) => (
-              <option key={option.id} value={option.id}>
-                {option.name}
-              </option>
+            {groupCategoryOptions(categoryOptions).map(({ group, options }) => (
+              // One <optgroup> per parent group ("مردانه › لباس مردانه"), so
+              // the ~180 type categories stay scannable.
+              <optgroup key={group} label={group}>
+                {options.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.name.split(CATEGORY_PATH_SEPARATOR).pop()}
+                  </option>
+                ))}
+              </optgroup>
             ))}
           </select>
         </label>

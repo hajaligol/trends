@@ -1,7 +1,8 @@
-import { and, asc, count, desc, eq, ilike, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, ilike, inArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { categories, productImages, productVariants, products } from "@/lib/db/schema";
 import type { Product, ProductImage, ProductVariant } from "@/lib/db/schema";
+import { getCategorySubtreeIds } from "@/domains/categories/queries";
 
 /**
  * Admin-facing catalog reads — distinct from
@@ -48,7 +49,12 @@ export async function listProductsForAdmin({
 
   const conditions = [];
   if (search?.trim()) conditions.push(ilike(products.title, `%${search.trim()}%`));
-  if (categoryId) conditions.push(eq(products.categoryId, categoryId));
+  if (categoryId) {
+    // Filtering by an audience or group includes everything beneath it;
+    // an unknown/garbage id matches nothing instead of erroring.
+    const subtreeIds = await getCategorySubtreeIds(categoryId);
+    conditions.push(subtreeIds.length > 0 ? inArray(products.categoryId, subtreeIds) : sql`false`);
+  }
   const where = conditions.length > 0 ? and(...conditions) : undefined;
 
   const [rows, totalRows] = await Promise.all([

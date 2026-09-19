@@ -25,21 +25,6 @@ export type CategorySwatch =
   | "lavender"
   | "aqua";
 
-export type DemoCategory = {
-  id: string;
-  label: string;
-  swatch: CategorySwatch;
-};
-
-export const demoCategories: DemoCategory[] = [
-  { id: "men", label: "مردان", swatch: "sage" },
-  { id: "women", label: "زنان", swatch: "blush" },
-  { id: "shoes", label: "کفش‌ها", swatch: "blue" },
-  { id: "accessories", label: "اکسسوری‌ها", swatch: "yellow" },
-  { id: "hats", label: "کلاه", swatch: "lavender" },
-  { id: "sunglasses", label: "عینک آفتابی", swatch: "aqua" },
-];
-
 export type DemoProduct = {
   id: string;
   name: string;

@@ -7,6 +7,7 @@ import { ProductGrid } from "@/components/catalog/ProductGrid";
 import { SortSelect } from "@/components/catalog/SortSelect";
 import { CategoryFilters } from "@/components/catalog/CategoryFilters";
 import { Pagination } from "@/components/catalog/Pagination";
+import { SubcategoryNav } from "@/components/catalog/SubcategoryNav";
 import { getProductsByCategorySlug } from "@/domains/catalog/queries";
 import { isProductSort, type CategoryQueryState, type ProductSort } from "@/domains/catalog/presentation";
 import { toPersianDigits } from "@/lib/utils/persian-digits";
@@ -81,7 +82,13 @@ export default async function CategoryPage(props: CategoryPageProps) {
   return (
     <main className="py-[clamp(24px,4vw,40px)]">
       <Container>
-        <Breadcrumbs items={[{ label: "صفحه اصلی", href: "/" }, { label: category.name }]} />
+        <Breadcrumbs
+          items={[
+            { label: "صفحه اصلی", href: "/" },
+            ...category.trail.map((ancestor) => ({ label: ancestor.name, href: `/category/${ancestor.slug}` })),
+            { label: category.name },
+          ]}
+        />
 
         <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
           <div>
@@ -92,6 +99,8 @@ export default async function CategoryPage(props: CategoryPageProps) {
           </div>
           <SortSelect slug={slug} state={state} />
         </div>
+
+        <SubcategoryNav category={category} />
 
         <div className="mb-7">
           <CategoryFilters
