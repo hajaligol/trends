@@ -1,7 +1,47 @@
 "use client";
 
-import { SessionProvider } from "next-auth/react";
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
+import { usePathname } from "next/navigation";
+import { SessionProvider, getSession, signOut, useSession } from "next-auth/react";
+
+/**
+ * Login and logout run as Server Actions, so the client `SessionProvider`
+ * is never told the session changed — the header kept showing the old
+ * state until a full reload. This re-checks the session whenever the
+ * route changes (login redirects to `/account`, logout to `/`).
+ *
+ * - Signed in: `update()` refetches, so the header picks up the user.
+ * - Signed out: `update()` is NOT enough — NextAuth ignores an empty
+ *   (null) result and keeps the stale session in state. The client-side
+ *   `signOut({ redirect: false })` is what makes the provider drop it.
+ *   The cookie is already gone at that point, so this call only syncs
+ *   the client state.
+ *
+ * The initial fetch is left to `SessionProvider` itself.
+ */
+function SessionRefreshOnNavigation() {
+  const { data, update } = useSession();
+  const pathname = usePathname();
+  const previousPathname = useRef(pathname);
+  const currentSession = useRef(data);
+  currentSession.current = data;
+
+  useEffect(() => {
+    if (previousPathname.current === pathname) return;
+    previousPathname.current = pathname;
+
+    void (async () => {
+      const fresh = await getSession();
+      if (fresh) {
+        await update();
+      } else if (currentSession.current) {
+        await signOut({ redirect: false });
+      }
+    })();
+  }, [pathname, update]);
+
+  return null;
+}
 
 /**
  * Wraps the app in NextAuth's client `SessionProvider` so `Header` (and
@@ -27,5 +67,10 @@ import type { ReactNode } from "react";
  * (which nav links/buttons to show).
  */
 export function AuthSessionProvider({ children }: { children: ReactNode }) {
-  return <SessionProvider>{children}</SessionProvider>;
+  return (
+    <SessionProvider>
+      <SessionRefreshOnNavigation />
+      {children}
+    </SessionProvider>
+  );
 }

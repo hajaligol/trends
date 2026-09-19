@@ -17,7 +17,7 @@ export default async function AdminCustomerDetailPage({ params }: { params: Prom
     <div className="flex flex-col gap-8">
       <div>
         <Link href="/admin/customers" className="text-[0.8rem] text-text-secondary underline underline-offset-2">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#000000" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6" /></svg> بازگشت به مشتریان
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#000000" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6" /></svg> بازگشت به مشتریان
         </Link>
         <h1 className="mt-1 text-[1.15rem] font-bold text-ink">{customer.fullName ?? customer.mobile}</h1>
         <p className="mt-0.5 text-[0.85rem] text-text-secondary" dir="ltr">

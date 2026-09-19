@@ -19,8 +19,14 @@ export function SectionHead({
         <p className="text-[0.88rem] text-text-secondary">{eyebrow}</p>
         <h2 className="m-0 mt-1.5 text-[clamp(1.4rem,2.6vw,1.95rem)] font-bold">{title}</h2>
       </div>
-      <a href={viewAllHref} className="flex items-center gap-1.5 whitespace-nowrap text-[0.9rem]">
-        {viewAllLabel} <span aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#000000" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg></span>
+      <a
+        href={viewAllHref}
+        className="flex items-center gap-1.5 whitespace-nowrap rounded-full bg-brand px-5 py-2 text-[0.9rem] font-semibold text-white transition-colors duration-200 hover:bg-brand-dark"
+      >
+        {viewAllLabel}{" "}
+        <span aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="h-[18px] w-[18px]"><path d="m15 18-6-6 6-6"/></svg>
+        </span>
       </a>
     </div>
   );

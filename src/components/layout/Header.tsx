@@ -4,9 +4,17 @@ import { useState } from "react";
 import Form from "next/form";
 import Image from "next/image";
 import Link from "next/link";
-import { useSession } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
 import { Container } from "@/components/ui/Container";
-import { CartIcon, AccountIcon, SearchIcon } from "@/components/ui/icons";
+import {
+  CartIcon,
+  AccountIcon,
+  ClipboardListIcon,
+  HeartIcon,
+  LogOutIcon,
+  SearchIcon,
+  UserRoundIcon,
+} from "@/components/ui/icons";
 import { useUIOverlay } from "@/components/overlays/UIOverlayProvider";
 import { useCart } from "@/components/cart/CartProvider";
 import { CategoryMegaMenu } from "@/components/layout/CategoryMegaMenu";
@@ -44,6 +52,7 @@ const ICON = "h-[28px] w-[28px] text-ink lg:h-[36px] lg:w-[36px]";
 
 export function Header({ categories }: { categories: NavCategory[] }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const { openSearch, openCart } = useUIOverlay();
   const { cart } = useCart();
   const cartCount = cart.itemCount;
@@ -52,6 +61,9 @@ export function Header({ categories }: { categories: NavCategory[] }) {
   // `/api/auth/session`) is treated the same as "logged out" for this
   // icon — see `AuthSessionProvider`'s comment on the tradeoff.
   const accountHref = session?.user ? "/account" : "/login";
+  // First word of the full name ("علی رضایی" -> "علی"); falls back to a
+  // neutral word if the account has no name.
+  const greetingName = session?.user?.name?.trim().split(/\s+/)[0] || "کاربر";
 
   const closeMenu = () => setMenuOpen(false);
 
@@ -114,7 +126,7 @@ export function Header({ categories }: { categories: NavCategory[] }) {
           {/* The row runs down to the header's bottom edge, so the menu
               panel (positioned at the header's bottom) is reachable by
               the pointer with no dead gap in between. */}
-          <nav aria-label="ناوبری اصلی" className="flex h-[48px] items-stretch justify-center gap-14">
+          <nav aria-label="ناوبری اصلی" className="flex h-[48px] items-stretch justify-center gap-7">
             <CategoryMegaMenu categories={categories} />
           </nav>
         </div>
@@ -135,13 +147,105 @@ export function Header({ categories }: { categories: NavCategory[] }) {
               </span>
             )}
           </button>
-          <Link
-            href={accountHref}
-            aria-label={session?.user ? "حساب کاربری" : "ورود به حساب کاربری"}
-            className={ICON_BUTTON}
-          >
-            <AccountIcon className={ICON} />
-          </Link>
+          {/* Wishlist — logged-in users only; sits between the cart and the
+              account button. */}
+          {session?.user && (
+            <Link href="/account/wishlist" aria-label="علاقه‌مندی‌ها" className={ICON_BUTTON}>
+              <HeartIcon className={ICON} />
+            </Link>
+          )}
+          {/* Account button.
+              - Logged in: no capsule — the account icon (same size as the
+                cart icon) followed by "<first name> عزیز". Below `sm` only
+                the icon shows so the compact mobile bar does not overflow.
+              - Logged out: brand-purple capsule with the login prompt only. */}
+          {session?.user ? (
+            // Account button + dropdown. The menu opens on hover and on
+            // keyboard focus (desktop, `lg` and up only — below that the
+            // button is a plain link to /account, which has its own nav).
+            // The panel's `pt-2` wrapper bridges the gap under the button so
+            // the pointer never leaves the hover area on its way down.
+            <div
+              className="relative"
+              onMouseEnter={() => setAccountMenuOpen(true)}
+              onMouseLeave={() => setAccountMenuOpen(false)}
+              onFocus={() => setAccountMenuOpen(true)}
+              onBlur={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                  setAccountMenuOpen(false);
+                }
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") setAccountMenuOpen(false);
+              }}
+            >
+              <Link
+                href={accountHref}
+                aria-label={`حساب کاربری ${greetingName}`}
+                aria-haspopup="menu"
+                aria-expanded={accountMenuOpen}
+                onClick={() => setAccountMenuOpen(false)}
+                className="flex h-[46px] items-center justify-center gap-1.5 rounded-full bg-transparent px-[9px] transition-colors duration-200 hover:bg-ink/6 lg:h-[56px] lg:gap-2 lg:px-3"
+              >
+                <AccountIcon className={`${ICON} shrink-0`} />
+                <span className="hidden max-w-[150px] truncate text-[0.92rem] font-semibold leading-none text-ink sm:inline lg:text-[1rem]">
+                  {greetingName} عزیز
+                </span>
+              </Link>
+
+              {accountMenuOpen && (
+                <div className="absolute start-0 top-full z-50 hidden pt-2 lg:block">
+                  <div
+                    role="menu"
+                    aria-label="منوی حساب کاربری"
+                    className="w-[210px] overflow-hidden rounded-[14px] border border-line bg-white py-2 shadow-[0_12px_32px_rgba(24,38,48,0.12)]"
+                  >
+                    <Link
+                      href="/account"
+                      role="menuitem"
+                      onClick={() => setAccountMenuOpen(false)}
+                      className="flex items-center gap-3 px-4 py-2.5 text-[0.92rem] text-ink transition-colors hover:bg-ink/5"
+                    >
+                      <UserRoundIcon className="h-[20px] w-[20px] shrink-0" />
+                      حساب کاربری
+                    </Link>
+                    <Link
+                      href="/account/orders"
+                      role="menuitem"
+                      onClick={() => setAccountMenuOpen(false)}
+                      className="flex items-center gap-3 px-4 py-2.5 text-[0.92rem] text-ink transition-colors hover:bg-ink/5"
+                    >
+                      <ClipboardListIcon className="h-[20px] w-[20px] shrink-0" />
+                      سفارش‌ها
+                    </Link>
+                    <div className="my-1 border-t border-line" />
+                    {/* Client-side sign-out with a full reload: also works when
+                        the visitor is already on "/", where a route change
+                        would not happen and the header would keep the name. */}
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setAccountMenuOpen(false);
+                        void signOut({ callbackUrl: "/" });
+                      }}
+                      className="flex w-full items-center gap-3 px-4 py-2.5 text-start text-[0.92rem] text-red-600 transition-colors hover:bg-red-50"
+                    >
+                      <LogOutIcon className="h-[20px] w-[20px] shrink-0" />
+                      خروج از حساب کاربری
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <Link
+              href={accountHref}
+              className="flex h-[38px] items-center justify-center whitespace-nowrap rounded-full bg-brand px-3.5 text-[0.78rem] font-semibold leading-none text-white transition-colors duration-200 hover:bg-brand-dark sm:h-[40px] sm:px-5 sm:text-[0.88rem] lg:h-[46px] lg:px-6 lg:text-[0.95rem]"
+            >
+              ورود / ثبت‌نام
+            </Link>
+          )}
           <button
             type="button"
             aria-label="جستجو"

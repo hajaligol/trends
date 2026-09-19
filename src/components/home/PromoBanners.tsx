@@ -46,7 +46,7 @@ export function PromoBanners({ banners }: { banners: PromoBannerLike[] }) {
               </p>
               <Button type="button" variant="ghost">
                 <span>{banner.ctaLabel}</span>
-                <span aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#000000" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg></span>
+                <span aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#000000" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg></span>
               </Button>
             </div>
             <div className="relative w-full min-h-[200px] md:w-auto md:min-h-[260px] md:flex-1 md:self-stretch">

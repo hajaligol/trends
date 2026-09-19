@@ -16,7 +16,7 @@ const AUTOPLAY_DELAY_MS = 5000;
 const SWIPE_THRESHOLD_RATIO = 0.15;
 
 /**
- * Image-only hero banner carousel: autoplay, prev/next arrows, dots, and
+ * Image-only hero banner carousel: autoplay, dots, and
  * mouse/touch drag-to-swipe. Mirrors #heroCarousel in
  * reference/prototype.html, reimplemented as a real component with React
  * state/effects instead of the prototype's inline <script>, per
@@ -172,29 +172,6 @@ export function HeroCarousel({ slides }: { slides: HeroSlideLike[] }) {
 
       {slideCount > 1 && (
         <>
-          <button
-            type="button"
-            aria-label="اسلاید قبلی"
-            onClick={() => {
-              goTo(currentIndex - 1);
-              startAutoplay();
-            }}
-            className="absolute top-1/2 right-4 z-[2] flex h-[42px] w-[42px] -translate-y-1/2 items-center justify-center rounded-full border-0 bg-bg/90 text-[1.05rem] text-ink transition-colors duration-200 hover:bg-white"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#000000" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6" /></svg>
-          </button>
-          <button
-            type="button"
-            aria-label="اسلاید بعدی"
-            onClick={() => {
-              goTo(currentIndex + 1);
-              startAutoplay();
-            }}
-            className="absolute top-1/2 left-4 z-[2] flex h-[42px] w-[42px] -translate-y-1/2 items-center justify-center rounded-full border-0 bg-bg/90 text-[1.05rem] text-ink transition-colors duration-200 hover:bg-white"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#000000" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>
-          </button>
-
           <div className="absolute bottom-4 left-1/2 z-[2] flex -translate-x-1/2 items-center gap-1.5">
             {slides.map((slide, index) => (
               <button
@@ -207,7 +184,7 @@ export function HeroCarousel({ slides }: { slides: HeroSlideLike[] }) {
                 }}
                 className={
                   index === currentIndex
-                    ? "h-2 w-[22px] rounded border-[1.5px] border-ink bg-ink transition-[width,background-color,border-radius] duration-200"
+                    ? "h-2 w-[22px] rounded border-[1.5px] border-ink bg-white transition-[width,background-color,border-radius] duration-200"
                     : "h-2 w-2 rounded-full border-[1.5px] border-ink bg-bg/60 transition-[width,background-color,border-radius] duration-200"
                 }
               />

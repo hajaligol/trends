@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { Fragment, useRef, useState } from "react";
 import Link from "next/link";
 import { Container } from "@/components/ui/Container";
 import type { NavCategory } from "@/domains/categories/tree";
@@ -39,12 +39,16 @@ export function CategoryMegaMenu({ categories }: { categories: NavCategory[] }) 
 
   return (
     <>
-      {categories.map((root) => {
+      {categories.map((root, index) => {
         const isOpen = openSlug === root.slug;
         const panelId = `category-menu-${root.slug}`;
         return (
+          <Fragment key={root.slug}>
+          {/* Gray divider between the audience triggers (not before the first). */}
+          {index > 0 && (
+            <span aria-hidden="true" className="h-5 w-px self-center bg-[#c9ced2]" />
+          )}
           <div
-            key={root.slug}
             className="flex items-center"
             onMouseEnter={() => setOpenSlug(root.slug)}
             onMouseLeave={close}
@@ -87,11 +91,20 @@ export function CategoryMegaMenu({ categories }: { categories: NavCategory[] }) 
                     همه‌ی محصولات {root.name}
                   </Link>
 
-                  <div className="grid grid-cols-5 gap-x-8 gap-y-6">
+                  {/* Columns are separated by thin gray rules (same gray as the
+                      header's audience dividers): a left border on every
+                      group but the first, with padding either side of it. */}
+                  <div className="grid grid-cols-5 gap-y-6">
                     {root.children.map((group, groupIndex) => (
                       // The first group (clothing) is by far the longest, so
                       // it gets two grid columns and a two-column list.
-                      <div key={group.slug} className={groupIndex === 0 ? "col-span-2" : undefined}>
+                      <div
+                        key={group.slug}
+                        className={[
+                          groupIndex === 0 ? "col-span-2 ps-0" : "border-s border-[#c9ced2] ps-5",
+                          groupIndex === root.children.length - 1 ? "pe-0" : "pe-5",
+                        ].join(" ")}
+                      >
                         <Link
                           href={`/category/${group.slug}`}
                           onClick={close}
@@ -99,7 +112,7 @@ export function CategoryMegaMenu({ categories }: { categories: NavCategory[] }) 
                         >
                           {group.name}
                         </Link>
-                        <ul className={groupIndex === 0 ? "columns-2 gap-x-6" : undefined}>
+                        <ul className={groupIndex === 0 ? "columns-2 gap-x-6 [column-rule:1px_solid_#c9ced2]" : undefined}>
                           {group.children.map((type) => (
                             <li key={type.slug} className="break-inside-avoid">
                               <Link
@@ -119,6 +132,7 @@ export function CategoryMegaMenu({ categories }: { categories: NavCategory[] }) 
               </div>
             )}
           </div>
+          </Fragment>
         );
       })}
     </>
