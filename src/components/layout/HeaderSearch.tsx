@@ -33,9 +33,6 @@ function writeHistory(items: string[]) {
 
 const searchHref = (term: string) => `/search?q=${encodeURIComponent(term)}`;
 
-const ROW =
-  "flex min-w-0 flex-1 items-center gap-3 px-5 py-2 text-[0.92rem] text-ink transition-colors hover:bg-ink/5";
-
 /**
  * Desktop header search box. Narrower than the centre column, light gray,
  * no focus outline (the `!` beats the global `:focus-visible` rule in
@@ -107,7 +104,7 @@ export function HeaderSearch() {
       <Form
         action="/search"
         role="search"
-        className="relative"
+        className="relative z-[51]"
         onSubmit={() => {
           remember(query);
           setOpen(false);
@@ -157,64 +154,80 @@ export function HeaderSearch() {
         </button>
       </Form>
 
-      {open && (
-        <div className="absolute inset-x-0 top-full z-50 mt-2 max-h-[70vh] overflow-y-auto rounded-[18px] border border-line bg-white py-3 shadow-[0_12px_32px_rgba(24,38,48,0.12)]">
-          {visibleHistory.length > 0 && (
-            <section aria-label="جستجوهای اخیر" className="pb-2">
-              <div className="flex items-center justify-between px-5 pb-1 text-[0.8rem] text-text-secondary">
-                <h3 className="m-0 text-[0.8rem] font-semibold">جستجوهای اخیر</h3>
-                {!typed && (
-                  <button
-                    type="button"
-                    onClick={clearHistory}
-                    className="text-[0.78rem] text-text-secondary transition-colors hover:text-ink"
-                  >
-                    پاک کردن همه
-                  </button>
-                )}
-              </div>
-              <ul className="m-0 list-none p-0">
-                {visibleHistory.map((term) => (
-                  <li key={term} className="flex items-center hover:bg-ink/5">
+      {/* Expanded search panel: a white rounded card that opens *around* the
+          input (the input sits at its top, raised above it via z-[51]),
+          followed by trending searches as chips and then the recent-search
+          history. */}
+      {/* Always mounted so it can animate both ways: fades and eases down
+          from the input on open, reverses on close. `invisible` (visibility)
+          also removes it from the tab order while closed. */}
+      <div
+          aria-hidden={!open}
+          className={`absolute -inset-x-3 -top-3 z-50 origin-top rounded-[26px] border border-line bg-white pt-[72px] shadow-[0_12px_32px_rgba(24,38,48,0.14)] transition-[opacity,transform,visibility] duration-200 ease-out motion-reduce:transition-none ${
+            open
+              ? "visible translate-y-0 scale-100 opacity-100"
+              : "pointer-events-none invisible -translate-y-2 scale-[0.97] opacity-0"
+          }`}
+        >
+          <div className="max-h-[60vh] overflow-y-auto px-4 pb-5 pt-2">
+            <section aria-label="جستجوهای پرطرفدار">
+              <h3 className="m-0 mb-3 text-[0.95rem] font-bold text-ink">جستجوهای پرطرفدار</h3>
+              <ul className="m-0 flex list-none flex-wrap gap-2 p-0">
+                {TRENDING_SEARCHES.map((term) => (
+                  <li key={term}>
                     <Link
                       href={searchHref(term)}
                       onClick={() => pick(term)}
-                      className={`${ROW} hover:bg-transparent`}
+                      className="inline-flex items-center gap-2 rounded-full border border-[#dfe2e5] bg-white px-4 py-2 text-[0.9rem] text-ink transition-colors hover:bg-[#f0f2f4]"
                     >
-                      <ClockIcon className="h-[18px] w-[18px] shrink-0 text-text-secondary" />
-                      <span className="truncate">{term}</span>
+                      <span>{term}</span>
+                      <TrendingUpIcon className="h-[18px] w-[18px] shrink-0 text-black" />
                     </Link>
-                    <button
-                      type="button"
-                      aria-label={`حذف «${term}» از جستجوهای اخیر`}
-                      onClick={() => removeFromHistory(term)}
-                      className="me-3 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-text-secondary transition-colors hover:bg-ink/6 hover:text-ink"
-                    >
-                      <XIcon className="h-[16px] w-[16px]" />
-                    </button>
                   </li>
                 ))}
               </ul>
             </section>
-          )}
 
-          <section aria-label="جستجوهای پرطرفدار">
-            <h3 className="m-0 px-5 pb-1 text-[0.8rem] font-semibold text-text-secondary">
-              جستجوهای پرطرفدار
-            </h3>
-            <ul className="m-0 list-none p-0">
-              {TRENDING_SEARCHES.map((term) => (
-                <li key={term}>
-                  <Link href={searchHref(term)} onClick={() => pick(term)} className={ROW}>
-                    <TrendingUpIcon className="h-[18px] w-[18px] shrink-0 text-text-secondary" />
-                    <span className="truncate">{term}</span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </section>
+            {visibleHistory.length > 0 && (
+              <section aria-label="جستجوهای اخیر" className="mt-6">
+                <div className="mb-2 flex items-center justify-between">
+                  <h3 className="m-0 text-[0.95rem] font-bold text-ink">جستجوهای اخیر</h3>
+                  {!typed && (
+                    <button
+                      type="button"
+                      onClick={clearHistory}
+                      className="text-[0.8rem] text-text-secondary transition-colors hover:text-ink"
+                    >
+                      پاک کردن همه
+                    </button>
+                  )}
+                </div>
+                <ul className="m-0 list-none p-0">
+                  {visibleHistory.map((term) => (
+                    <li key={term} className="flex items-center rounded-xl hover:bg-[#f0f2f4]">
+                      <Link
+                        href={searchHref(term)}
+                        onClick={() => pick(term)}
+                        className="flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5 text-[0.92rem] text-ink"
+                      >
+                        <ClockIcon className="h-[18px] w-[18px] shrink-0 text-text-secondary" />
+                        <span className="truncate">{term}</span>
+                      </Link>
+                      <button
+                        type="button"
+                        aria-label={`حذف «${term}» از جستجوهای اخیر`}
+                        onClick={() => removeFromHistory(term)}
+                        className="me-2 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-text-secondary transition-colors hover:bg-ink/6 hover:text-ink"
+                      >
+                        <XIcon className="h-[16px] w-[16px]" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+          </div>
         </div>
-      )}
     </div>
   );
 }

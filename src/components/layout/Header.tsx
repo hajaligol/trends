@@ -171,8 +171,17 @@ export function Header({ categories }: { categories: NavCategory[] }) {
                 </span>
               </Link>
 
-              {accountMenuOpen && (
-                <div className="absolute start-0 top-full z-50 hidden pt-2 lg:block">
+              {/* Always mounted so it animates both ways, like the mega menus
+                  and the search panel. `invisible` keeps it out of the tab
+                  order and out of hit-testing while closed. */}
+              <div
+                aria-hidden={!accountMenuOpen}
+                className={`absolute start-0 top-full z-50 hidden origin-top pt-2 transition-[opacity,transform,visibility] duration-200 ease-out motion-reduce:transition-none lg:block ${
+                  accountMenuOpen
+                    ? "visible translate-y-0 scale-100 opacity-100"
+                    : "pointer-events-none invisible -translate-y-2 scale-[0.97] opacity-0"
+                }`}
+              >
                   <div
                     role="menu"
                     aria-label="منوی حساب کاربری"
@@ -214,7 +223,6 @@ export function Header({ categories }: { categories: NavCategory[] }) {
                     </button>
                   </div>
                 </div>
-              )}
             </div>
           ) : (
             <Link

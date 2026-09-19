@@ -70,18 +70,26 @@ export function CategoryMegaMenu({ categories }: { categories: NavCategory[] }) 
                 else triggerRefs.current.delete(root.slug);
               }}
               aria-expanded={isOpen}
-              aria-controls={isOpen ? panelId : undefined}
+              aria-controls={panelId}
               onClick={close}
               className={navLinkClass(isOpen)}
             >
               {root.name}
             </Link>
 
-            {isOpen && (
-              <div
-                id={panelId}
-                className="absolute inset-x-0 top-full z-30 border-b border-line bg-header-bg"
-              >
+            {/* Always mounted so it can animate both ways (fade + ease down
+                from the header, reversed on close). `invisible` also removes
+                the closed panel from the tab order. Full-width panel, so no
+                scale — just opacity and a small vertical slide. */}
+            <div
+              id={panelId}
+              aria-hidden={!isOpen}
+              className={`absolute inset-x-0 top-full z-30 border-b border-line bg-header-bg transition-[opacity,transform,visibility] duration-200 ease-out motion-reduce:transition-none ${
+                isOpen
+                  ? "visible translate-y-0 opacity-100"
+                  : "pointer-events-none invisible -translate-y-2 opacity-0"
+              }`}
+            >
                 <Container className="max-h-[calc(100vh-150px)] overflow-y-auto py-6">
                   <Link
                     href={`/category/${root.slug}`}
@@ -130,7 +138,6 @@ export function CategoryMegaMenu({ categories }: { categories: NavCategory[] }) 
                   </div>
                 </Container>
               </div>
-            )}
           </div>
           </Fragment>
         );
