@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Form from "next/form";
 import Image from "next/image";
 import Link from "next/link";
 import { signOut, useSession } from "next-auth/react";
@@ -17,6 +16,7 @@ import {
 } from "@/components/ui/icons";
 import { useUIOverlay } from "@/components/overlays/UIOverlayProvider";
 import { useCart } from "@/components/cart/CartProvider";
+import { HeaderSearch } from "@/components/layout/HeaderSearch";
 import { CategoryMegaMenu } from "@/components/layout/CategoryMegaMenu";
 import { MobileCategoryMenu } from "@/components/layout/MobileCategoryMenu";
 import type { NavCategory } from "@/domains/categories/tree";
@@ -99,29 +99,7 @@ export function Header({ categories }: { categories: NavCategory[] }) {
 
         {/* Centre column (desktop only): search box, then category menu. */}
         <div className="hidden lg:col-start-2 lg:row-start-1 lg:flex lg:flex-col lg:gap-1.5 lg:pt-3">
-          <Form action="/search" role="search" className="relative">
-            <label htmlFor="header-search" className="sr-only">
-              جستجو در ترندز
-            </label>
-            <input
-              id="header-search"
-              type="search"
-              name="q"
-              required
-              autoComplete="off"
-              enterKeyHint="search"
-              maxLength={100}
-              placeholder="نام محصول یا دسته را جستجو کنید..."
-              className="h-[48px] w-full rounded-full border border-line bg-white ps-6 pe-14 text-[0.95rem] text-ink placeholder:text-text-secondary focus:outline-2 focus:outline-offset-2 focus:outline-ink"
-            />
-            <button
-              type="submit"
-              aria-label="جستجو"
-              className="absolute inset-y-1 end-1 flex w-[40px] items-center justify-center rounded-full transition-colors duration-200 hover:bg-ink/6"
-            >
-              <SearchIcon className="h-[24px] w-[24px] text-ink" />
-            </button>
-          </Form>
+          <HeaderSearch />
 
           {/* The row runs down to the header's bottom edge, so the menu
               panel (positioned at the header's bottom) is reachable by
