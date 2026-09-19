@@ -116,7 +116,7 @@ export function CategoryMegaMenu({ categories }: { categories: NavCategory[] }) 
                         <Link
                           href={`/category/${group.slug}`}
                           onClick={close}
-                          className="mb-2.5 block text-[0.95rem] font-bold text-ink hover:underline"
+                          className="mb-2.5 block text-[0.95rem] font-bold text-brand hover:underline"
                         >
                           {group.name}
                         </Link>
