@@ -134,8 +134,11 @@ export function HeroCarousel({ slides }: { slides: HeroSlideLike[] }) {
       aria-label="بنرهای تبلیغاتی"
       onMouseEnter={stopAutoplay}
       onMouseLeave={startAutoplay}
+      // Stop the browser's native image drag-and-drop (and text selection),
+      // which otherwise hijacks a mouse swipe and drags the picture itself.
+      onDragStart={(event) => event.preventDefault()}
       style={{ touchAction: "pan-y" }}
-      className="relative aspect-[21/8] w-full cursor-grab overflow-hidden rounded-[22px] bg-gradient-to-br from-[#E7DFD2] to-[#DED4C4] active:cursor-grabbing max-[640px]:aspect-[4/3.4]"
+      className="relative aspect-[21/8] w-full cursor-grab select-none overflow-hidden rounded-[22px] bg-gradient-to-br from-[#E7DFD2] to-[#DED4C4] active:cursor-grabbing max-[640px]:aspect-[4/3.4]"
     >
       <div
         style={{
@@ -161,7 +164,8 @@ export function HeroCarousel({ slides }: { slides: HeroSlideLike[] }) {
                 fill
                 priority={index === 0}
                 sizes="100vw"
-                className="object-cover"
+                draggable={false}
+                className="pointer-events-none object-cover"
               />
             ) : (
               <AssetSlot label={slide.alt} tone="banner" rounded="none" className="h-full w-full" />
