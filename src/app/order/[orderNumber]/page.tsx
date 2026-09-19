@@ -65,7 +65,7 @@ export default async function OrderConfirmationPage({
 
   return (
     <main className="py-[clamp(40px,7vw,80px)]">
-      <Container className="mx-auto flex max-w-[720px] flex-col gap-8">
+      <Container className="mx-auto flex max-w-[860px] flex-col gap-8">
         <div className="text-center">
           <h1 className="m-0 text-[1.5rem] font-bold">سفارش شما ثبت شد</h1>
           <p className="mt-2 text-[0.92rem] text-text-secondary">

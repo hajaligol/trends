@@ -50,8 +50,8 @@
    Kept as a small utility class since Tailwind v4's built-in `container`
    is deliberately not configured the same way. */
 :root {
-  --gutter: clamp(20px, 4.5vw, 55px);
-  --max-width: 1240px;
+  --gutter: clamp(16px, 2.5vw, 32px);
+  --max-width: 1400px;
 }
 
 html {

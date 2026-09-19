@@ -11,7 +11,7 @@ export default function AboutPage() {
   return (
     <main className="py-[clamp(24px,4vw,40px)]">
       <Container>
-        <div className="mx-auto max-w-[760px]">
+        <div className="mx-auto max-w-[860px]">
           <h1 className="mb-5 text-[clamp(1.4rem,3vw,1.9rem)] font-bold text-ink">درباره ترندز</h1>
           <div className="flex flex-col gap-4 text-[0.95rem] leading-8 text-ink/85">
             <p>

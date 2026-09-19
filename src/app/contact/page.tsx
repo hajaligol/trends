@@ -15,7 +15,7 @@ export default async function ContactPage() {
   return (
     <main className="py-[clamp(24px,4vw,40px)]">
       <Container>
-        <div className="mx-auto grid max-w-[900px] gap-10 lg:grid-cols-[1fr_1.4fr]">
+        <div className="mx-auto grid max-w-[1000px] gap-10 lg:grid-cols-[1fr_1.4fr]">
           <div className="flex flex-col gap-4">
             <h1 className="text-[clamp(1.4rem,3vw,1.9rem)] font-bold text-ink">تماس با ما</h1>
             <p className="text-[0.9rem] leading-7 text-text-secondary">

@@ -38,7 +38,7 @@ export default function FaqPage() {
   return (
     <main className="py-[clamp(24px,4vw,40px)]">
       <Container>
-        <div className="mx-auto max-w-[760px]">
+        <div className="mx-auto max-w-[860px]">
           <h1 className="mb-6 text-[clamp(1.4rem,3vw,1.9rem)] font-bold text-ink">سوالات متداول</h1>
           <div className="flex flex-col gap-3">
             {FAQ_ITEMS.map((item) => (
