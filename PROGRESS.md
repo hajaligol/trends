@@ -18,6 +18,8 @@
   admin login → categories/products pages) against a real local
   PostgreSQL. Shippability is otherwise unchanged from Phase 14's
   assessment — see `docs/PRODUCTION_CHECKLIST.md`.
+- **Latest change (2026-09-19, after the category work):** header
+  redesign — see "Change request — Header layout" under `## Completed`.
 - Current phase: none in progress.
 - Last completed phase: PHASE 14 — QA, accessibility, production
   readiness. The category-system change and the earlier admin-image-upload
@@ -2541,6 +2543,53 @@ handoff note, not a prerequisite someone else needed to finish first.
   pipeline (esbuild, via Vite) that `tsx` (already a dependency, used for
   `db:seed`) also uses — one less distinct toolchain in the project.
 
+### Change request — Header layout (three columns)
+
+**Requested:** bigger header, three columns — left: brand logo only
+(bigger); right: profile + cart buttons with bigger icons; centre: two
+rows — a wide search box (replacing the search button), then only
+«مردانه»، «زنانه»، «بچگانه» with their hover menus. The other nav links
+(صفحه اصلی / فروشگاه / درباره ما) are removed.
+
+**Implemented (`src/components/layout/Header.tsx`, rewritten):**
+- **lg and up:** 3-column grid `1fr | 2.4fr | 1fr` (equal side tracks so
+  the centre is truly centred). Placement is by *physical* side as
+  requested: logo on the **left**, cart+account on the **right**. The page
+  is RTL (grid column 1 = right), so actions are `lg:col-start-1`, centre
+  `lg:col-start-2`, logo `lg:col-start-3`; swap 1 and 3 to flip. Logo
+  44px→84px tall; icon buttons 46→56px with 36px icons; header ≈115px
+  tall (was 68px).
+- **Search box:** `next/form` GET to `/search?q=…` (`role="search"`,
+  visible-to-AT `<label>`, `type="search"`, `required`, `maxLength=100`,
+  submit button inside the field). Works without JS. The old
+  `SearchOverlay` is unchanged and still opens from the search icon below lg.
+- **Category row:** the existing `CategoryMegaMenu`, now in the centre
+  column's second row (row runs to the header's bottom edge so the menu
+  panel has no hover dead-zone); trigger text slightly larger
+  (`nav-styles.ts`); panel `max-h` adjusted for the taller header.
+- **Below lg:** compact single bar as before (logo, search icon, cart,
+  account, hamburger → category accordion); the home/shop/about links were
+  removed from the accordion too. The logo is the home link.
+- **Bug fixed on the way:** `CartIcon`/`AccountIcon`/`SearchIcon` in
+  `components/ui/icons.tsx` ignored `className`/props (never spread), so
+  the header's `h-[30px] w-[30px]` had *never applied* — the icons were
+  always 24px. They now spread props and use `currentColor` (so `text-ink`
+  takes effect: #182630 instead of pure black).
+- **Logo image:** added `sizes` so Next serves a small generated variant
+  instead of the 1536px source (277KB webp).
+- Removed dead code: the scroll-spy `IntersectionObserver` and the
+  plain-link render helpers.
+
+**Checks:** `typecheck`, `lint` (0 warnings), `build` clean; served HTML
+verified (search form → `/search`, exactly three category links in the
+nav, old links gone, logo srcset uses small widths, `/search?q=…` 200).
+**Not verified:** how it actually *looks* and behaves in a browser (no
+browser in the sandbox) — spacing, the mega-menu panel's alignment under
+the taller header, the logo at 84px, and tablet widths near 1024px should
+be eyeballed. The sticky header is now ~115px of the viewport on desktop;
+if that feels heavy, use `relative` instead of `sticky top-0` in `Header.tsx` (do NOT just delete `sticky`: the
+menu panel needs the header to be positioned — `relative` or `sticky` — or it stops appearing). The header is now `relative z-40` (not sticky).
+
 ### Change request — Three-level category system (مردانه / زنانه / بچگانه)
 
 **Requested:** replace the whole category system with three main
@@ -2618,8 +2667,9 @@ against a simulated legacy database (6 old categories + 2 products):
 deactivate flag behaved as described.
 
 **Tests/checks (real local PostgreSQL 16, `next build` + `next start`):**
-- `npm run typecheck` clean; `npm run lint` 0 errors (1 pre-existing
-  `<img>` warning in `Footer.tsx`); `npm test` 95 pass (+29 new);
+- `npm run typecheck` clean; `npm run lint` 0 errors (the one pre-existing
+  `<img>` warning in `Footer.tsx` was fixed afterwards by switching the
+  social icons to `next/image` — lint is now fully clean); `npm test` 95 pass (+29 new);
   `npm run test:integration` 41 pass (new file covers sync idempotency and
   isActive/imageUrl preservation, drift repair, root/group/type listings,
   inactive-branch hiding, search by category name, related-products

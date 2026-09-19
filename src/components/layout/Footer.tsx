@@ -1,5 +1,5 @@
-import Link from "next/link";
 import Image from "next/image";
+import Link from "next/link";
 import { Container } from "@/components/ui/Container";
 import { NewsletterForm } from "@/components/layout/NewsletterForm";
 import type { NavCategory } from "@/domains/categories/tree";
@@ -38,7 +38,16 @@ export function Footer({ categories }: { categories: NavCategory[] }) {
                 aria-label={label}
                 className="flex h-[34px] w-[34px] items-center justify-center rounded-full bg-ink/6"
               >
-                <Image src={src} alt="" width={18} height={18} className="h-[18px] w-[18px] object-contain" />
+                {/* Local SVG: next/image serves it as-is (no resizing), and the
+                    explicit width/height reserve the space. Decorative — the
+                    wrapper span carries the accessible label. */}
+                <Image
+                  src={src}
+                  alt=""
+                  width={18}
+                  height={18}
+                  className="h-[18px] w-[18px] object-contain"
+                />
               </span>
             ))}
           </div>

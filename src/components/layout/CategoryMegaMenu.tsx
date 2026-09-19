@@ -8,7 +8,7 @@ import { navLinkClass } from "@/components/layout/nav-styles";
 
 /**
  * Desktop category navigation: one trigger per audience (مردانه/زنانه/
- * بچگانه) in the header row, each opening a full-width panel with that
+ * بچگانه) in the header's second row, each opening a full-width panel with that
  * audience's four groups and every type under them.
  *
  * Behaviour (WCAG 1.4.13 "content on hover or focus"):
@@ -20,6 +20,10 @@ import { navLinkClass } from "@/components/layout/nav-styles";
  * - Escape closes it and returns focus to the trigger;
  * - clicking any link closes it (the header persists across navigations,
  *   so state would otherwise stay "open" on the next page).
+ *
+ * **Layout requirement:** the panel is `absolute inset-x-0 top-full`, so
+ * the `<header>` that contains this component must be a positioned
+ * element (`relative` or `sticky`) — see the comment in `Header.tsx`.
  *
  * The trigger itself is a real link to the audience's page, so it still
  * works on touch devices and with JS disabled. The panel is only rendered
@@ -74,7 +78,7 @@ export function CategoryMegaMenu({ categories }: { categories: NavCategory[] }) 
                 id={panelId}
                 className="absolute inset-x-0 top-full z-30 border-b border-line bg-header-bg"
               >
-                <Container className="max-h-[calc(100vh-110px)] overflow-y-auto py-6">
+                <Container className="max-h-[calc(100vh-150px)] overflow-y-auto py-6">
                   <Link
                     href={`/category/${root.slug}`}
                     onClick={close}
