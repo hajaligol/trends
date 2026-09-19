@@ -5,6 +5,7 @@ import Form from "next/form";
 import Image from "next/image";
 import Link from "next/link";
 import { ClockIcon, FolderIcon, SearchIcon, TrendingUpIcon, XIcon } from "@/components/ui/icons";
+import { useDimPage } from "@/components/overlays/UIOverlayProvider";
 import { TRENDING_SEARCHES } from "@/lib/search/trending-searches";
 import { formatToman } from "@/lib/utils/money";
 import { toPersianDigits } from "@/lib/utils/persian-digits";
@@ -71,6 +72,11 @@ export function HeaderSearch() {
     categories: CategorySuggestion[];
   } | null>(null);
   const [liveFailed, setLiveFailed] = useState(false);
+
+  // Dim the page *and the header* while the dropdown is open. The search
+  // box (z-[51]) and its dropdown (z-50) stay above the header's dim layer
+  // (z-[45], see Header.tsx) so they remain bright.
+  useDimPage(open, { includeHeader: true });
 
   const typed = query.trim();
   const showResults = typed.length >= MIN_LIVE_LENGTH;

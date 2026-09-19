@@ -53,7 +53,7 @@ const ICON = "h-[28px] w-[28px] text-ink lg:h-[36px] lg:w-[36px]";
 export function Header({ categories }: { categories: NavCategory[] }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
-  const { openSearch, openCart } = useUIOverlay();
+  const { openSearch, openCart, isHeaderDimmed } = useUIOverlay();
   const { cart } = useCart();
   const cartCount = cart.itemCount;
   const { data: session } = useSession();
@@ -76,6 +76,18 @@ export function Header({ categories }: { categories: NavCategory[] }) {
   // keeps working).
   return (
     <header className="relative z-40 border-b border-line bg-header-bg">
+      {/* Dims the header bar while the search dropdown is open (the page
+          below is dimmed by PageDim). z-[45] sits above the header's own
+          content but below the search box (z-[51]) and dropdown (z-50), and
+          below the mega menu panel (z-[46]) in case both are open. Purely
+          visual, so it never blocks clicks. `-bottom-px` extends it over the
+          header's 1px bottom border, which `inset-0` alone would leave bright. */}
+      <div
+        aria-hidden="true"
+        className={`pointer-events-none absolute inset-x-0 top-0 -bottom-px z-[45] bg-ink/35 transition-[opacity,visibility] duration-200 ease-out motion-reduce:transition-none ${
+          isHeaderDimmed ? "visible opacity-100" : "invisible opacity-0"
+        }`}
+      />
       <Container className="flex min-h-[68px] items-center justify-between gap-4 lg:grid lg:min-h-0 lg:grid-cols-[1fr_minmax(0,2.4fr)_1fr] lg:items-center lg:gap-x-8">
         {/* Logo — left column on desktop. */}
         <Link

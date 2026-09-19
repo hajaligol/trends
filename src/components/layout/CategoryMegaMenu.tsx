@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Container } from "@/components/ui/Container";
 import type { NavCategory } from "@/domains/categories/tree";
 import { navLinkClass } from "@/components/layout/nav-styles";
+import { useDimPage } from "@/components/overlays/UIOverlayProvider";
 
 /**
  * Desktop category navigation: one trigger per audience (مردانه/زنانه/
@@ -34,6 +35,9 @@ import { navLinkClass } from "@/components/layout/nav-styles";
 export function CategoryMegaMenu({ categories }: { categories: NavCategory[] }) {
   const [openSlug, setOpenSlug] = useState<string | null>(null);
   const triggerRefs = useRef<Map<string, HTMLAnchorElement>>(new Map());
+
+  // Dim the rest of the page while any audience menu is open.
+  useDimPage(openSlug !== null);
 
   const close = () => setOpenSlug(null);
 
@@ -84,7 +88,7 @@ export function CategoryMegaMenu({ categories }: { categories: NavCategory[] }) 
             <div
               id={panelId}
               aria-hidden={!isOpen}
-              className={`absolute inset-x-0 top-full z-30 border-b border-line bg-header-bg transition-[opacity,transform,visibility] duration-200 ease-out motion-reduce:transition-none ${
+              className={`absolute inset-x-0 top-full z-[46] border-b border-line bg-header-bg transition-[opacity,transform,visibility] duration-200 ease-out motion-reduce:transition-none ${
                 isOpen
                   ? "visible translate-y-0 opacity-100"
                   : "pointer-events-none invisible -translate-y-2 opacity-0"
