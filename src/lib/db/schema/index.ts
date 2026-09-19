@@ -19,6 +19,7 @@ export * from "./order-status-history";
 export * from "./audit-logs";
 export * from "./hero-slides";
 export * from "./promo-banners";
+export * from "./home-category-tiles";
 export * from "./site-settings";
 export * from "./reviews";
 export * from "./newsletter-subscribers";

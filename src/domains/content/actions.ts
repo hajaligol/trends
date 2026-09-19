@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { auth } from "@/lib/auth/config";
 import { db } from "@/lib/db/client";
-import { heroSlides, promoBanners } from "@/lib/db/schema";
+import { heroSlides, homeCategoryTiles, promoBanners } from "@/lib/db/schema";
+import { isHomeCategoryTileKey } from "@/domains/content/home-category-tiles";
 import { heroSlideSchema, promoBannerSchema } from "@/lib/validation/admin";
 import { isStaffOrAdmin, UNAUTHORIZED_ERROR, type ActionResult } from "@/domains/auth/roles";
 import { recordAuditLog } from "@/domains/analytics/audit";
@@ -107,6 +108,32 @@ export async function deletePromoBannerAction(id: string): Promise<ActionResult>
 
   await db.delete(promoBanners).where(eq(promoBanners.id, id));
   await recordAuditLog(session.user, "promo_banner.delete", "promo_banner", id);
+
+  revalidatePath("/admin/content");
+  revalidatePath("/");
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------------
+// Homepage category squares
+// ---------------------------------------------------------------------
+
+/** Sets (or, with an empty `imageUrl`, clears) the picture of one of the
+ * six fixed homepage category squares. */
+export async function saveHomeCategoryTileAction(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user || !isStaffOrAdmin(session.user.role)) return { ok: false, error: UNAUTHORIZED_ERROR };
+
+  const tileKey = String(formData.get("tileKey") ?? "");
+  if (!isHomeCategoryTileKey(tileKey)) return { ok: false, error: "دسته‌بندی یافت نشد" };
+
+  const imageUrl = String(formData.get("imageUrl") ?? "").trim().slice(0, 2000) || null;
+
+  await db
+    .insert(homeCategoryTiles)
+    .values({ tileKey, imageUrl })
+    .onConflictDoUpdate({ target: homeCategoryTiles.tileKey, set: { imageUrl, updatedAt: new Date() } });
+  await recordAuditLog(session.user, "home_category_tile.update", "home_category_tile", null, { tileKey, imageUrl });
 
   revalidatePath("/admin/content");
   revalidatePath("/");

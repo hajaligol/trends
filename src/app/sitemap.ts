@@ -3,6 +3,7 @@ import { getSitemapEntries } from "@/domains/catalog/queries";
 import { SITE_URL } from "@/lib/site-config";
 
 const STATIC_PAGES = [
+  "/accessories",
   "/about",
   "/contact",
   "/faq",
