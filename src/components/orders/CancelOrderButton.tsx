@@ -36,13 +36,9 @@ export function CancelOrderButton({ orderNumber }: { orderNumber: string }) {
 
   if (!isOpen) {
     return (
-      <button
-        type="button"
-        onClick={() => setIsOpen(true)}
-        className="text-[0.85rem] font-semibold text-red-600 underline underline-offset-2"
-      >
+      <Button type="button" variant="danger-outline" size="sm" onClick={() => setIsOpen(true)}>
         لغو سفارش
-      </button>
+      </Button>
     );
   }
 
@@ -64,18 +60,27 @@ export function CancelOrderButton({ orderNumber }: { orderNumber: string }) {
           {error}
         </p>
       )}
-      <div className="flex gap-2">
-        <Button type="button" onClick={handleConfirm} disabled={isPending} className="disabled:opacity-60">
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <Button
+          type="button"
+          variant="danger"
+          size="sm"
+          onClick={handleConfirm}
+          disabled={isPending}
+          className="sm:flex-1 disabled:cursor-not-allowed disabled:opacity-60"
+        >
           {isPending ? "در حال لغو..." : "بله، سفارش لغو شود"}
         </Button>
-        <button
+        <Button
           type="button"
+          variant="outline"
+          size="sm"
           onClick={() => setIsOpen(false)}
           disabled={isPending}
-          className="rounded-[var(--radius-sm)] px-3 py-2 text-text-secondary hover:bg-ink/5"
+          className="sm:flex-1 disabled:cursor-not-allowed disabled:opacity-60"
         >
           انصراف
-        </button>
+        </Button>
       </div>
     </div>
   );

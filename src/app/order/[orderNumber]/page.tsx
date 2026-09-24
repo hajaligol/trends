@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { Container } from "@/components/ui/Container";
+import { buttonClasses } from "@/components/ui/Button";
 import { AssetSlot } from "@/components/ui/AssetSlot";
 import { getCurrentUser } from "@/domains/auth/actions";
 import { getOrderForUser, getOrderStatusHistoryForUser } from "@/domains/orders/queries";
@@ -204,9 +205,11 @@ export default async function OrderConfirmationPage({
           </section>
         )}
 
-        <Link href="/" className="text-center text-[0.88rem] font-semibold text-ink underline underline-offset-2">
-          بازگشت به فروشگاه
-        </Link>
+        <div className="flex justify-center">
+          <Link href="/" className={buttonClasses("outline", "md")}>
+            بازگشت به فروشگاه
+          </Link>
+        </div>
       </Container>
     </main>
   );

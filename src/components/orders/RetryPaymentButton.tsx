@@ -34,7 +34,7 @@ export function RetryPaymentButton({ orderNumber }: { orderNumber: string }) {
 
   return (
     <div className="flex flex-col items-center gap-2">
-      <Button type="button" onClick={handleClick} disabled={isPending} className="disabled:opacity-60">
+      <Button type="button" onClick={handleClick} disabled={isPending} className="disabled:cursor-not-allowed disabled:opacity-60">
         {isPending ? "در حال انتقال..." : "پرداخت مجدد"}
       </Button>
       {error && (
