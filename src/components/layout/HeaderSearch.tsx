@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Form from "next/form";
 import Image from "next/image";
 import Link from "next/link";
@@ -13,10 +13,43 @@ import { toPersianDigits } from "@/lib/utils/persian-digits";
 const STORAGE_KEY = "trends:search-history";
 const MAX_HISTORY = 8;
 
-/** Search history lives in this browser only (localStorage). */
-function readHistory(): string[] {
+/**
+ * Search history lives in this browser only (localStorage), exposed to React
+ * as an external store. The server snapshot is always empty, so server and
+ * first client render match; the stored history appears right after hydration.
+ */
+const historyListeners = new Set<() => void>();
+
+function notifyHistory() {
+  historyListeners.forEach((listener) => listener());
+}
+
+function subscribeHistory(listener: () => void) {
+  historyListeners.add(listener);
+  // Keeps other tabs in sync too.
+  const onStorage = (event: StorageEvent) => {
+    if (event.key === null || event.key === STORAGE_KEY) listener();
+  };
+  window.addEventListener("storage", onStorage);
+  return () => {
+    historyListeners.delete(listener);
+    window.removeEventListener("storage", onStorage);
+  };
+}
+
+/** Raw stored string (a primitive, so the snapshot is referentially stable). */
+function getHistorySnapshot(): string {
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    return window.localStorage.getItem(STORAGE_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+const getServerHistorySnapshot = () => "";
+
+function parseHistory(raw: string): string[] {
+  try {
     const parsed: unknown = raw ? JSON.parse(raw) : [];
     if (!Array.isArray(parsed)) return [];
     return parsed
@@ -27,12 +60,17 @@ function readHistory(): string[] {
   }
 }
 
+function readHistory(): string[] {
+  return parseHistory(getHistorySnapshot());
+}
+
 function writeHistory(items: string[]) {
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
   } catch {
     // Storage can be blocked (private mode, quota) — history is a convenience only.
   }
+  notifyHistory();
 }
 
 type Suggestion = {
@@ -62,7 +100,12 @@ const searchHref = (term: string) => `/search?q=${encodeURIComponent(term)}`;
 export function HeaderSearch() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [history, setHistory] = useState<string[]>([]);
+  const rawHistory = useSyncExternalStore(
+    subscribeHistory,
+    getHistorySnapshot,
+    getServerHistorySnapshot,
+  );
+  const history = useMemo(() => parseHistory(rawHistory), [rawHistory]);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [live, setLive] = useState<{
@@ -71,7 +114,9 @@ export function HeaderSearch() {
     items: Suggestion[];
     categories: CategorySuggestion[];
   } | null>(null);
-  const [liveFailed, setLiveFailed] = useState(false);
+  // The query that last failed to load; "failed" is derived from it below so
+  // it never needs resetting from inside an effect.
+  const [failedQuery, setFailedQuery] = useState<string | null>(null);
 
   // Dim the page *and the header* while the dropdown is open. The search
   // box (z-[51]) and its dropdown (z-50) stay above the header's dim layer
@@ -80,21 +125,13 @@ export function HeaderSearch() {
 
   const typed = query.trim();
   const showResults = typed.length >= MIN_LIVE_LENGTH;
+  const liveFailed = showResults && failedQuery === typed;
   const liveLoading = showResults && !liveFailed && live?.q !== typed;
-
-  // Read after mount so server and first client render match.
-  useEffect(() => {
-    setHistory(readHistory());
-  }, []);
 
   // Live results: debounced fetch while the panel is open. Each keystroke
   // cancels the previous timer/request, so only the latest query resolves.
   useEffect(() => {
-    if (!open || typed.length < MIN_LIVE_LENGTH) {
-      setLive(null);
-      setLiveFailed(false);
-      return;
-    }
+    if (!open || typed.length < MIN_LIVE_LENGTH) return;
     const controller = new AbortController();
     const timer = window.setTimeout(async () => {
       try {
@@ -108,10 +145,10 @@ export function HeaderSearch() {
           categories: CategorySuggestion[];
         };
         setLive({ q: typed, total: data.total, items: data.items, categories: data.categories });
-        setLiveFailed(false);
+        setFailedQuery(null);
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") return;
-        setLiveFailed(true);
+        setFailedQuery(typed);
       }
     }, 250);
     return () => {
@@ -134,18 +171,15 @@ export function HeaderSearch() {
     const term = raw.trim();
     if (!term) return;
     const next = [term, ...readHistory().filter((item) => item !== term)].slice(0, MAX_HISTORY);
-    setHistory(next);
     writeHistory(next);
   };
 
   const removeFromHistory = (term: string) => {
     const next = readHistory().filter((item) => item !== term);
-    setHistory(next);
     writeHistory(next);
   };
 
   const clearHistory = () => {
-    setHistory([]);
     writeHistory([]);
   };
 

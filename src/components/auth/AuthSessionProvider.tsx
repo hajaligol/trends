@@ -24,7 +24,13 @@ function SessionRefreshOnNavigation() {
   const pathname = usePathname();
   const previousPathname = useRef(pathname);
   const currentSession = useRef(data);
-  currentSession.current = data;
+
+  // Keep the ref in sync after each commit (refs must not be written during
+  // render). Declared before the navigation effect so that, within the same
+  // commit, it has already run when the navigation effect reads it.
+  useEffect(() => {
+    currentSession.current = data;
+  }, [data]);
 
   useEffect(() => {
     if (previousPathname.current === pathname) return;
