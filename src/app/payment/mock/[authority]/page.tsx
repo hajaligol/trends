@@ -59,10 +59,10 @@ export default async function MockPaymentGatewayPage({
           )}
 
           <div className="flex flex-col gap-3">
-            <ButtonLink href={callbackUrl("OK")} variant="primary" className="justify-center">
+            <ButtonLink href={callbackUrl("OK")} variant="primary">
               شبیه‌سازی پرداخت موفق
             </ButtonLink>
-            <ButtonLink href={callbackUrl("NOK")} variant="ghost" className="justify-center">
+            <ButtonLink href={callbackUrl("NOK")} variant="outline">
               شبیه‌سازی پرداخت ناموفق / انصراف
             </ButtonLink>
           </div>

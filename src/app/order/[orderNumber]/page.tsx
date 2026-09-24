@@ -39,6 +39,69 @@ const BANNER_CLASSES: Record<"success" | "error" | "info", string> = {
   info: "bg-ink/[0.05] text-ink",
 };
 
+type OrderPageItem = NonNullable<Awaited<ReturnType<typeof getOrderForUser>>>["items"][number];
+
+/**
+ * One purchased line. When the product still exists and is active
+ * (`liveProductSlug` set) the *whole* row is a single link to its product
+ * page; otherwise it renders as the same card without a link, since
+ * /product/[slug] would 404 (old orders outlive their products). One link
+ * around the row — rather than separate thumbnail/title links — keeps a
+ * single tab stop and avoids nested anchors.
+ */
+function OrderItemRow({ item }: { item: OrderPageItem }) {
+  const linked = Boolean(item.liveProductSlug);
+  const content = (
+    <>
+      <div className="relative h-16 w-14 shrink-0 overflow-hidden rounded-[8px] bg-card-image">
+        {item.imageUrl ? (
+          // Decorative here: the title beside it already names the product.
+          <Image src={item.imageUrl} alt="" fill sizes="56px" className="object-cover" />
+        ) : (
+          <AssetSlot label={item.productTitle} rounded="none" className="h-full w-full" />
+        )}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="truncate font-semibold text-ink">{item.productTitle}</p>
+        <p className="text-text-secondary">
+          {item.size} / {item.color} × {toPersianDigits(item.quantity)}
+        </p>
+      </div>
+      <span className="shrink-0 font-semibold text-ink">{formatToman(item.lineTotalToman)}</span>
+      {linked && (
+        <svg
+          aria-hidden="true"
+          xmlns="http://www.w3.org/2000/svg"
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="h-5 w-5 shrink-0 text-text-secondary"
+        >
+          <path d="m15 18-6-6 6-6" />
+        </svg>
+      )}
+    </>
+  );
+
+  const rowClasses =
+    "flex items-center gap-3 rounded-[var(--radius-md)] border border-line p-3 text-[0.88rem]";
+
+  if (!linked) return <div className={rowClasses}>{content}</div>;
+  return (
+    <Link
+      href={`/product/${item.liveProductSlug}`}
+      className={`${rowClasses} transition-colors duration-200 hover:border-brand/25 hover:bg-header-bg/60`}
+    >
+      {content}
+    </Link>
+  );
+}
+
 /**
  * `getOrderForUser` is ownership-scoped by `userId` (same shape as
  * `addresses/queries.ts`) — a signed-in customer requesting someone
@@ -113,22 +176,7 @@ export default async function OrderConfirmationPage({
           </div>
           <div className="flex flex-col gap-3">
             {order.items.map((item) => (
-              <div key={item.id} className="flex items-center gap-3 text-[0.88rem]">
-                <div className="relative h-16 w-14 shrink-0 overflow-hidden rounded-[8px] bg-card-image">
-                  {item.imageUrl ? (
-                    <Image src={item.imageUrl} alt={item.productTitle} fill sizes="56px" className="object-cover" />
-                  ) : (
-                    <AssetSlot label={item.productTitle} rounded="none" className="h-full w-full" />
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-semibold text-ink">{item.productTitle}</p>
-                  <p className="text-text-secondary">
-                    {item.size} / {item.color} × {toPersianDigits(item.quantity)}
-                  </p>
-                </div>
-                <span className="shrink-0 font-semibold text-ink">{formatToman(item.lineTotalToman)}</span>
-              </div>
+              <OrderItemRow key={item.id} item={item} />
             ))}
           </div>
         </section>

@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
 
 type SectionHeadProps = {
-  eyebrow: string;
+  /** Optional small line above the title. */
+  eyebrow?: string;
   title: string;
   /** Optional decorative icon shown before the title. */
   icon?: ReactNode;
@@ -21,8 +22,8 @@ export function SectionHead({
   return (
     <div className="mb-[34px] flex flex-wrap items-end justify-between gap-4">
       <div>
-        <p className="text-[0.88rem] text-text-secondary">{eyebrow}</p>
-        <h2 className="m-0 mt-1.5 flex items-center gap-2.5 text-[clamp(1.4rem,2.6vw,1.95rem)] font-bold">
+        {eyebrow && <p className="text-[0.88rem] text-text-secondary">{eyebrow}</p>}
+        <h2 className={`m-0 ${eyebrow ? "mt-1.5" : ""} flex items-center gap-2.5 text-[clamp(1.4rem,2.6vw,1.95rem)] font-bold`}>
           {icon && (
             <span aria-hidden="true" className="flex shrink-0">
               {icon}

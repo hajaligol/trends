@@ -294,7 +294,16 @@ export async function createOrderFromCart(
 
 export type OrderWithItems = Order & { items: OrderItem[] };
 
-export async function getOrderForUser(orderNumber: string, userId: string): Promise<OrderWithItems | null> {
+/** An order line plus where its product currently lives in the storefront.
+ * `liveProductSlug` is the product's *current* slug, and is `null` when the
+ * product was deleted or is no longer active — i.e. when `/product/[slug]`
+ * would 404 — so callers can render a link only when it will resolve. The
+ * `productSlug` snapshot on the item itself is deliberately not used for
+ * this: it's frozen at purchase time and may be stale. */
+export type OrderItemWithLiveLink = OrderItem & { liveProductSlug: string | null };
+export type OrderWithLinkableItems = Order & { items: OrderItemWithLiveLink[] };
+
+export async function getOrderForUser(orderNumber: string, userId: string): Promise<OrderWithLinkableItems | null> {
   const [order] = await db
     .select()
     .from(orders)
@@ -302,7 +311,17 @@ export async function getOrderForUser(orderNumber: string, userId: string): Prom
     .limit(1);
   if (!order) return null;
 
-  const items = await db.select().from(orderItems).where(eq(orderItems.orderId, order.id));
+  const rows = await db
+    .select({ item: orderItems, productSlug: products.slug, productIsActive: products.isActive })
+    .from(orderItems)
+    .leftJoin(products, eq(products.id, orderItems.productId))
+    .where(eq(orderItems.orderId, order.id))
+    .orderBy(asc(orderItems.createdAt), asc(orderItems.id));
+
+  const items = rows.map(({ item, productSlug, productIsActive }) => ({
+    ...item,
+    liveProductSlug: productIsActive ? productSlug : null,
+  }));
   return { ...order, items };
 }
 
