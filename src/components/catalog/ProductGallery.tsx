@@ -33,7 +33,7 @@ export function ProductGallery({
     return (
       <div
         style={maxWidthStyle}
-        className="mx-auto aspect-[4/5] w-full overflow-hidden rounded-[18px] bg-card-image"
+        className="mx-auto aspect-[4/5] w-full overflow-hidden rounded-[var(--radius-lg)] bg-card-image"
       >
         <AssetSlot label={title} rounded="none" className="h-full w-full" />
       </div>
@@ -47,7 +47,7 @@ export function ProductGallery({
     <div className="flex flex-col gap-3">
       <div
         style={images.length > 1 ? maxWidthWithThumbnailsStyle : maxWidthStyle}
-        className="relative mx-auto aspect-[4/5] w-full overflow-hidden rounded-[18px] bg-card-image"
+        className="relative mx-auto aspect-[4/5] w-full overflow-hidden rounded-[var(--radius-lg)] bg-card-image"
       >
         <Image
           src={active.url}
@@ -59,7 +59,7 @@ export function ProductGallery({
         />
       </div>
       {images.length > 1 && (
-        <div style={maxWidthWithThumbnailsStyle} className="mx-auto flex w-full gap-2.5">
+        <div style={maxWidthWithThumbnailsStyle} className="mx-auto flex w-full gap-2.5 overflow-x-auto p-0.5">
           {images.map((image, index) => (
             <button
               key={image.url}
@@ -67,11 +67,11 @@ export function ProductGallery({
               onClick={() => setActiveIndex(index)}
               aria-current={index === activeIndex}
               aria-label={`تصویر ${index + 1}`}
-              className={`relative h-16 w-16 shrink-0 overflow-hidden rounded-[10px] border transition-colors ${
-                index === activeIndex ? "border-ink" : "border-transparent"
+              className={`relative h-[72px] w-[58px] shrink-0 cursor-pointer overflow-hidden rounded-[var(--radius-sm)] border bg-card-image transition-[border-color,opacity] duration-200 ${
+                index === activeIndex ? "border-ink" : "border-transparent opacity-70 hover:opacity-100"
               }`}
             >
-              <Image src={image.url} alt="" fill sizes="64px" className="object-cover" />
+              <Image src={image.url} alt="" fill sizes="58px" className="object-cover" />
             </button>
           ))}
         </div>

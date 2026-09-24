@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { MAX_SPEC_ROWS } from "@/lib/validation/spec-limits";
+import { normalizeSpecLabel } from "@/lib/utils/spec-label";
 
 /**
  * Server-side validation for every Phase 11 admin mutation
@@ -103,6 +105,40 @@ export const productImageSchema = z.object({
   displayOrder: z.coerce.number().int().default(0),
   isPrimary: checkbox,
 });
+
+// ---------------------------------------------------------------------
+// Product specifications (custom rows of the «مشخصات محصول» table)
+// ---------------------------------------------------------------------
+
+const specRowInput = z.object({
+  label: z.string().trim().max(80, "عنوان هر ردیف حداکثر ۸۰ نویسه می‌تواند باشد"),
+  value: z.string().trim().max(500, "مقدار هر ردیف حداکثر ۵۰۰ نویسه می‌تواند باشد"),
+});
+
+/** Fully blank rows are dropped (an admin adding then not filling a row is
+ * not an error); a half-filled row, a duplicate label or too many rows is. */
+export const productSpecificationsSchema = z
+  .array(specRowInput)
+  .max(MAX_SPEC_ROWS + 20, "تعداد ردیف‌ها بیش از حد مجاز است")
+  .transform((rows) => rows.filter((row) => row.label !== "" || row.value !== ""))
+  .superRefine((rows, ctx) => {
+    if (rows.length > MAX_SPEC_ROWS) {
+      ctx.addIssue({ code: "custom", message: `حداکثر ${MAX_SPEC_ROWS} ردیف مجاز است` });
+    }
+    const seen = new Set<string>();
+    for (const row of rows) {
+      if (row.label === "" || row.value === "") {
+        ctx.addIssue({ code: "custom", message: "برای هر ردیف هم عنوان و هم مقدار را وارد کنید" });
+        return;
+      }
+      const key = normalizeSpecLabel(row.label);
+      if (seen.has(key)) {
+        ctx.addIssue({ code: "custom", message: `عنوان «${row.label}» بیش از یک بار استفاده شده است` });
+        return;
+      }
+      seen.add(key);
+    }
+  });
 
 // ---------------------------------------------------------------------
 // Inventory

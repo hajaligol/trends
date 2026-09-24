@@ -3,6 +3,7 @@ import { db } from "@/lib/db/client";
 import { categories, productImages, productVariants, products } from "@/lib/db/schema";
 import type { Product, ProductImage, ProductVariant } from "@/lib/db/schema";
 import { getCategorySubtreeIds } from "@/domains/categories/queries";
+import { listProductSpecifications, type SpecificationRow } from "@/domains/catalog/specifications";
 
 /**
  * Admin-facing catalog reads — distinct from
@@ -101,6 +102,8 @@ export type AdminProductDetail = Product & {
   categoryName: string;
   variants: ProductVariant[];
   images: ProductImage[];
+  /** Custom «مشخصات محصول» rows, in display order. */
+  specifications: SpecificationRow[];
 };
 
 export async function getProductForAdmin(id: string): Promise<AdminProductDetail | null> {
@@ -112,12 +115,13 @@ export async function getProductForAdmin(id: string): Promise<AdminProductDetail
     .limit(1);
   if (!product) return null;
 
-  const [variants, images] = await Promise.all([
+  const [variants, images, specifications] = await Promise.all([
     db.select().from(productVariants).where(eq(productVariants.productId, id)).orderBy(asc(productVariants.size)),
     db.select().from(productImages).where(eq(productImages.productId, id)).orderBy(asc(productImages.displayOrder)),
+    listProductSpecifications(id),
   ]);
 
-  return { ...product.product, categoryName: product.categoryName, variants, images };
+  return { ...product.product, categoryName: product.categoryName, variants, images, specifications };
 }
 
 export async function isProductSlugTaken(slug: string, excludeId?: string): Promise<boolean> {

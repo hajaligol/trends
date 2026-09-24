@@ -69,9 +69,10 @@ export function WishlistButton({ productId, productName }: { productId: string; 
 }
 
 /**
- * Labeled wishlist toggle for the product detail page — a full-width
- * secondary action next to "افزودن به سبد خرید", rather than the bare
- * icon used on cards, so the action is discoverable without hovering.
+ * Wishlist toggle for the product detail page — a round outlined icon
+ * button that sits beside "افزودن به سبد خرید". Icon-only (with a real
+ * accessible name and `aria-pressed`) so it fits next to the primary CTA
+ * on narrow screens without competing with it.
  */
 export function WishlistToggleButton({ productId, productName }: { productId: string; productName: string }) {
   const { active, handleClick } = useWishlistToggle(productId);
@@ -80,16 +81,21 @@ export function WishlistToggleButton({ productId, productName }: { productId: st
     <button
       type="button"
       aria-pressed={active}
+      aria-label={
+        active
+          ? `حذف «${productName}» از علاقه‌مندی‌ها`
+          : `افزودن «${productName}» به علاقه‌مندی‌ها`
+      }
+      title={active ? "حذف از علاقه‌مندی‌ها" : "افزودن به علاقه‌مندی‌ها"}
       onClick={handleClick}
-      className={`inline-flex w-full items-center justify-center gap-2.5 rounded-full border px-[26px] py-[13px] text-[0.92rem] transition-colors duration-200 ${
+      className={`flex h-[52px] w-[52px] shrink-0 cursor-pointer items-center justify-center rounded-full border bg-white transition-colors duration-200 ${
         active ? "border-[#E0483C] text-[#E0483C]" : "border-line text-ink hover:border-ink"
       }`}
     >
       <HeartIcon
-        style={active ? { fill: "currentColor" } : undefined}
-        className="h-[18px] w-[18px] transition-colors duration-200"
+        style={active ? { fill: "#E0483C", stroke: "#E0483C" } : undefined}
+        className="h-[22px] w-[22px] transition-colors duration-200"
       />
-      {active ? `حذف از علاقه‌مندی‌ها` : `افزودن به علاقه‌مندی‌ها`}
     </button>
   );
 }

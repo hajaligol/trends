@@ -5,7 +5,8 @@ import { eq } from "drizzle-orm";
 import { auth } from "@/lib/auth/config";
 import { db } from "@/lib/db/client";
 import { productImages, productVariants, products } from "@/lib/db/schema";
-import { productImageSchema, productSchema, productVariantSchema } from "@/lib/validation/admin";
+import { productImageSchema, productSchema, productSpecificationsSchema, productVariantSchema } from "@/lib/validation/admin";
+import { replaceProductSpecifications } from "@/domains/catalog/specifications";
 import { isStaffOrAdmin, UNAUTHORIZED_ERROR, type ActionResult } from "@/domains/auth/roles";
 import { recordAuditLog } from "@/domains/analytics/audit";
 import { isProductSlugTaken, isVariantSkuTaken } from "@/domains/catalog/admin-queries";
@@ -104,6 +105,43 @@ export async function deleteProductAction(id: string): Promise<ActionResult> {
 
   revalidateStorefrontForProduct(deleted?.slug);
   return { ok: true };
+}
+
+export async function saveProductSpecificationsAction(
+  _prev: ActionResult<{ saved: boolean }>,
+  formData: FormData,
+): Promise<ActionResult<{ saved: boolean }>> {
+  const session = await auth();
+  if (!session?.user || !isStaffOrAdmin(session.user.role)) return { ok: false, error: UNAUTHORIZED_ERROR };
+
+  const productId = String(formData.get("productId") ?? "");
+  const [product] = productId
+    ? await db.select({ slug: products.slug }).from(products).where(eq(products.id, productId)).limit(1)
+    : [];
+  if (!product) return { ok: false, error: "محصول یافت نشد" };
+
+  const labels = formData.getAll("specLabel").map(String);
+  const values = formData.getAll("specValue").map(String);
+  if (labels.length !== values.length) return { ok: false, error: "اطلاعات وارد شده معتبر نیست" };
+
+  const parsed = productSpecificationsSchema.safeParse(labels.map((label, index) => ({ label, value: values[index] })));
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "اطلاعات وارد شده معتبر نیست" };
+
+  try {
+    await replaceProductSpecifications(productId, parsed.data);
+  } catch {
+    // The DB's unique/length constraints are the backstop for anything the
+    // schema above let through; never leak the raw error to the admin UI.
+    return { ok: false, error: "ذخیره جدول مشخصات ممکن نشد" };
+  }
+
+  await recordAuditLog(session.user, "product.specifications.update", "product", productId, {
+    rows: parsed.data,
+  });
+
+  revalidateStorefrontForProduct(product.slug);
+  revalidatePath(`/admin/products/${productId}`);
+  return { ok: true, data: { saved: true } };
 }
 
 // ---------------------------------------------------------------------

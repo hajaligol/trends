@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getProductForAdmin } from "@/domains/catalog/admin-queries";
 import { listLeafCategoryOptions } from "@/domains/categories/queries";
 import { ProductForm } from "@/components/admin/ProductForm";
+import { ProductSpecificationsEditor } from "@/components/admin/ProductSpecificationsEditor";
 import { ProductVariantsAndImages } from "@/components/admin/ProductVariantsAndImages";
 import { DeleteProductButton } from "@/components/admin/DeleteProductButton";
 
@@ -27,6 +28,11 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
 
       <section className="max-w-2xl">
         <ProductForm product={product} categoryOptions={categoryOptions} />
+      </section>
+
+      <section className="flex max-w-3xl flex-col gap-4">
+        <h2 className="text-[1rem] font-bold text-ink">جدول مشخصات محصول</h2>
+        <ProductSpecificationsEditor productId={product.id} initialRows={product.specifications} />
       </section>
 
       <ProductVariantsAndImages productId={product.id} variants={product.variants} images={product.images} />

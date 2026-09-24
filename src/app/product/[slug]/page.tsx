@@ -1,6 +1,7 @@
 import { cache } from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { Container } from "@/components/ui/Container";
 import { Breadcrumbs } from "@/components/catalog/Breadcrumbs";
 import { ProductGallery } from "@/components/catalog/ProductGallery";
@@ -11,6 +12,10 @@ import { ProductGrid } from "@/components/catalog/ProductGrid";
 import { getProductDetailBySlug, getRelatedProducts } from "@/domains/catalog/queries";
 import { getApprovedReviewsForProduct } from "@/domains/reviews/queries";
 import { ReviewsSection } from "@/components/catalog/ReviewsSection";
+import { ProductSpecs } from "@/components/catalog/ProductSpecs";
+import { ProductTabs } from "@/components/catalog/ProductTabs";
+import { StarRating } from "@/components/catalog/StarRating";
+import { toPersianDigits } from "@/lib/utils/persian-digits";
 import { SITE_URL } from "@/lib/site-config";
 import { safeJsonLd } from "@/lib/utils/safe-json-ld";
 
@@ -108,56 +113,69 @@ export default async function ProductPage({ params }: ProductPageProps) {
           ]}
         />
 
-        <div className="grid gap-10 lg:grid-cols-2">
+        <div className="grid gap-8 lg:grid-cols-2 lg:gap-14">
           <ProductGallery title={product.title} images={product.images} />
 
-          <div className="flex flex-col gap-5">
-            <div>
-              {product.brand && <p className="mb-1 text-[0.88rem] text-text-secondary">{product.brand}</p>}
-              <h1 className="m-0 text-[clamp(1.5rem,3vw,2.1rem)] font-bold">{product.title}</h1>
+          <div className="flex flex-col gap-6 lg:py-2">
+            <div className="flex flex-col gap-2">
+              {product.brand && <p className="text-[0.88rem] text-text-secondary">{product.brand}</p>}
+              <h1 className="m-0 text-[clamp(1.5rem,3vw,2.1rem)] leading-snug font-bold">{product.title}</h1>
+              {reviewSummary.averageRating !== null && (
+                <a
+                  href="#reviews"
+                  className="inline-flex w-fit items-center gap-2 rounded-full text-[0.85rem] text-text-secondary hover:text-ink"
+                >
+                  <StarRating rating={reviewSummary.averageRating} />
+                  <span>
+                    {toPersianDigits(reviewSummary.averageRating).replace(".", "٫")} (
+                    {toPersianDigits(reviewSummary.approvedCount)} دیدگاه)
+                  </span>
+                </a>
+              )}
             </div>
 
-            <VariantSelector variants={product.variants} />
-
-            <WishlistToggleButton productId={product.id} productName={product.title} />
-
             {product.shortDescription && (
-              <p className="text-[0.95rem] leading-7 text-text-secondary">{product.shortDescription}</p>
+              <p className="text-[0.95rem] leading-8 text-text-secondary">{product.shortDescription}</p>
             )}
 
-            {product.longDescription && (
-              <div className="border-t border-line pt-5 text-[0.92rem] leading-8 whitespace-pre-line text-ink/85">
-                {product.longDescription}
-              </div>
-            )}
+            <div className="border-t border-line pt-6">
+              <VariantSelector
+                variants={product.variants}
+                secondaryAction={
+                  <WishlistToggleButton productId={product.id} productName={product.title} />
+                }
+              />
+            </div>
 
-            {product.tags.length > 0 && (
-              <ul className="flex flex-wrap gap-2">
-                {product.tags.map((tag) => (
-                  <li
-                    key={tag}
-                    className="rounded-full border border-line px-2.5 py-1 text-[0.78rem] text-text-secondary"
-                  >
-                    {tag}
-                  </li>
-                ))}
-              </ul>
-            )}
+            <p className="flex flex-wrap gap-x-5 gap-y-1 border-t border-line pt-5 text-[0.85rem] text-text-secondary">
+              <Link href="/shipping-policy" className="underline-offset-4 hover:text-ink hover:underline">
+                راهنمای ارسال
+              </Link>
+              <Link href="/returns-policy" className="underline-offset-4 hover:text-ink hover:underline">
+                شرایط بازگشت کالا
+              </Link>
+            </p>
           </div>
         </div>
 
+        <div className="mt-14 border-t border-line pt-10 lg:mt-20">
+          <ProductTabs
+            reviewCount={reviewSummary.approvedCount}
+            specs={<ProductSpecs product={product} />}
+            reviews={
+              <ReviewsSection productId={product.id} productSlug={product.slug} summary={reviewSummary} />
+            }
+          />
+        </div>
+
         {relatedProducts.length > 0 && (
-          <section aria-labelledby="related-products-heading" className="mt-16">
-            <h2 id="related-products-heading" className="mb-6 text-[1.3rem] font-bold">
+          <section aria-labelledby="related-products-heading" className="mt-16 lg:mt-20">
+            <h2 id="related-products-heading" className="mb-6 text-[clamp(1.3rem,2.4vw,1.75rem)] font-bold">
               محصولات مرتبط
             </h2>
             <ProductGrid products={relatedProducts} />
           </section>
         )}
-
-        <div className="mt-16 border-t border-line pt-10">
-          <ReviewsSection productId={product.id} productSlug={product.slug} summary={reviewSummary} />
-        </div>
       </Container>
     </main>
   );

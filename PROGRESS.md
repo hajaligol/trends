@@ -18,7 +18,8 @@
   admin login → categories/products pages) against a real local
   PostgreSQL. Shippability is otherwise unchanged from Phase 14's
   assessment — see `docs/PRODUCTION_CHECKLIST.md`.
-- **Latest change (2026-09-19, after the category work):** header
+- **Latest change (2026-09-24):** product detail page polish + Specs/Reviews tabs — see "Change request — Product detail page polish" under `## Completed`.
+- **Earlier change (2026-09-19, after the category work):** header
   redesign — see "Change request — Header layout" under `## Completed`.
 - Current phase: none in progress.
 - Last completed phase: PHASE 14 — QA, accessibility, production
@@ -2542,6 +2543,93 @@ handoff note, not a prerequisite someone else needed to finish first.
   transform step, and it already shares the same underlying transform
   pipeline (esbuild, via Vite) that `tsx` (already a dependency, used for
   `db:seed`) also uses — one less distinct toolchain in the project.
+
+### Change request — Editable product specifications table (2026-09-25)
+
+**Requested:** admins can edit the «مشخصات محصول» table in the product admin
+panel and add custom rows.
+
+**Implemented:**
+- New table `product_specifications` (migration `0011_product_specifications`):
+  `product_id` FK (cascade), `label`, `value`, `display_order`; DB-enforced
+  `UNIQUE (product_id, label)`, label 1–80 / value 1–500 char CHECKs, index on
+  `(product_id, display_order)`.
+- Model: the automatic rows (brand, category, material, sizes, colors, tags)
+  stay derived from product/variant data. Admin rows are **custom** rows
+  appended after them; a custom row whose label matches an automatic row
+  (normalized: whitespace, Arabic/Persian ی/ک, case) **replaces that row's
+  value in place** — this is how automatic rows are overridden.
+- `src/domains/catalog/specifications.ts` (`listProductSpecifications`,
+  `replaceProductSpecifications` — delete+insert in one transaction).
+- `saveProductSpecificationsAction` (admin-actions.ts): staff/admin check,
+  product existence check, `productSpecificationsSchema` (trims, drops fully
+  blank rows, rejects half-filled rows / duplicate labels / >30 rows), audit
+  log `product.specifications.update`, revalidates storefront + admin pages.
+- Admin UI: `ProductSpecificationsEditor` section on
+  `/admin/products/[id]` — add/remove/reorder rows, label suggestions for the
+  automatic labels.
+- Storefront: `CatalogProductDetail.specifications`; `ProductSpecs` merges them.
+- Helpers: `lib/utils/spec-label.ts`, `lib/validation/spec-limits.ts`.
+
+**Tests/checks:** `typecheck` pass; `test` 102/102 (new
+`tests/unit/product-specifications.test.ts`); `test:integration` 46/46 (new
+`tests/integration/product-specifications.test.ts`: save/replace/order,
+transactional rollback, DB length + unique constraints, cascade, storefront
+read); `build` pass; SSR of `/product/classic-shirt` verified with an override
+row and an appended row. `eslint` clean on touched folders.
+**Not verified:** the admin editor UI and the Server Action itself were not
+exercised in a browser / over the real wire protocol (no browser here) — the
+schema, domain function and storefront output were tested directly.
+**Migration to run:** `npm run db:migrate`.
+
+### Change request — Product detail page polish + Specifications/Reviews tabs (2026-09-24)
+
+**Requested:** polish `/product/[slug]` to match the site's design language;
+replace the old description block with a two-tab section — مشخصات محصول and
+دیدگاه‌ها.
+
+**Implemented:**
+- New `ProductTabs` (client; only owns which tab is visible; both panels are
+  server-rendered and passed in, inactive one stays in the DOM `hidden`).
+  WAI-ARIA tabs, roving tabindex, Arrow/Home/End (arrow direction follows
+  computed `direction`, so RTL is correct), `#reviews`/`#specs` hash selects
+  a tab. Pill-style tab bar (`bg-header-bg` track, `bg-ink` active).
+- New `ProductSpecs` (server): rows derived from existing data — brand,
+  category (linked), material, sizes (sold-out sizes struck through), colors
+  with swatches, tags; rows are omitted when data is missing. The product's
+  `longDescription` now renders above the table (under «توضیحات») so admin
+  text isn't lost; remove that block in `ProductSpecs.tsx` if it should go.
+- `ReviewsSection` redesigned: summary card (average, stars, count,
+  per-star distribution computed from the already-fetched approved list),
+  review cards with pastel initial avatars, verified-purchase chip, dates in
+  Asia/Tehran. Fixes a latent bug: the notice boxes used `bg-header`, which
+  is not a defined token (real one is `bg-header-bg`), so they had no
+  background.
+- `VariantSelector`: larger touch targets (44px), size/color fieldsets with
+  the selected value in the legend, round swatch buttons for colors that
+  have a hex, pill quantity stepper, low-stock line shows the real count,
+  new `secondaryAction` slot. `WishlistToggleButton` is now a round icon
+  button beside the add-to-cart CTA (accessible name + `aria-pressed`).
+- Page: brand/title/rating link (jumps to reviews tab), short description,
+  variants block, links to `/shipping-policy` and `/returns-policy`; tabs
+  below the fold, related products after them. Gallery radius/thumbnails
+  aligned with cards; `loading.tsx` skeleton matches the new layout.
+
+**Files:** `src/app/product/[slug]/{page,loading}.tsx`,
+`src/components/catalog/{ProductTabs,ProductSpecs,ReviewsSection,VariantSelector,ProductGallery}.tsx`,
+`src/components/ui/WishlistButton.tsx`, `src/domains/catalog/queries.ts`
+(`CatalogProductVariant` gains read-only `material`).
+**Database changes:** none. **Cart/price/stock logic:** unchanged (server
+still re-reads variant price/stock on add-to-cart).
+
+**Checks:** `typecheck` pass; `test` 95/95 pass; `build` pass (against local
+PostgreSQL + seed); SSR HTML of `/product/classic-shirt` verified over HTTP
+(tabs, both panels, reviews, rating link, JSON-LD). `lint` reports 3
+pre-existing errors in `AuthSessionProvider.tsx` and `HeaderSearch.tsx`
+(react-hooks rules) — none in files touched here.
+**Not verified:** no browser was available, so visual layout and tab
+interaction/keyboard behavior were not exercised in a real browser —
+please eyeball desktop/tablet/mobile.
 
 ### Change request — Header layout (three columns)
 

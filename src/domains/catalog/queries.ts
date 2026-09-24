@@ -13,6 +13,7 @@ import {
   type CategoryRow,
 } from "@/domains/categories/tree";
 import type { ProductSort } from "./presentation";
+import { listProductSpecifications, type SpecificationRow } from "@/domains/catalog/specifications";
 
 /**
  * Catalog read model returned to callers (Server Components, future route
@@ -134,6 +135,9 @@ export type CatalogProductVariant = {
   size: string;
   color: string;
   colorHex: string | null;
+  /** Free-text fabric/material of this variant (may be null). Shown in the
+   * product page's specifications tab; never used for pricing/stock. */
+  material: string | null;
   priceToman: number;
   compareAtPriceToman: number | null;
   stock: number;
@@ -145,6 +149,7 @@ type RawVariantRow = {
   size: string;
   color: string;
   colorHex: string | null;
+  material: string | null;
   priceToman: number;
   compareAtPriceToman: number | null;
   stock: number;
@@ -157,6 +162,7 @@ function toVariant(row: RawVariantRow): CatalogProductVariant {
     size: row.size,
     color: row.color,
     colorHex: row.colorHex,
+    material: row.material,
     priceToman: row.priceToman,
     compareAtPriceToman: row.compareAtPriceToman,
     stock: row.stock,
@@ -170,6 +176,7 @@ const VARIANT_COLUMNS = {
   size: productVariants.size,
   color: productVariants.color,
   colorHex: productVariants.colorHex,
+  material: productVariants.material,
   priceToman: productVariants.priceToman,
   compareAtPriceToman: productVariants.compareAtPriceToman,
   stock: productVariants.stock,
@@ -363,6 +370,8 @@ export type CatalogProductDetail = CatalogProductSummary & {
    * the product page's size/color picker needs every variant's own price
    * and stock, not just the cheapest one. */
   variants: CatalogProductVariant[];
+  /** Admin-authored extra rows of the specifications table, in order. */
+  specifications: SpecificationRow[];
 };
 
 export async function getProductDetailBySlug(slug: string): Promise<CatalogProductDetail | null> {
@@ -393,7 +402,7 @@ export async function getProductDetailBySlug(slug: string): Promise<CatalogProdu
     name: category.name,
   }));
 
-  const [variantRows, imageRows] = await Promise.all([
+  const [variantRows, imageRows, specifications] = await Promise.all([
     db
       .select(VARIANT_COLUMNS)
       .from(productVariants)
@@ -403,6 +412,7 @@ export async function getProductDetailBySlug(slug: string): Promise<CatalogProdu
       .from(productImages)
       .where(eq(productImages.productId, row.id))
       .orderBy(asc(productImages.displayOrder)),
+    listProductSpecifications(row.id),
   ]);
 
   const variants = variantRows.map(toVariant);
@@ -420,6 +430,7 @@ export async function getProductDetailBySlug(slug: string): Promise<CatalogProdu
     categoryName: row.categoryName,
     categoryTrail,
     variants,
+    specifications,
   };
 }
 

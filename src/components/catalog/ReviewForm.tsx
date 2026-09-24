@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { RatingStarIcon } from "@/components/ui/icons";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { submitReviewAction } from "@/domains/reviews/actions";
 import type { ActionResult } from "@/domains/auth/roles";
@@ -60,9 +61,10 @@ export function ReviewForm({ productSlug }: { productSlug: string }) {
               type="button"
               onClick={() => setRating(value)}
               aria-label={`${value} ستاره`}
-              className={`text-[1.4rem] leading-none ${value <= rating ? "text-ink" : "text-line"}`}
+              aria-pressed={value === rating}
+              className={`cursor-pointer rounded-full p-0.5 ${value <= rating ? "" : "text-ink/30"}`}
             >
-              ★
+              <RatingStarIcon filled={value <= rating} style={{ width: 32, height: 32 }} />
             </button>
           ))}
         </div>
