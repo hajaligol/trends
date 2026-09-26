@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { HomeIcon } from "@/components/ui/icons";
 
 export type BreadcrumbItem = {
   label: string;
@@ -20,8 +21,13 @@ export function Breadcrumbs({ items }: { items: BreadcrumbItem[] }) {
           return (
             <li key={`${item.label}-${index}`} className="flex items-center gap-2">
               {item.href && !isLast ? (
-                <Link href={item.href} className="hover:text-ink">
-                  {item.label}
+                <Link
+                  href={item.href}
+                  // The home crumb is shown as an icon; the label stays for screen readers.
+                  aria-label={item.href === "/" ? item.label : undefined}
+                  className={item.href === "/" ? "flex items-center" : "hover:text-ink"}
+                >
+                  {item.href === "/" ? <HomeIcon className="h-[20px] w-[20px]" /> : item.label}
                 </Link>
               ) : (
                 <span aria-current={isLast ? "page" : undefined} className={isLast ? "text-ink" : undefined}>
