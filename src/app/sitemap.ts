@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { getSitemapEntries } from "@/domains/catalog/queries";
+import { COLLECTIONS } from "@/domains/catalog/presentation";
 import { SITE_URL } from "@/lib/site-config";
 
 const STATIC_PAGES = [
@@ -25,6 +26,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       url: `${SITE_URL}${path}`,
       changeFrequency: "monthly" as const,
       priority: 0.3,
+    })),
+    ...Object.keys(COLLECTIONS).map((slug) => ({
+      url: `${SITE_URL}/collection/${slug}`,
+      changeFrequency: "daily" as const,
+      priority: 0.6,
     })),
     ...categories.map((category) => ({
       url: `${SITE_URL}/category/${category.slug}`,

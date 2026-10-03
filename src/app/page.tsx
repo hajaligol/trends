@@ -8,6 +8,7 @@ import { NewArrivals } from "@/components/home/NewArrivals";
 import { BenefitsStrip } from "@/components/home/BenefitsStrip";
 import { Container } from "@/components/ui/Container";
 import { demoBenefits } from "@/domains/catalog/demo-data";
+import { HOME_ROW_MAX_PRODUCTS } from "@/domains/catalog/presentation";
 import { getFeaturedProducts, getNewArrivals, getTopSellingProducts } from "@/domains/catalog/queries";
 import { getActiveHeroSlides, getActivePromoBanners, getHomeCategoryTiles } from "@/domains/content/queries";
 
@@ -31,9 +32,11 @@ export const metadata: Metadata = {
 export default async function HomePage() {
   const [categoryTiles, featuredProducts, topSellingProducts, newArrivals, heroSlides, promoBanners] = await Promise.all([
     getHomeCategoryTiles(),
-    getFeaturedProducts(),
-    getTopSellingProducts(),
-    getNewArrivals(),
+    // One more than a row shows, so each row can tell whether the section
+    // has more products than fit and render its "show all" tile.
+    getFeaturedProducts(HOME_ROW_MAX_PRODUCTS + 1),
+    getTopSellingProducts(HOME_ROW_MAX_PRODUCTS + 1),
+    getNewArrivals(HOME_ROW_MAX_PRODUCTS + 1),
     getActiveHeroSlides(),
     getActivePromoBanners(),
   ]);

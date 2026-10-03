@@ -120,3 +120,24 @@ export function swatchForCategorySlug(slug: string, fallbackIndex = 0): Category
   if (known) return known;
   return SWATCH_FALLBACK_ORDER[fallbackIndex % SWATCH_FALLBACK_ORDER.length] ?? "sage";
 }
+
+
+/**
+ * Homepage product rows ("شگفت‌انگیزها", "پرفروش‌ترین محصولات",
+ * "جدیدترین محصولات"). A row shows at most `HOME_ROW_MAX_PRODUCTS`
+ * products; if the section has more, the row ends with a "show all"
+ * tile that links to `/collection/<slug>` (the scroll arrows stay).
+ */
+export const HOME_ROW_MAX_PRODUCTS = 10;
+
+export const COLLECTIONS = {
+  featured: { title: "شگفت‌انگیزها", description: "محصولات ویژه و منتخب ترندز" },
+  "top-selling": { title: "پرفروش‌ترین محصولات", description: "پرفروش‌ترین محصولات ترندز" },
+  "new-arrivals": { title: "جدیدترین محصولات", description: "تازه‌ترین محصولات ترندز" },
+} as const;
+
+export type CollectionSlug = keyof typeof COLLECTIONS;
+
+export function isCollectionSlug(value: string): value is CollectionSlug {
+  return Object.prototype.hasOwnProperty.call(COLLECTIONS, value);
+}

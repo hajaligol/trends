@@ -3,18 +3,27 @@ import Link from "next/link";
 import { AssetSlot } from "@/components/ui/AssetSlot";
 import { Container } from "@/components/ui/Container";
 import { SectionHead } from "@/components/home/SectionHead";
+import { SwipeRow } from "@/components/home/SwipeRow";
+import { ShowAllTile } from "@/components/home/ShowAllTile";
 import { StarIcon } from "@/components/ui/icons";
+import { COLLECTIONS, HOME_ROW_MAX_PRODUCTS } from "@/domains/catalog/presentation";
 import { StockBadge } from "@/components/catalog/StockBadge";
 import { WishlistButton } from "@/components/ui/WishlistButton";
 import type { CatalogProductSummary } from "@/domains/catalog/queries";
 import { formatToman } from "@/lib/utils/money";
 
 /**
- * Mirrors #new-arrivals .arrivals-grid in the prototype: 6 columns
- * desktop, 3 from ~640px, 2 below that. Real catalog data since Phase 4 —
- * see `getNewArrivals` in `@/domains/catalog/queries`.
+ * Swipeable row (6 cards visible on desktop, 3 from ~640px, ~2 below
+ * that; the prototype's #new-arrivals grid layout). Real catalog data
+ * since Phase 4 — see `getNewArrivals` in `@/domains/catalog/queries`.
+ * More than `HOME_ROW_MAX_PRODUCTS` products → "show all" tile at
+ * the end; arrows always shown.
  */
 export function NewArrivals({ arrivals }: { arrivals: CatalogProductSummary[] }) {
+  if (arrivals.length === 0) return null;
+  const hasMore = arrivals.length > HOME_ROW_MAX_PRODUCTS;
+  const visible = arrivals.slice(0, HOME_ROW_MAX_PRODUCTS);
+
   return (
     <section id="new-arrivals" className="py-[clamp(30px,5vw,54px)]">
       <Container>
@@ -22,13 +31,17 @@ export function NewArrivals({ arrivals }: { arrivals: CatalogProductSummary[] })
           eyebrow="تازه‌ترین‌ها"
           title="جدیدترین محصولات"
           icon={<StarIcon className="h-[1.1em] w-[1.1em] text-brand" />}
-          viewAllHref="#new-arrivals"
         />
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
-          {arrivals.map((arrival) => {
+        <SwipeRow
+          label={COLLECTIONS["new-arrivals"].title}
+          showArrows
+          gapClassName="gap-4"
+          itemClassName="basis-[calc((100%_-_16px)/2)] sm:basis-[calc((100%_-_32px)/3)] lg:basis-[calc((100%_-_80px)/6)]"
+        >
+          {visible.map((arrival) => {
             const primaryImage = arrival.images[0];
             return (
-              <article key={arrival.id} className="flex flex-col gap-2">
+              <article key={arrival.id} className="flex w-full flex-col gap-2">
                 <div className="group relative aspect-[4/5] overflow-hidden rounded-[14px] bg-card-image">
                   <Link href={`/product/${arrival.slug}`} className="absolute inset-0 block">
                     {primaryImage ? (
@@ -69,7 +82,10 @@ export function NewArrivals({ arrivals }: { arrivals: CatalogProductSummary[] })
               </article>
             );
           })}
-        </div>
+          {hasMore && (
+            <ShowAllTile key="show-all" href="/collection/new-arrivals" label="مشاهده همه" productsLabel={COLLECTIONS["new-arrivals"].title} />
+          )}
+        </SwipeRow>
       </Container>
     </section>
   );

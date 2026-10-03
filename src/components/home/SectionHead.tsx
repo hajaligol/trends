@@ -6,7 +6,8 @@ type SectionHeadProps = {
   title: string;
   /** Optional decorative icon shown before the title. */
   icon?: ReactNode;
-  viewAllHref: string;
+  /** Omit to render the heading without a "view all" link. */
+  viewAllHref?: string;
   viewAllLabel?: string;
 };
 
@@ -32,6 +33,7 @@ export function SectionHead({
           {title}
         </h2>
       </div>
+      {viewAllHref && (
       <a
         href={viewAllHref}
         className="flex items-center gap-1.5 whitespace-nowrap rounded-full bg-brand px-5 py-2 text-[0.9rem] font-semibold text-white transition-colors duration-200 hover:bg-brand-dark"
@@ -41,6 +43,7 @@ export function SectionHead({
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="h-[18px] w-[18px]"><path d="m15 18-6-6 6-6"/></svg>
         </span>
       </a>
+      )}
     </div>
   );
 }

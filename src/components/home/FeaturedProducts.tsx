@@ -1,71 +1,68 @@
 import { Container } from "@/components/ui/Container";
 import { ProductCard } from "@/components/catalog/ProductCard";
+import { SwipeRow } from "@/components/home/SwipeRow";
+import { ShowAllTile } from "@/components/home/ShowAllTile";
 import { FlameIcon } from "@/components/ui/icons";
+import { COLLECTIONS, HOME_ROW_MAX_PRODUCTS } from "@/domains/catalog/presentation";
 import type { CatalogProductSummary } from "@/domains/catalog/queries";
 
 /**
- * Mirrors #featured .product-grid in the prototype: 5 columns desktop,
- * 3 from ~640px, 2 below that. Real catalog data since Phase 4 — see
- * `getFeaturedProducts` in `@/domains/catalog/queries`.
+ * A swipeable row (5 cards visible on desktop, 3 from ~640px, ~2 below
+ * that). Real catalog data since Phase 4 — see `getFeaturedProducts` in
+ * `@/domains/catalog/queries`. The page passes up to
+ * `HOME_ROW_MAX_PRODUCTS + 1` products: if there are more than
+ * `HOME_ROW_MAX_PRODUCTS`, the row shows the first ones, keeps its arrows
+ * and ends with a "show all" tile linking to `/collection/featured`.
  *
- * Styled as the homepage's "hero" product section on purpose: a branded
- * lavender stage with a glowing flame badge, and each product lifted onto
- * its own white tile. `ProductCard` itself is untouched (it is shared with
- * category listings) — the tile is a wrapper around it here.
+ * Styled as the homepage's "hero" product section on purpose: a plain
+ * light-purple panel, a purple title pill with a white flame icon, and each
+ * product on its own white tile. Deliberately has no animations (no hover
+ * lift, no flame pulse, no smooth-scrolling arrows). `ProductCard` itself is
+ * untouched (it is shared with category listings) — the tile is a wrapper
+ * around it here.
  */
 export function FeaturedProducts({ products }: { products: CatalogProductSummary[] }) {
+  if (products.length === 0) return null;
+  const hasMore = products.length > HOME_ROW_MAX_PRODUCTS;
+  const visible = products.slice(0, HOME_ROW_MAX_PRODUCTS);
+
   return (
     <section id="featured" className="py-[clamp(30px,5vw,54px)]">
       <Container>
-        <div className="relative isolate overflow-hidden rounded-[clamp(20px,3vw,32px)] border border-brand/15 bg-gradient-to-br from-[#f7f0fc] via-[#ede1f7] to-[#e2d4ec] px-[clamp(14px,3vw,40px)] pb-[clamp(18px,3vw,40px)] pt-[clamp(22px,3.4vw,42px)] shadow-[0_30px_70px_-32px_rgba(91,15,165,0.5)]">
-          {/* Decorative layers — purely visual, behind the content. */}
-          <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-1.5 bg-gradient-to-r from-brand via-[#b56ee6] to-brand" />
-          <div aria-hidden="true" className="pointer-events-none absolute -top-28 -end-20 -z-10 h-80 w-80 rounded-full bg-brand/20 blur-3xl" />
-          <div aria-hidden="true" className="pointer-events-none absolute -bottom-32 -start-24 -z-10 h-96 w-96 rounded-full bg-[#c79ae8]/45 blur-3xl" />
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-0 -z-10 opacity-70"
-            style={{
-              backgroundImage: "radial-gradient(rgba(91,15,165,0.13) 1px, transparent 1px)",
-              backgroundSize: "18px 18px",
-              maskImage: "linear-gradient(to bottom, black, transparent 70%)",
-              WebkitMaskImage: "linear-gradient(to bottom, black, transparent 70%)",
-            }}
-          />
-
+        <div className="relative overflow-hidden rounded-[clamp(20px,3vw,32px)] border border-brand/15 bg-[#f3ebfa] px-[clamp(14px,3vw,40px)] pb-[clamp(18px,3vw,40px)] pt-[clamp(22px,3.4vw,42px)] shadow-[0_30px_70px_-32px_rgba(91,15,165,0.5)]">
           <div className="mb-[clamp(20px,3vw,34px)] flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-3.5 sm:gap-4">
+            <div className="flex h-14 items-center gap-3.5 rounded-2xl bg-brand pe-5 sm:h-16 sm:gap-4">
               <span
                 aria-hidden="true"
-                className="flame-badge-pulse flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white ring-1 ring-brand/15 sm:h-16 sm:w-16"
+                className="flex h-14 w-14 shrink-0 items-center justify-center sm:h-16 sm:w-16"
               >
-                <FlameIcon className="flame-flicker h-9 w-9 text-brand sm:h-10 sm:w-10" strokeWidth={2} />
+                <FlameIcon className="h-9 w-9 text-white sm:h-10 sm:w-10" strokeWidth={2} />
               </span>
-              <h2 className="m-0 bg-gradient-to-l from-brand-dark to-[#9a3ddb] bg-clip-text text-[clamp(1.7rem,3.4vw,2.5rem)] font-extrabold leading-[1.3] text-transparent">
+              <h2 className="m-0 text-[clamp(1.7rem,3.4vw,2.5rem)] font-extrabold leading-[1.3] text-white">
                 شگفت‌انگیزها
               </h2>
             </div>
-            <a
-              href="#featured"
-              className="flex items-center gap-1.5 whitespace-nowrap rounded-full bg-brand px-5 py-2 text-[0.9rem] font-semibold text-white shadow-lg shadow-brand/30 transition-colors duration-200 hover:bg-brand-dark"
-            >
-              مشاهده همه{" "}
-              <span aria-hidden="true">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="h-[18px] w-[18px]"><path d="m15 18-6-6 6-6" /></svg>
-              </span>
-            </a>
           </div>
 
-          <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 sm:gap-5 lg:grid-cols-5">
-            {products.map((product) => (
+          <SwipeRow
+            label={COLLECTIONS.featured.title}
+            showArrows
+            animated={false}
+            gapClassName="gap-3.5 sm:gap-5"
+            itemClassName="basis-[calc((100%_-_14px)/2)] sm:basis-[calc((100%_-_40px)/3)] lg:basis-[calc((100%_-_80px)/5)]"
+          >
+            {visible.map((product) => (
               <div
                 key={product.id}
-                className="rounded-[24px] bg-white/85 p-2.5 shadow-[0_2px_14px_-6px_rgba(24,38,48,0.18)] ring-1 ring-white transition duration-300 hover:-translate-y-1.5 hover:shadow-[0_22px_40px_-16px_rgba(91,15,165,0.5)] motion-reduce:hover:translate-y-0"
+                className="w-full rounded-[24px] bg-white/85 p-2.5 shadow-[0_2px_14px_-6px_rgba(24,38,48,0.18)] ring-1 ring-white"
               >
                 <ProductCard product={product} />
               </div>
             ))}
-          </div>
+            {hasMore && (
+              <ShowAllTile key="show-all" animated={false} href="/collection/featured" label="مشاهده همه" productsLabel={COLLECTIONS.featured.title} />
+            )}
+          </SwipeRow>
         </div>
       </Container>
     </section>

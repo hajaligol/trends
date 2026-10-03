@@ -258,8 +258,11 @@ function groupByProductId<T extends { productId: string }>(rows: T[]): Map<strin
   return map;
 }
 
-async function loadProductSummaries(filter: SQL): Promise<CatalogProductSummary[]> {
-  const rows = await db
+async function loadProductSummaries(
+  filter: SQL,
+  options: { limit?: number; newestFirst?: boolean } = {},
+): Promise<CatalogProductSummary[]> {
+  const baseQuery = db
     .select({
       id: products.id,
       slug: products.slug,
@@ -269,7 +272,8 @@ async function loadProductSummaries(filter: SQL): Promise<CatalogProductSummary[
     .from(products)
     .innerJoin(categories, eq(categories.id, products.categoryId))
     .where(and(eq(products.isActive, true), filter))
-    .orderBy(asc(products.createdAt));
+    .orderBy(options.newestFirst ? desc(products.createdAt) : asc(products.createdAt));
+  const rows = await (options.limit !== undefined ? baseQuery.limit(options.limit) : baseQuery);
 
   if (rows.length === 0) return [];
 
@@ -298,8 +302,11 @@ async function loadProductSummaries(filter: SQL): Promise<CatalogProductSummary[
   );
 }
 
-export async function getFeaturedProducts(): Promise<CatalogProductSummary[]> {
-  return loadProductSummaries(eq(products.isFeatured, true));
+/** `limit` is optional: the homepage row asks for one more than it
+ * shows (to know whether to render the "show all" tile), while the
+ * `/collection/featured` page asks for everything. */
+export async function getFeaturedProducts(limit?: number): Promise<CatalogProductSummary[]> {
+  return loadProductSummaries(eq(products.isFeatured, true), { limit });
 }
 
 /** Product summaries for an explicit set of ids, in no particular
@@ -312,8 +319,10 @@ export async function getProductSummariesByIds(ids: string[]): Promise<CatalogPr
   return loadProductSummaries(inArray(products.id, ids));
 }
 
-export async function getNewArrivals(): Promise<CatalogProductSummary[]> {
-  return loadProductSummaries(eq(products.isNewArrival, true));
+/** Newest first, so that a `limit` keeps the most recent products
+ * rather than the oldest ones. */
+export async function getNewArrivals(limit?: number): Promise<CatalogProductSummary[]> {
+  return loadProductSummaries(eq(products.isNewArrival, true), { limit, newestFirst: true });
 }
 
 /** Order statuses whose units count as "sold". `pending_payment` (not yet
@@ -331,18 +340,18 @@ const SALES_COUNTING_STATUSES = ["paid", "processing", "shipped", "delivered"] a
  * list with unsold products, so an empty array (no paid orders yet) is a
  * normal result and the homepage hides the section.
  */
-export async function getTopSellingProducts(limit = 5): Promise<CatalogProductSummary[]> {
+export async function getTopSellingProducts(limit?: number): Promise<CatalogProductSummary[]> {
   const unitsSold = sql<number>`sum(${orderItems.quantity})::int`;
 
-  const ranked = await db
+  const rankedQuery = db
     .select({ productId: orderItems.productId, unitsSold })
     .from(orderItems)
     .innerJoin(orders, eq(orders.id, orderItems.orderId))
     .innerJoin(products, eq(products.id, orderItems.productId))
     .where(and(inArray(orders.status, [...SALES_COUNTING_STATUSES]), eq(products.isActive, true)))
     .groupBy(orderItems.productId)
-    .orderBy(desc(unitsSold), asc(orderItems.productId))
-    .limit(limit);
+    .orderBy(desc(unitsSold), asc(orderItems.productId));
+  const ranked = await (limit !== undefined ? rankedQuery.limit(limit) : rankedQuery);
 
   const rankedIds = ranked.map((row) => row.productId).filter((id): id is string => id !== null);
   if (rankedIds.length === 0) return [];
