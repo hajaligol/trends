@@ -53,7 +53,7 @@ const ICON = "h-[28px] w-[28px] text-ink lg:h-[36px] lg:w-[36px]";
 export function Header({ categories }: { categories: NavCategory[] }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
-  const { openSearch, openCart, isHeaderDimmed } = useUIOverlay();
+  const { openSearch, isHeaderDimmed } = useUIOverlay();
   const { cart } = useCart();
   const cartCount = cart.itemCount;
   const { data: session } = useSession();
@@ -123,20 +123,14 @@ export function Header({ categories }: { categories: NavCategory[] }) {
 
         {/* Actions — right column on desktop. */}
         <div className="flex items-center gap-2 lg:col-start-1 lg:row-start-1 lg:justify-self-start lg:gap-3">
-          <button
-            type="button"
-            aria-label="سبد خرید"
-            aria-haspopup="true"
-            onClick={openCart}
-            className={ICON_BUTTON}
-          >
+          <Link href="/checkout" aria-label="سبد خرید" className={ICON_BUTTON}>
             <CartIcon className={ICON} />
             {cartCount > 0 && (
               <span className="absolute top-0.5 left-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand px-0.5 text-[0.62rem] leading-none text-white lg:top-1 lg:left-1 lg:h-[18px] lg:min-w-[18px] lg:text-[0.68rem]">
                 {toPersianDigits(cartCount)}
               </span>
             )}
-          </button>
+          </Link>
           {/* Wishlist — logged-in users only; sits between the cart and the
               account button. */}
           {session?.user && (

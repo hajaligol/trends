@@ -7,7 +7,7 @@ const FOCUSABLE_SELECTOR =
 
 /**
  * Accessibility behavior shared by every modal overlay/drawer
- * (`CartDrawer`, `SearchOverlay`) — Phase 14's "accessibility pass" and
+ * (`SearchOverlay`, formerly also the cart drawer) — Phase 14's "accessibility pass" and
  * "RTL pass" tasks, and critical flow #12 ("keyboard navigation of
  * dialogs/drawers") from CLAUDE_BUILD_INSTRUCTIONS.txt.
  *

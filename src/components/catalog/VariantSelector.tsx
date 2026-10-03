@@ -7,9 +7,8 @@ import { toPersianDigits } from "@/lib/utils/persian-digits";
 import { StockBadge } from "@/components/catalog/StockBadge";
 import { Button } from "@/components/ui/Button";
 import { CartIcon } from "@/components/ui/icons";
-import { useToast } from "@/components/feedback/ToastProvider";
+import { AddedToCartModal } from "@/components/catalog/AddedToCartModal";
 import { useCart } from "@/components/cart/CartProvider";
-import { useUIOverlay } from "@/components/overlays/UIOverlayProvider";
 
 /**
  * Size/color picker plus a real "add to cart" control, for a product's
@@ -47,8 +46,7 @@ export function VariantSelector({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const { addItem, isMutating } = useCart();
-  const { openCart } = useUIOverlay();
-  const { showToast } = useToast();
+  const [addedInfo, setAddedInfo] = useState<{ size: string; color: string; colorHex: string | null; quantity: number } | null>(null);
 
   const selectedVariant =
     variants.find((variant) => variant.size === selectedSize && variant.color === selectedColor) ??
@@ -89,8 +87,12 @@ export function VariantSelector({
     setErrorMessage(null);
     const ok = await addItem(selectedVariant.id, quantity);
     if (ok) {
-      showToast("محصول به سبد خرید اضافه شد");
-      openCart();
+      setAddedInfo({
+        size: selectedVariant.size,
+        color: selectedVariant.color,
+        colorHex: selectedVariant.colorHex,
+        quantity,
+      });
     } else {
       setErrorMessage("افزودن به سبد خرید ممکن نشد");
     }
@@ -98,6 +100,14 @@ export function VariantSelector({
 
   return (
     <div className="flex flex-col gap-6">
+      <AddedToCartModal
+        open={addedInfo !== null}
+        onClose={() => setAddedInfo(null)}
+        size={addedInfo?.size ?? ""}
+        color={addedInfo?.color ?? ""}
+        colorHex={addedInfo?.colorHex ?? null}
+        quantity={addedInfo?.quantity ?? 1}
+      />
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
         <span className="text-[1.65rem] leading-tight font-bold">{formatToman(selectedVariant.priceToman)}</span>
         {percent > 0 && selectedVariant.compareAtPriceToman !== null && (

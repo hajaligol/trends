@@ -18,7 +18,8 @@
   admin login → categories/products pages) against a real local
   PostgreSQL. Shippability is otherwise unchanged from Phase 14's
   assessment — see `docs/PRODUCTION_CHECKLIST.md`.
-- **Latest change (2026-09-24):** product detail page polish + Specs/Reviews tabs — see "Change request — Product detail page polish" under `## Completed`.
+- **Latest change (2026-10-03, later):** add-to-cart now shows a confirmation modal (مشاهده سبد خرید / ادامه خرید) instead of the toast — `components/catalog/AddedToCartModal.tsx`, wired in `VariantSelector`. Earlier the same day: cart drawer removed; the header cart icon opens `/checkout`, now a 3-stage flow (سبد خرید → ارسال → پرداخت) with a step tracker — see "Change request — Staged checkout" under `## Completed`.
+- **Earlier change (2026-09-24):** product detail page polish + Specs/Reviews tabs — see "Change request — Product detail page polish" under `## Completed`.
 - **Earlier change (2026-09-19, after the category work):** header
   redesign — see "Change request — Header layout" under `## Completed`.
 - Current phase: none in progress.
@@ -47,6 +48,33 @@
 - Date: 2026-09-18
 
 ## Completed
+
+### Change request — Remove-from-cart modal (2026-10-03)
+- The trash button on a stage-1 cart line no longer removes immediately; it opens `components/checkout/RemoveFromCartModal.tsx` with: «حذف کالا» (red `danger`), «انصراف» (outline, initial focus), «افزودن به علاقه‌مندی‌ها» (purple `brand`).
+- «افزودن به علاقه‌مندی‌ها» = **move to wishlist** (assumption): `toggleWishlistAction(productId, true)` first, then remove the cart line; if the wishlist write fails the item stays in the cart. Success toast «کالا به علاقه‌مندی‌ها منتقل شد».
+- Guests have no persisted wishlist, so the button shows a sign-in notice and leaves the cart unchanged.
+- State lives in `CheckoutView` (`pendingRemove`, `isRemoving`, errors). Checks: typecheck, lint, 102 unit tests pass; not verified in a browser.
+
+### Change request — Add-to-cart modal (2026-10-03)
+- Replaces the success toast in `VariantSelector` (its only add-to-cart caller). New `AddedToCartModal`: check badge, "محصول به سبد خرید اضافه شد", size/color/quantity line, purple "مشاهده سبد خرید" (link to `/checkout`) and outline "ادامه خرید" (closes). Backdrop click, close button and Escape also close; focus trap/restore via `useDialogA11y`, initial focus on "ادامه خرید". Enter animations in `globals.css` respect reduced motion.
+- `ToastProvider` is untouched and still available. Checks: typecheck, eslint (catalog), 102 unit tests pass. Not verified in a browser.
+
+### Change request — Staged checkout (2026-10-03)
+User-requested change, not a numbered phase.
+- **Removed** `components/overlays/CartDrawer.tsx` and its mount in `app/layout.tsx`; removed `isCartOpen/openCart/closeCart` from `UIOverlayProvider`.
+- **Add to cart** (`VariantSelector`) now only shows the success toast; it no longer opens anything.
+- **Header cart icon** is now a `<Link href="/checkout">` (badge unchanged).
+- **`/checkout`** (`app/checkout/page.tsx`) no longer redirects guests to `/login` or empty carts to `/`. Stage 1 works for guests and shows an empty state for an empty cart.
+- **`CheckoutView`** rewritten as three client-side stages (state, not routes):
+  1. سبد خرید — line items (image, title→product link, size, color swatch, unit price, quantity ±, line total, remove), coupon field, summary with total.
+  2. ارسال — address cards + add-address form, shipping method, order note. Guests see a login/register gate (cart merges on login).
+  3. پرداخت — review (address/method/items with edit links), payment method card, "ثبت سفارش و پرداخت" → existing `placeOrderAction`.
+- **`CheckoutStepper.tsx`** (new): ordered list, `aria-current="step"`, finished steps are buttons. Icons: `CartIcon` (header cart icon), `ShippingIcon` and `PaymentIcon` (the ones used in the homepage benefits strip).
+- `ShippingIcon`/`PaymentIcon` in `ui/icons.tsx` now spread `props` (default stroke unchanged, so the benefits strip is identical). Added `TrashIcon`, `ArrowLeftIcon`, `ArrowRightIcon`, `TagIcon`, `BagIcon`.
+- After any cart mutation the page calls `router.refresh()` (shipping methods depend on the subtotal for free-shipping) and re-previews an applied coupon.
+- Server authority unchanged: `placeOrderAction` still receives only addressId, shipping code, note, coupon code.
+- No DB/schema changes. Checks run: `typecheck` OK, `lint` OK, `test` 102 passed. **Not run:** `next build`, integration tests (no PostgreSQL in the session) and any in-browser check (no browser tooling). Verify visually (RTL, mobile) before shipping.
+- Known follow-ups: no `callbackUrl` after login (login still lands on `/account`; user clicks the cart icon again); stage is component state, so browser Back leaves checkout rather than going to the previous stage.
 
 ### Phase 0 — Repository audit + implementation plan
 Prototype structure, design tokens, missing assets, and architecture

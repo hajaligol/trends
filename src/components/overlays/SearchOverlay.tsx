@@ -10,7 +10,7 @@ import { useDialogA11y } from "@/lib/hooks/useDialogA11y";
  * `/search?q=...` (Phase 5) — no client-side fetch/state needed, the
  * `/search` page itself is what's database-backed and URL-driven.
  *
- * Uses the same `useDialogA11y` focus-trap hook as `CartDrawer` (Phase
+ * Uses the same `useDialogA11y` focus-trap hook as the former cart drawer (Phase
  * 14 accessibility pass) — previously had Escape-to-close and initial
  * input focus but no Tab trap and no focus restored to the search
  * trigger button on close.

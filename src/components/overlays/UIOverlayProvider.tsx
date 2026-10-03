@@ -12,7 +12,6 @@ import {
 
 type UIOverlayState = {
   isSearchOpen: boolean;
-  isCartOpen: boolean;
   /** True while at least one header panel (search dropdown, category menu) asks for the page to be dimmed. */
   isPageDimmed: boolean;
   /** True while a panel asks for the header itself to be dimmed as well (the search dropdown). */
@@ -21,37 +20,26 @@ type UIOverlayState = {
   acquireDim: (includeHeader?: boolean) => () => void;
   openSearch: () => void;
   closeSearch: () => void;
-  openCart: () => void;
-  closeCart: () => void;
 };
 
 const UIOverlayContext = createContext<UIOverlayState | null>(null);
 
 /**
- * Shares search-overlay/cart-drawer open state between the header's
- * trigger buttons (rendered in the layout) and the overlay/drawer
- * components (also rendered at the layout root). Mirrors the
+ * Shares search-overlay open state between the header's
+ * trigger button (rendered in the layout) and the overlay
+ * component (also rendered at the layout root). Mirrors the
  * prototype's global open/close functions in <script>, reimplemented as
  * React state instead of directly mutating the DOM.
  */
 export function UIOverlayProvider({ children }: { children: ReactNode }) {
   const [isSearchOpen, setSearchOpen] = useState(false);
-  const [isCartOpen, setCartOpen] = useState(false);
   // A counter rather than a boolean, so two panels asking at once (or one
   // closing as another opens) can't switch each other's dimming off.
   const [dimCount, setDimCount] = useState(0);
   const [headerDimCount, setHeaderDimCount] = useState(0);
 
-  const openSearch = useCallback(() => {
-    setCartOpen(false);
-    setSearchOpen(true);
-  }, []);
+  const openSearch = useCallback(() => setSearchOpen(true), []);
   const closeSearch = useCallback(() => setSearchOpen(false), []);
-  const openCart = useCallback(() => {
-    setSearchOpen(false);
-    setCartOpen(true);
-  }, []);
-  const closeCart = useCallback(() => setCartOpen(false), []);
   const acquireDim = useCallback((includeHeader = false) => {
     setDimCount((count) => count + 1);
     if (includeHeader) setHeaderDimCount((count) => count + 1);
@@ -64,16 +52,13 @@ export function UIOverlayProvider({ children }: { children: ReactNode }) {
   const value = useMemo(
     () => ({
       isSearchOpen,
-      isCartOpen,
       isPageDimmed: dimCount > 0,
       isHeaderDimmed: headerDimCount > 0,
       acquireDim,
       openSearch,
       closeSearch,
-      openCart,
-      closeCart,
     }),
-    [isSearchOpen, isCartOpen, dimCount, headerDimCount, acquireDim, openSearch, closeSearch, openCart, closeCart],
+    [isSearchOpen, dimCount, headerDimCount, acquireDim, openSearch, closeSearch],
   );
 
   return <UIOverlayContext.Provider value={value}>{children}</UIOverlayContext.Provider>;

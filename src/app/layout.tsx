@@ -5,7 +5,6 @@ import { Footer } from "@/components/layout/Footer";
 import { UIOverlayProvider } from "@/components/overlays/UIOverlayProvider";
 import { SearchOverlay } from "@/components/overlays/SearchOverlay";
 import { PageDim } from "@/components/overlays/PageDim";
-import { CartDrawer } from "@/components/overlays/CartDrawer";
 import { SITE_NAME, SITE_URL } from "@/lib/site-config";
 import { AuthSessionProvider } from "@/components/auth/AuthSessionProvider";
 import { CartProvider } from "@/components/cart/CartProvider";
@@ -52,7 +51,6 @@ export default async function RootLayout({
                   <Footer categories={navCategories} />
                   <PageDim />
                   <SearchOverlay />
-                  <CartDrawer />
                 </UIOverlayProvider>
               </ToastProvider>
             </WishlistProvider>

@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
 import { Container } from "@/components/ui/Container";
 import { getCurrentUser } from "@/domains/auth/actions";
 import { getAddressesForUser } from "@/domains/addresses/queries";
@@ -9,39 +8,39 @@ import { listShippingMethods } from "@/domains/shipping/methods";
 import { CheckoutView } from "@/components/checkout/CheckoutView";
 
 export const metadata: Metadata = {
-  title: "تسویه حساب",
+  title: "سبد خرید و تسویه حساب",
   robots: { index: false, follow: false },
 };
 
 /**
- * Checkout requires a signed-in customer — the address book
- * (`addresses`) is itself authenticated-only (Phase 6), and building a
- * parallel guest-address model is real, separate scope, not a natural
- * side effect of this phase (documented in PROGRESS.md as an
- * assumption, not silently invented, per rule A.18). An unauthenticated
- * visitor is sent to `/login`, the same as `/account`'s layout — there's
- * no `callbackUrl` round-trip back to `/checkout` yet since `loginAction`
- * (Phase 6, already complete) doesn't support one; not modifying that
- * completed flow just to add a redirect target is deliberate (rule B.4
- * "do not redo completed work unless fixing a defect" — this isn't a
- * defect, just a nicety), documented as a follow-up in PROGRESS.md.
+ * The header's cart icon links here, so this page doubles as the cart:
+ * it is a three-stage flow (سبد خرید → ارسال → پرداخت), see
+ * `CheckoutView`. Stage 1 works for guests (a guest cart exists since
+ * Phase 7); stages 2–3 need an account, because the address book is
+ * authenticated-only (Phase 6) — a guest reaching stage 2 is asked to
+ * sign in, and their cart merges into their account on login.
+ *
+ * An empty cart no longer redirects away: opening the cart icon on an
+ * empty cart must show an empty state, not bounce the visitor home.
  */
 export default async function CheckoutPage() {
   const user = await getCurrentUser();
-  if (!user) redirect("/login");
 
   const cartId = await getCurrentCartIdReadOnly();
   const cart = await getCartSummary(cartId);
-  if (cart.items.length === 0) redirect("/");
 
-  const addresses = await getAddressesForUser(user.id);
+  const addresses = user ? await getAddressesForUser(user.id) : [];
   const shippingMethods = await listShippingMethods(cart.subtotalToman);
 
   return (
-    <main className="py-[clamp(40px,7vw,80px)]">
+    <main className="py-[clamp(28px,5vw,64px)]">
       <Container>
-        <h1 className="mb-8 text-[1.6rem] font-bold">تسویه حساب</h1>
-        <CheckoutView initialCart={cart} initialAddresses={addresses} shippingMethods={shippingMethods} />
+        <CheckoutView
+          initialCart={cart}
+          initialAddresses={addresses}
+          shippingMethods={shippingMethods}
+          isAuthenticated={Boolean(user)}
+        />
       </Container>
     </main>
   );
