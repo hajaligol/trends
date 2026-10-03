@@ -7,6 +7,8 @@ complete.** See `PROGRESS.md` for the authoritative, detailed status —
 always read it before starting new work; this README is a map, not the
 source of truth.
 
+![Screenshot](images/trends-homepage.png)
+
 ## What this is
 
 A customer can discover products, search/filter, inspect size/color
