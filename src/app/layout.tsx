@@ -9,6 +9,7 @@ import { CartDrawer } from "@/components/overlays/CartDrawer";
 import { SITE_NAME, SITE_URL } from "@/lib/site-config";
 import { AuthSessionProvider } from "@/components/auth/AuthSessionProvider";
 import { CartProvider } from "@/components/cart/CartProvider";
+import { ToastProvider } from "@/components/feedback/ToastProvider";
 import { WishlistProvider } from "@/components/wishlist/WishlistProvider";
 import { getCategoryTree } from "@/domains/catalog/queries";
 import { toNavTree } from "@/domains/categories/tree";
@@ -44,14 +45,16 @@ export default async function RootLayout({
         <AuthSessionProvider>
           <CartProvider>
             <WishlistProvider>
-              <UIOverlayProvider>
-                <Header categories={navCategories} />
-                {children}
-                <Footer categories={navCategories} />
-                <PageDim />
-                <SearchOverlay />
-                <CartDrawer />
-              </UIOverlayProvider>
+              <ToastProvider>
+                <UIOverlayProvider>
+                  <Header categories={navCategories} />
+                  {children}
+                  <Footer categories={navCategories} />
+                  <PageDim />
+                  <SearchOverlay />
+                  <CartDrawer />
+                </UIOverlayProvider>
+              </ToastProvider>
             </WishlistProvider>
           </CartProvider>
         </AuthSessionProvider>

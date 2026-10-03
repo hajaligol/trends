@@ -7,6 +7,7 @@ import { toPersianDigits } from "@/lib/utils/persian-digits";
 import { StockBadge } from "@/components/catalog/StockBadge";
 import { Button } from "@/components/ui/Button";
 import { CartIcon } from "@/components/ui/icons";
+import { useToast } from "@/components/feedback/ToastProvider";
 import { useCart } from "@/components/cart/CartProvider";
 import { useUIOverlay } from "@/components/overlays/UIOverlayProvider";
 
@@ -43,10 +44,11 @@ export function VariantSelector({
   const [selectedSize, setSelectedSize] = useState(firstVariant?.size ?? "");
   const [selectedColor, setSelectedColor] = useState(firstVariant?.color ?? "");
   const [quantity, setQuantity] = useState(1);
-  const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const { addItem, isMutating } = useCart();
   const { openCart } = useUIOverlay();
+  const { showToast } = useToast();
 
   const selectedVariant =
     variants.find((variant) => variant.size === selectedSize && variant.color === selectedColor) ??
@@ -55,7 +57,7 @@ export function VariantSelector({
 
   function selectSize(size: string) {
     setSelectedSize(size);
-    setFeedback(null);
+    setErrorMessage(null);
     const stillValid = variants.some((variant) => variant.size === size && variant.color === selectedColor);
     if (!stillValid) {
       const fallback = variants.find((variant) => variant.size === size);
@@ -65,7 +67,7 @@ export function VariantSelector({
 
   function selectColor(color: string) {
     setSelectedColor(color);
-    setFeedback(null);
+    setErrorMessage(null);
     const stillValid = variants.some((variant) => variant.size === selectedSize && variant.color === color);
     if (!stillValid) {
       const fallback = variants.find((variant) => variant.color === color);
@@ -84,13 +86,13 @@ export function VariantSelector({
 
   async function handleAddToCart() {
     if (!selectedVariant) return;
-    setFeedback(null);
+    setErrorMessage(null);
     const ok = await addItem(selectedVariant.id, quantity);
     if (ok) {
-      setFeedback({ type: "success", message: "به سبد خرید اضافه شد" });
+      showToast("محصول به سبد خرید اضافه شد");
       openCart();
     } else {
-      setFeedback({ type: "error", message: "افزودن به سبد خرید ممکن نشد" });
+      setErrorMessage("افزودن به سبد خرید ممکن نشد");
     }
   }
 
@@ -230,12 +232,9 @@ export function VariantSelector({
           {secondaryAction}
         </div>
 
-        {feedback && (
-          <p
-            role="status"
-            className={`text-[0.85rem] ${feedback.type === "success" ? "text-[#4C7A5D]" : "text-[#B0453C]"}`}
-          >
-            {feedback.message}
+        {errorMessage && (
+          <p role="alert" className="text-[0.85rem] text-[#B0453C]">
+            {errorMessage}
           </p>
         )}
       </div>

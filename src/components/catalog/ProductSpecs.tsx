@@ -126,12 +126,14 @@ export function ProductSpecs({ product }: { product: CatalogProductDetail }) {
     return <p className="py-6 text-[0.9rem] text-text-secondary">مشخصاتی برای این محصول ثبت نشده است.</p>;
   }
 
+  // One shared max-width, resolved at the description's font size, so the
+  // description and the specs table always have exactly the same width.
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex max-w-[72ch] flex-col gap-6 text-[0.92rem]">
       {hasDescription && (
         <div>
           <h2 className="mb-2.5 text-[1.05rem] font-bold">توضیحات</h2>
-          <p className="max-w-[72ch] text-[0.92rem] leading-8 whitespace-pre-line text-ink/85">
+          <p className="text-[0.92rem] leading-8 whitespace-pre-line text-ink/85">
             {product.longDescription}
           </p>
         </div>

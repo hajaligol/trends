@@ -3046,6 +3046,19 @@ silently ignored):**
   still outstanding — see "What was not verified" above; folded into the
   existing browser-automation backlog (see "Next Session Instructions").
 
+## Auth UI polish (out-of-phase UI-only task)
+- Scope: login, register, forgot-password, reset-password pages. No schema/migration changes, no auth logic changes.
+- New: `components/auth/AuthShell.tsx` (two-panel card + `AuthAlert`), `PasswordField.tsx` (show/hide), `NewPasswordFields.tsx` (advisory strength meter + live match; server rules unchanged, min 8), `useFocusOnError.ts` (focus first invalid field/alert).
+- `FormField` gained optional props only (hint, labelAction, endAdornment, dir, inputMode, autoFocus, inputProps); other callers unaffected.
+- `ActionResult` gained optional `values` (mobile/name/email echoed on failure so React 19 form reset does not wipe input; passwords never echoed). Used by login/register.
+- Forms use `noValidate` so Persian server messages show instead of native browser tooltips.
+- Checks: `tsc --noEmit` pass, `eslint src` pass, Next compile pass. `npm run build` and visual/browser check NOT run (no PostgreSQL in sandbox; build needs DATABASE_URL). Verify visually on RTL mobile + desktop.
+
+## Toast messages (out-of-phase UI-only task)
+- `components/feedback/ToastProvider.tsx` (`useToast().showToast(msg)`), mounted in `app/layout.tsx` around UIOverlayProvider. Bottom-center ink pill, 3s total (250ms in/out), aria-live polite, reduced-motion respected (keyframes in globals.css).
+- Fired from `VariantSelector` (add to cart success) and `WishlistButton` (add only; signed-in users after the server save succeeds, guests on local toggle). Not shown on removal or failure.
+- Checks: tsc + eslint pass; not verified in a browser (no PostgreSQL in sandbox).
+
 ## Important Assumptions
 
 - Password-based auth (mobile + password) was chosen as this phase's

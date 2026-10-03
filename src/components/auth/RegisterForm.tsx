@@ -1,69 +1,71 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useRef } from "react";
 import Link from "next/link";
 import { registerAction, type ActionResult } from "@/domains/auth/actions";
 import { FormField } from "@/components/ui/FormField";
 import { SubmitButton } from "@/components/ui/SubmitButton";
+import { AuthAlert } from "@/components/auth/AuthShell";
+import { NewPasswordFields } from "@/components/auth/NewPasswordFields";
+import { useFocusOnError } from "@/components/auth/useFocusOnError";
 
 const initialState: ActionResult = undefined;
 
 export function RegisterForm() {
   const [state, formAction] = useActionState(registerAction, initialState);
+  const formRef = useRef<HTMLFormElement>(null);
+  useFocusOnError(formRef, state);
 
   return (
-    <form action={formAction} className="flex flex-col gap-4">
-      {state?.error ? (
-        <p role="alert" className="rounded-[var(--radius-sm)] bg-red-50 px-4 py-2.5 text-[0.85rem] text-red-700">
-          {state.error}
-        </p>
-      ) : null}
+    <form ref={formRef} action={formAction} noValidate className="flex flex-col gap-5">
+      {state?.error ? <AuthAlert tone="error">{state.error}</AuthAlert> : null}
 
       <FormField
         label="نام و نام خانوادگی"
         name="fullName"
         autoComplete="name"
+        autoFocus
         required
+        defaultValue={state?.values?.fullName}
         error={state?.fieldErrors?.fullName}
       />
       <FormField
         label="شماره موبایل"
         name="mobile"
         type="tel"
+        dir="ltr"
+        inputMode="tel"
         placeholder="۰۹۱۲۳۴۵۶۷۸۹"
         autoComplete="tel"
         required
+        hint="برای ورود به حساب و اطلاع‌رسانی سفارش از این شماره استفاده می‌شود."
+        defaultValue={state?.values?.mobile}
         error={state?.fieldErrors?.mobile}
       />
       <FormField
         label="ایمیل (اختیاری)"
         name="email"
         type="email"
+        dir="ltr"
+        inputMode="email"
+        placeholder="name@example.com"
         autoComplete="email"
+        defaultValue={state?.values?.email}
         error={state?.fieldErrors?.email}
       />
-      <FormField
-        label="رمز عبور"
-        name="password"
-        type="password"
-        autoComplete="new-password"
-        required
-        error={state?.fieldErrors?.password}
-      />
-      <FormField
-        label="تکرار رمز عبور"
-        name="confirmPassword"
-        type="password"
-        autoComplete="new-password"
-        required
-        error={state?.fieldErrors?.confirmPassword}
+
+      <NewPasswordFields
+        passwordError={state?.fieldErrors?.password}
+        confirmError={state?.fieldErrors?.confirmPassword}
       />
 
-      <SubmitButton pendingLabel="در حال ثبت‌نام...">ثبت‌نام</SubmitButton>
+      <SubmitButton variant="brand" pendingLabel="در حال ساخت حساب...">
+        ساخت حساب کاربری
+      </SubmitButton>
 
-      <p className="text-center text-[0.85rem] text-text-secondary">
-        حساب کاربری دارید؟{" "}
-        <Link href="/login" className="font-semibold text-ink underline underline-offset-2">
+      <p className="m-0 border-t border-line pt-5 text-center text-[0.88rem] text-text-secondary">
+        قبلاً ثبت‌نام کرده‌اید؟{" "}
+        <Link href="/login" className="font-semibold text-brand underline underline-offset-2">
           وارد شوید
         </Link>
       </p>

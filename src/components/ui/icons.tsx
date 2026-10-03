@@ -143,3 +143,51 @@ export function RatingStarIcon({ filled = false, ...props }: SVGProps<SVGSVGElem
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill={filled ? STAR_GOLD : "none"} stroke={filled ? STAR_GOLD : "currentColor"} strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}><path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z" /></svg>
   );
 }
+
+const strokeProps = {
+  xmlns: "http://www.w3.org/2000/svg",
+  width: 24,
+  height: 24,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 1.6,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
+  "aria-hidden": true,
+};
+
+/** Lucide "eye" — show password. */
+export function EyeIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...strokeProps} {...props}><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0" /><circle cx="12" cy="12" r="3" /></svg>
+  );
+}
+
+/** Lucide "eye-off" — hide password. */
+export function EyeOffIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...strokeProps} {...props}><path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49" /><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242" /><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143" /><path d="m2 2 20 20" /></svg>
+  );
+}
+
+/** Lucide "check" — satisfied requirement / success. */
+export function CheckIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...strokeProps} {...props}><path d="M20 6 9 17l-5-5" /></svg>
+  );
+}
+
+/** Lucide "circle-alert" — inline error marker. */
+export function AlertCircleIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...strokeProps} {...props}><circle cx="12" cy="12" r="10" /><line x1="12" x2="12" y1="8" y2="12" /><line x1="12" x2="12.01" y1="16" y2="16" /></svg>
+  );
+}
+
+/** Lucide "smartphone" — mobile number field. */
+export function SmartphoneIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...strokeProps} {...props}><rect width="14" height="20" x="5" y="2" rx="2" ry="2" /><path d="M12 18h.01" /></svg>
+  );
+}

@@ -40,6 +40,12 @@ import { checkIpRateLimit } from "@/lib/security/rate-limit";
 export type ActionResult = {
   error?: string;
   fieldErrors?: Record<string, string>;
+  /**
+   * Non-sensitive submitted values (mobile, name, email) echoed back on
+   * failure so React 19's automatic form reset doesn't wipe what the
+   * person typed. Passwords are never echoed.
+   */
+  values?: Record<string, string>;
 } | void;
 
 /**
@@ -58,6 +64,15 @@ async function mergeGuestCartOnSignIn(userId: string): Promise<void> {
   if (guestCartId) await clearGuestCartId();
 }
 
+function echoValues(formData: FormData, keys: string[]): Record<string, string> {
+  const values: Record<string, string> = {};
+  for (const key of keys) {
+    const raw = formData.get(key);
+    if (typeof raw === "string") values[key] = raw.slice(0, 200);
+  }
+  return values;
+}
+
 function firstFieldErrors(issues: { path: PropertyKey[]; message: string }[]): Record<string, string> {
   const fieldErrors: Record<string, string> = {};
   for (const issue of issues) {
@@ -74,8 +89,9 @@ export async function registerAction(_prevState: ActionResult, formData: FormDat
   // submitting their number repeatedly. See
   // `src/lib/security/rate-limit.ts`'s header comment for why an
   // in-process limiter (not Redis) is the right primitive here.
+  const echoed = echoValues(formData, ["fullName", "mobile", "email"]);
   const rateLimited = await checkIpRateLimit("register", 5, 60 * 60 * 1000);
-  if (rateLimited) return { error: rateLimited.error };
+  if (rateLimited) return { error: rateLimited.error, values: echoed };
 
   const parsed = registerSchema.safeParse({
     mobile: formData.get("mobile"),
@@ -86,7 +102,7 @@ export async function registerAction(_prevState: ActionResult, formData: FormDat
   });
 
   if (!parsed.success) {
-    return { fieldErrors: firstFieldErrors(parsed.error.issues) };
+    return { fieldErrors: firstFieldErrors(parsed.error.issues), values: echoed };
   }
 
   let newUser;
@@ -99,7 +115,7 @@ export async function registerAction(_prevState: ActionResult, formData: FormDat
     });
   } catch (error) {
     if (error instanceof MobileAlreadyRegisteredError) {
-      return { fieldErrors: { mobile: error.message } };
+      return { fieldErrors: { mobile: error.message }, values: echoed };
     }
     throw error;
   }
@@ -125,8 +141,9 @@ export async function loginAction(_prevState: ActionResult, formData: FormData):
   // password a few times is never locked out, while still bounding an
   // automated attempt loop. Keyed by IP, not by the submitted mobile
   // number, for the same reason `registerAction` is (see its comment).
+  const echoed = echoValues(formData, ["mobile"]);
   const rateLimited = await checkIpRateLimit("login", 10, 5 * 60 * 1000);
-  if (rateLimited) return { error: rateLimited.error };
+  if (rateLimited) return { error: rateLimited.error, values: echoed };
 
   const parsed = loginSchema.safeParse({
     mobile: formData.get("mobile"),
@@ -134,7 +151,7 @@ export async function loginAction(_prevState: ActionResult, formData: FormData):
   });
 
   if (!parsed.success) {
-    return { fieldErrors: firstFieldErrors(parsed.error.issues) };
+    return { fieldErrors: firstFieldErrors(parsed.error.issues), values: echoed };
   }
 
   try {
@@ -149,7 +166,7 @@ export async function loginAction(_prevState: ActionResult, formData: FormData):
     // path. Never reveal *which* of the two was wrong (standard
     // enumeration-prevention practice), same message either way.
     if (error instanceof AuthError) {
-      return { error: "شماره موبایل یا رمز عبور اشتباه است" };
+      return { error: "شماره موبایل یا رمز عبور اشتباه است", values: echoed };
     }
     throw error;
   }

@@ -99,6 +99,19 @@ body {
   animation: flame-glow 2.4s ease-out infinite;
 }
 
+/* Bottom toast (components/feedback/ToastProvider.tsx). Slides up on enter,
+   down on exit; the reduced-motion block below collapses both to instant. */
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes toast-out {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(24px); }
+}
+.toast-in { animation: toast-in 250ms ease-out both; }
+.toast-out { animation: toast-out 250ms ease-in both; }
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;

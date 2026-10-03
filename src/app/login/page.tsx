@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
-import { Container } from "@/components/ui/Container";
+import { AuthShell } from "@/components/auth/AuthShell";
 import { LoginForm } from "@/components/auth/LoginForm";
 import { getCurrentUser } from "@/domains/auth/actions";
 
@@ -15,18 +15,14 @@ export default async function LoginPage() {
   if (user) redirect("/account");
 
   return (
-    <main className="py-[clamp(50px,8vw,90px)]">
-      <Container className="mx-auto flex max-w-[420px] flex-col gap-6">
-        <div className="text-center">
-          <h1 className="m-0 text-[1.6rem] font-bold">ورود به حساب کاربری</h1>
-          <p className="mt-2 text-[0.9rem] text-text-secondary">
-            با شماره موبایل و رمز عبور خود وارد شوید.
-          </p>
-        </div>
-        <Suspense>
-          <LoginForm />
-        </Suspense>
-      </Container>
-    </main>
+    <AuthShell
+      title="ورود به حساب کاربری"
+      subtitle="با شماره موبایل و رمز عبور خود وارد شوید."
+      panelHeading="خوش برگشتید؛ ادامه خرید از همین‌جا"
+    >
+      <Suspense>
+        <LoginForm />
+      </Suspense>
+    </AuthShell>
   );
 }

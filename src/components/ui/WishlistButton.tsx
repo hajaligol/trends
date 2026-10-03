@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { HeartIcon } from "@/components/ui/icons";
+import { useToast } from "@/components/feedback/ToastProvider";
 import { useWishlist } from "@/components/wishlist/WishlistProvider";
 
 /**
@@ -22,14 +23,22 @@ import { useWishlist } from "@/components/wishlist/WishlistProvider";
 function useWishlistToggle(productId: string) {
   const { isAuthenticated, isWishlisted, toggle } = useWishlist();
   const [guestActive, setGuestActive] = useState(false);
+  const { showToast } = useToast();
 
   const active = isAuthenticated ? isWishlisted(productId) : guestActive;
 
+  const ADDED_MESSAGE = "محصول به علاقه‌مندی‌ها اضافه شد";
+
   function handleClick() {
+    const willBeActive = !active;
     if (isAuthenticated) {
-      void toggle(productId, !active);
+      // Announce only once the server has actually saved it.
+      void toggle(productId, willBeActive).then((ok) => {
+        if (ok && willBeActive) showToast(ADDED_MESSAGE);
+      });
     } else {
-      setGuestActive((value) => !value);
+      setGuestActive(willBeActive);
+      if (willBeActive) showToast(ADDED_MESSAGE);
     }
   }
 

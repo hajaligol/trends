@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Container } from "@/components/ui/Container";
+import { AuthShell } from "@/components/auth/AuthShell";
 import { ForgotPasswordForm } from "@/components/auth/ForgotPasswordForm";
 
 export const metadata: Metadata = {
@@ -9,16 +9,12 @@ export const metadata: Metadata = {
 
 export default function ForgotPasswordPage() {
   return (
-    <main className="py-[clamp(50px,8vw,90px)]">
-      <Container className="mx-auto flex max-w-[420px] flex-col gap-6">
-        <div className="text-center">
-          <h1 className="m-0 text-[1.6rem] font-bold">بازیابی رمز عبور</h1>
-          <p className="mt-2 text-[0.9rem] text-text-secondary">
-            شماره موبایل حساب خود را وارد کنید تا لینک بازیابی رمز عبور ارسال شود.
-          </p>
-        </div>
-        <ForgotPasswordForm />
-      </Container>
-    </main>
+    <AuthShell
+      title="بازیابی رمز عبور"
+      subtitle="شماره موبایل حساب خود را وارد کنید تا لینک بازیابی رمز عبور ارسال شود."
+      panelHeading="رمز عبور را فراموش کرده‌اید؟ نگران نباشید"
+    >
+      <ForgotPasswordForm />
+    </AuthShell>
   );
 }
