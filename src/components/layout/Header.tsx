@@ -132,7 +132,7 @@ export function Header({ categories }: { categories: NavCategory[] }) {
           >
             <CartIcon className={ICON} />
             {cartCount > 0 && (
-              <span className="absolute top-0.5 left-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-ink px-0.5 text-[0.62rem] leading-none text-white lg:top-1 lg:left-1 lg:h-[18px] lg:min-w-[18px] lg:text-[0.68rem]">
+              <span className="absolute top-0.5 left-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand px-0.5 text-[0.62rem] leading-none text-white lg:top-1 lg:left-1 lg:h-[18px] lg:min-w-[18px] lg:text-[0.68rem]">
                 {toPersianDigits(cartCount)}
               </span>
             )}
