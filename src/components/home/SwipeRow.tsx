@@ -21,7 +21,7 @@ type SwipeRowProps = {
   itemClassName: string;
   /** Tailwind gap classes between items. */
   gapClassName: string;
-  /** Smooth-scroll on arrow clicks and fade/slide the arrows. Pass
+  /** Eased scroll on arrow clicks and transitions on the arrows. Pass
    * `false` for a row that must have no animation at all. */
   animated?: boolean;
   /** Items are server-rendered by the caller and passed through as
@@ -118,14 +118,75 @@ export function SwipeRow({ label, showArrows, itemClassName, gapClassName, anima
     };
   }, []);
 
+  // Eased, snap-aligned arrow scrolling. Native `behavior: "smooth"` fights
+  // `scroll-snap-type: mandatory` in several browsers (jerky or cut short),
+  // so the animation is driven manually with snap switched off meanwhile.
+  const animation = useRef<number | null>(null);
+
+  const cancelAnimation = useCallback(() => {
+    if (animation.current !== null) {
+      cancelAnimationFrame(animation.current);
+      animation.current = null;
+      const el = scrollerRef.current;
+      if (el) el.style.scrollSnapType = "";
+    }
+  }, []);
+
+  useEffect(() => cancelAnimation, [cancelAnimation]);
+
   function scrollByPage(direction: "prev" | "next") {
     const el = scrollerRef.current;
     if (!el) return;
+    cancelAnimation();
+
     const isRtl = getComputedStyle(el).direction === "rtl";
     const forward = direction === "next" ? 1 : -1;
-    const sign = isRtl ? -forward : forward;
+    // `delta` below is already signed by `forward` (negative = back), so only
+    // the RTL flip of scrollLeft's axis is applied to it here.
+    const axis = isRtl ? -1 : 1;
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    el.scrollBy({ left: sign * el.clientWidth * 0.85, behavior: reduceMotion || !animated ? "auto" : "smooth" });
+
+    // Distance (along the reading direction) of each item's start edge from
+    // the scroller's start edge, minus the 8px inline padding.
+    const box = el.getBoundingClientRect();
+    const offsets = Array.from(el.children).map((child) => {
+      const r = (child as HTMLElement).getBoundingClientRect();
+      return (isRtl ? box.right - r.right : r.left - box.left) - 8;
+    });
+    const wanted = forward * el.clientWidth * 0.85;
+    const candidates = offsets.filter((d) => (forward > 0 ? d > 1 : d < -1));
+    let delta = wanted;
+    if (candidates.length > 0) {
+      delta = candidates.reduce((best, d) => (Math.abs(d - wanted) < Math.abs(best - wanted) ? d : best));
+    }
+
+    const max = el.scrollWidth - el.clientWidth;
+    const from = el.scrollLeft;
+    const rawTarget = from + axis * delta;
+    const target = isRtl ? Math.max(-max, Math.min(0, rawTarget)) : Math.max(0, Math.min(max, rawTarget));
+    if (Math.abs(target - from) < 1) return;
+
+    if (reduceMotion || !animated) {
+      el.scrollLeft = target;
+      return;
+    }
+
+    const duration = Math.min(700, 380 + Math.abs(target - from) * 0.25);
+    const startTime = performance.now();
+    el.style.scrollSnapType = "none";
+
+    const step = (now: number) => {
+      const t = Math.min(1, (now - startTime) / duration);
+      const eased = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; // easeInOutCubic
+      el.scrollLeft = from + (target - from) * eased;
+      if (t < 1) {
+        animation.current = requestAnimationFrame(step);
+      } else {
+        animation.current = null;
+        el.style.scrollSnapType = "";
+      }
+    };
+    animation.current = requestAnimationFrame(step);
   }
 
   const arrowClass =
@@ -140,7 +201,12 @@ export function SwipeRow({ label, showArrows, itemClassName, gapClassName, anima
       <ul
         ref={scrollerRef}
         onScroll={showArrows ? updateEdges : undefined}
-        onPointerDown={onPointerDown}
+        onPointerDown={(event) => {
+          cancelAnimation();
+          onPointerDown(event);
+        }}
+        onWheel={cancelAnimation}
+        onTouchStart={cancelAnimation}
         onDragStart={(event) => event.preventDefault()}
         aria-label={label}
         className={`-mx-2 -my-4 flex snap-x snap-mandatory scroll-px-2 overflow-x-auto overscroll-x-contain px-2 py-4 md:cursor-grab [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${gapClassName}`}
