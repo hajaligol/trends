@@ -2,6 +2,8 @@ import Link from "next/link";
 import { listLowStockVariants } from "@/domains/catalog/admin-queries";
 import { StockAdjustForm } from "@/components/admin/StockAdjustForm";
 import { toPersianDigits } from "@/lib/utils/persian-digits";
+import { EmptyState, PageHeader, StatusBadge } from "@/components/admin/ui/layout";
+import { CheckCircleIcon } from "@/components/admin/ui/icons";
 
 export const metadata = { title: "موجودی", robots: { index: false, follow: false } };
 
@@ -11,50 +13,63 @@ export const metadata = { title: "موجودی", robots: { index: false, follow:
  * handling") with an inline adjustment form — see
  * `src/domains/inventory/actions.ts`'s header comment for why this is a
  * single audited delta-adjustment rather than a full movement ledger
- * table.
+ * table. Out-of-stock rows come first (the query orders by stock asc).
  */
 export default async function AdminInventoryPage() {
   const rows = await listLowStockVariants();
+  const outOfStock = rows.filter((row) => row.stock === 0).length;
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-[1.15rem] font-bold text-ink">موجودی — کالاهای رو به اتمام</h1>
-        <p className="mt-1 text-[0.85rem] text-text-secondary">
-          فقط انواع محصول فعالی که موجودی آن‌ها به آستانه کمبود موجودی رسیده یا کمتر است نمایش داده می‌شود.
-        </p>
-      </div>
+      <PageHeader
+        title="موجودی"
+        description={
+          rows.length === 0
+            ? "کالاهایی که موجودی‌شان به آستانه کمبود برسد، اینجا نمایش داده می‌شوند."
+            : `${toPersianDigits(rows.length)} نوع کالا رو به اتمام است${outOfStock > 0 ? ` که ${toPersianDigits(outOfStock)} مورد کاملاً ناموجود است` : ""}. موجودی را همین‌جا اصلاح کنید؛ هر تغییر در گزارش فعالیت‌ها ثبت می‌شود.`
+        }
+      />
 
       {rows.length === 0 ? (
-        <p className="rounded-[var(--radius-lg)] border border-line bg-white p-6 text-center text-[0.85rem] text-text-secondary">
-          در حال حاضر هیچ کالایی رو به اتمام نیست.
-        </p>
+        <EmptyState
+          icon={<CheckCircleIcon width={28} height={28} />}
+          title="موجودی همه کالاها کافی است"
+          description="در حال حاضر هیچ کالای فعالی به آستانه کمبود موجودی نرسیده است."
+        />
       ) : (
-        <div className="flex flex-col gap-3">
+        <ul className="m-0 flex list-none flex-col gap-4 p-0">
           {rows.map((row) => (
-            <div
+            <li
               key={row.variantId}
-              className="flex flex-col gap-3 rounded-[var(--radius-lg)] border border-line bg-white p-4 sm:flex-row sm:items-center sm:justify-between"
+              className={`flex flex-col gap-4 rounded-[var(--radius-lg)] border bg-white p-5 lg:flex-row lg:items-start lg:justify-between ${
+                row.stock === 0 ? "border-red-200" : "border-line"
+              }`}
             >
-              <div className="flex flex-col gap-0.5">
-                <Link href={`/admin/products/${row.productId}`} className="font-medium text-ink underline underline-offset-2">
+              <div className="flex min-w-0 flex-col gap-2 lg:w-72 lg:shrink-0">
+                <Link href={`/admin/products/${row.productId}#variants`} className="font-semibold text-ink hover:text-brand hover:underline">
                   {row.productTitle}
                 </Link>
-                <span className="text-[0.8rem] text-text-secondary" dir="ltr">
-                  {row.sku} · {row.size}/{row.color}
+                <span className="text-[0.82rem] text-text-secondary">
+                  سایز {row.size} · رنگ {row.color}
                 </span>
-                <span
-                  className={`w-fit rounded-full px-3 py-0.5 text-[0.75rem] ${
-                    row.stock === 0 ? "bg-blush text-ink" : "bg-yellow text-ink"
-                  }`}
-                >
-                  موجودی: {toPersianDigits(row.stock)} (آستانه: {toPersianDigits(row.lowStockThreshold)})
+                <span dir="ltr" className="w-fit text-[0.76rem] text-text-secondary">
+                  {row.sku}
                 </span>
+                <div className="flex flex-wrap items-center gap-2">
+                  {row.stock === 0 ? (
+                    <StatusBadge tone="danger">ناموجود</StatusBadge>
+                  ) : (
+                    <StatusBadge tone="warning">موجودی: {toPersianDigits(row.stock)}</StatusBadge>
+                  )}
+                  <span className="text-[0.76rem] text-text-secondary">آستانه: {toPersianDigits(row.lowStockThreshold)}</span>
+                </div>
               </div>
-              <StockAdjustForm variantId={row.variantId} />
-            </div>
+              <div className="min-w-0 flex-1 border-t border-line pt-4 lg:border-s lg:border-t-0 lg:ps-6 lg:pt-0">
+                <StockAdjustForm variantId={row.variantId} />
+              </div>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
     </div>
   );

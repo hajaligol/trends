@@ -1,13 +1,12 @@
 "use client";
 
-import { useActionState } from "react";
-import { FormField } from "@/components/ui/FormField";
-import { SubmitButton } from "@/components/ui/SubmitButton";
 import { ImagePicker } from "@/components/admin/ImagePicker";
 import { createCategoryAction, updateCategoryAction } from "@/domains/categories/actions";
 import type { AdminCategoryRow, CategoryOption } from "@/domains/categories/queries";
 import { collectDescendantIdsFromFlat, MAX_CATEGORY_DEPTH } from "@/domains/categories/tree";
 import type { ActionResult } from "@/domains/auth/roles";
+import { adminButton } from "@/components/admin/ui/layout";
+import { AdminSubmitButton, FieldGrid, FormAlert, SelectField, SwitchField, TextField, useAdminAction } from "@/components/admin/ui/form";
 
 const initialState: ActionResult = { ok: true };
 
@@ -15,13 +14,19 @@ export function CategoryForm({
   category,
   parentOptions,
   onDone,
+  onCancel,
 }: {
   category?: AdminCategoryRow;
   parentOptions: CategoryOption[];
+  /** Called only after the server accepted the change. */
   onDone?: () => void;
+  onCancel?: () => void;
 }) {
   const action = category ? updateCategoryAction : createCategoryAction;
-  const [state, formAction] = useActionState(action, initialState);
+  const [state, formAction] = useAdminAction(action, initialState, {
+    successMessage: category ? "دسته‌بندی ذخیره شد" : "دسته‌بندی اضافه شد",
+    onSuccess: () => onDone?.(),
+  });
 
   // Offer only parents that keep the tree valid: not the category itself
   // or anything beneath it (that would be a cycle), and nothing already at
@@ -34,55 +39,41 @@ export function CategoryForm({
   );
 
   return (
-    <form
-      action={async (formData) => {
-        await formAction(formData);
-        onDone?.();
-      }}
-      className="flex flex-col gap-4"
-    >
+    <form action={formAction} className="flex flex-col gap-4">
       {category && <input type="hidden" name="id" value={category.id} />}
+      <FormAlert state={state} />
 
-      {!state.ok && (
-        <p role="alert" className="rounded-[var(--radius-sm)] bg-red-50 px-4 py-2.5 text-[0.85rem] text-red-700">
-          {state.error}
-        </p>
-      )}
+      <FieldGrid>
+        <TextField label="نام دسته" name="name" defaultValue={category?.name} required />
+        <TextField label="نامک (بخشی از آدرس)" name="slug" defaultValue={category?.slug} required ltr placeholder="women-shoes" hint="فقط حروف کوچک انگلیسی، عدد و خط تیره." />
+      </FieldGrid>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <FormField label="نام دسته" name="name" defaultValue={category?.name} required />
-        <FormField label="نامک (slug)" name="slug" defaultValue={category?.slug} required placeholder="مثال: women-shoes" />
-      </div>
+      <FieldGrid>
+        <SelectField label="دسته والد" name="parentId" defaultValue={category?.parentId ?? ""} optional hint="دسته‌های اصلی (مخاطب) والد ندارند.">
+          <option value="">بدون والد</option>
+          {selectableParents.map((option) => (
+            <option key={option.id} value={option.id}>
+              {option.name}
+            </option>
+          ))}
+        </SelectField>
+        <TextField label="ترتیب نمایش" name="displayOrder" type="number" defaultValue={String(category?.displayOrder ?? 0)} hint="عدد کوچک‌تر، زودتر." />
+      </FieldGrid>
+
+      <TextField label="توضیحات" name="description" defaultValue={category?.description ?? ""} optional />
 
       <ImagePicker name="imageUrl" folder="categories" label="تصویر دسته (اختیاری)" defaultValue={category?.imageUrl} />
 
-      <FormField label="توضیحات (اختیاری)" name="description" defaultValue={category?.description ?? ""} />
+      <SwitchField name="isActive" label="فعال" description="دسته غیرفعال در فروشگاه نمایش داده نمی‌شود." defaultChecked={category?.isActive ?? true} />
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <label className="flex flex-col gap-1.5">
-          <span className="text-[0.85rem] text-ink">دسته والد (اختیاری)</span>
-          <select
-            name="parentId"
-            defaultValue={category?.parentId ?? ""}
-            className="w-full rounded-[var(--radius-md)] border border-line bg-white px-4 py-3 text-[0.92rem] text-ink outline-none focus:outline-2 focus:outline-ink"
-          >
-            <option value="">— بدون والد —</option>
-            {selectableParents.map((option) => (
-              <option key={option.id} value={option.id}>
-                {option.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <FormField label="ترتیب نمایش" name="displayOrder" type="number" defaultValue={String(category?.displayOrder ?? 0)} />
+      <div className="flex flex-wrap items-center gap-2.5">
+        <AdminSubmitButton>{category ? "ذخیره تغییرات" : "افزودن دسته"}</AdminSubmitButton>
+        {onCancel && (
+          <button type="button" onClick={onCancel} className={adminButton("ghost", "md")}>
+            انصراف
+          </button>
+        )}
       </div>
-
-      <label className="flex items-center gap-2 text-[0.88rem] text-ink">
-        <input type="checkbox" name="isActive" defaultChecked={category?.isActive ?? true} className="h-4 w-4" />
-        فعال (در فروشگاه نمایش داده شود)
-      </label>
-
-      <SubmitButton pendingLabel="در حال ذخیره...">{category ? "ذخیره تغییرات" : "افزودن دسته"}</SubmitButton>
     </form>
   );
 }

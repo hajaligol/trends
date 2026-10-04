@@ -1,7 +1,9 @@
 "use client";
 
-import { useActionState, useRef, useState } from "react";
-import { SubmitButton } from "@/components/ui/SubmitButton";
+import { useRef, useState } from "react";
+import { AdminSubmitButton, FormAlert, useAdminAction } from "@/components/admin/ui/form";
+import { adminButton } from "@/components/admin/ui/layout";
+import { ArrowDownIcon, ArrowUpIcon, CloseIcon, PlusIcon } from "@/components/admin/ui/icons";
 import { saveProductSpecificationsAction } from "@/domains/catalog/admin-actions";
 import type { ActionResult } from "@/domains/auth/roles";
 import { MAX_SPEC_ROWS } from "@/lib/validation/spec-limits";
@@ -15,9 +17,9 @@ const initialState: ActionResult<{ saved: boolean }> = { ok: true, data: { saved
 const AUTO_ROW_LABELS = ["برند", "دسته‌بندی", "جنس", "سایزها", "رنگ‌ها", "برچسب‌ها"];
 
 const inputClass =
-  "w-full rounded-[var(--radius-md)] border border-line bg-white px-3.5 py-2.5 text-[0.9rem] text-ink outline-none focus:outline-2 focus:outline-ink";
+  "w-full rounded-[var(--radius-md)] border border-line bg-white px-3.5 py-2.5 text-[0.88rem] text-ink outline-none transition-colors hover:border-ink/25 focus:border-brand focus:outline-2 focus:outline-offset-1 focus:outline-brand/30";
 const iconButtonClass =
-  "flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full border border-line text-[0.95rem] text-ink hover:border-ink disabled:cursor-not-allowed disabled:opacity-35";
+  "grid h-9 w-9 shrink-0 cursor-pointer place-items-center rounded-full text-ink transition-colors hover:bg-ink/[0.06] disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent";
 
 /**
  * Editor for a product's custom «مشخصات محصول» rows. Client state only
@@ -34,7 +36,9 @@ export function ProductSpecificationsEditor({
 }) {
   const nextKey = useRef(initialRows.length);
   const [rows, setRows] = useState<Row[]>(() => initialRows.map((row, index) => ({ key: index, ...row })));
-  const [state, formAction] = useActionState(saveProductSpecificationsAction, initialState);
+  const [state, formAction] = useAdminAction(saveProductSpecificationsAction, initialState, {
+    successMessage: "جدول مشخصات ذخیره شد",
+  });
 
   function update(key: number, field: "label" | "value", text: string) {
     setRows((current) => current.map((row) => (row.key === key ? { ...row, [field]: text } : row)));
@@ -61,11 +65,6 @@ export function ProductSpecificationsEditor({
     <form action={formAction} className="flex flex-col gap-4">
       <input type="hidden" name="productId" value={productId} />
 
-      <p className="text-[0.82rem] leading-6 text-text-secondary">
-        برند، دسته‌بندی، جنس، سایزها، رنگ‌ها و برچسب‌ها به‌صورت خودکار از اطلاعات محصول در جدول نمایش داده
-        می‌شوند. ردیف‌های زیر به انتهای جدول اضافه می‌شوند؛ اگر عنوان یکی از ردیف‌های خودکار را وارد کنید
-        (مثلاً «جنس»)، مقدار شما جای آن را می‌گیرد.
-      </p>
 
       <datalist id={listId}>
         {AUTO_ROW_LABELS.map((label) => (
@@ -73,20 +72,11 @@ export function ProductSpecificationsEditor({
         ))}
       </datalist>
 
-      {state.ok && state.data?.saved && (
-        <p role="status" className="rounded-[var(--radius-sm)] bg-sage/40 px-4 py-2.5 text-[0.85rem] text-ink">
-          جدول مشخصات ذخیره شد.
-        </p>
-      )}
-      {!state.ok && (
-        <p role="alert" className="rounded-[var(--radius-sm)] bg-red-50 px-4 py-2.5 text-[0.85rem] text-red-700">
-          {state.error}
-        </p>
-      )}
+      <FormAlert state={state} />
 
       {rows.length === 0 ? (
-        <p className="rounded-[var(--radius-md)] border border-dashed border-line px-4 py-6 text-center text-[0.85rem] text-text-secondary">
-          هنوز ردیف سفارشی‌ای اضافه نشده است.
+        <p className="m-0 rounded-[var(--radius-md)] border border-dashed border-ink/15 px-4 py-8 text-center text-[0.86rem] text-text-secondary">
+          هنوز ردیف سفارشی‌ای اضافه نشده است. با «افزودن ردیف» شروع کنید.
         </p>
       ) : (
         <ul className="flex flex-col gap-3">
@@ -119,7 +109,7 @@ export function ProductSpecificationsEditor({
                   aria-label={`انتقال ردیف ${index + 1} به بالا`}
                   className={iconButtonClass}
                 >
-                  ↑
+                  <ArrowUpIcon width={17} height={17} />
                 </button>
                 <button
                   type="button"
@@ -128,15 +118,15 @@ export function ProductSpecificationsEditor({
                   aria-label={`انتقال ردیف ${index + 1} به پایین`}
                   className={iconButtonClass}
                 >
-                  ↓
+                  <ArrowDownIcon width={17} height={17} />
                 </button>
                 <button
                   type="button"
                   onClick={() => removeRow(row.key)}
                   aria-label={`حذف ردیف ${index + 1}`}
-                  className={`${iconButtonClass} text-red-600 hover:border-red-600/50`}
+                  className={`${iconButtonClass} text-red-700 hover:bg-red-50`}
                 >
-                  ×
+                  <CloseIcon width={17} height={17} />
                 </button>
               </div>
             </li>
@@ -144,18 +134,18 @@ export function ProductSpecificationsEditor({
         </ul>
       )}
 
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-2.5">
         <button
           type="button"
           onClick={addRow}
           disabled={rows.length >= MAX_SPEC_ROWS}
-          className="cursor-pointer text-[0.85rem] underline underline-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
+          className={adminButton("secondary", "md")}
         >
-          + افزودن ردیف
+          <PlusIcon width={17} height={17} />
+          افزودن ردیف
         </button>
+        <AdminSubmitButton>ذخیره جدول مشخصات</AdminSubmitButton>
       </div>
-
-      <SubmitButton pendingLabel="در حال ذخیره...">ذخیره جدول مشخصات</SubmitButton>
     </form>
   );
 }

@@ -1,7 +1,8 @@
-import Link from "next/link";
 import { listSupportMessagesForAdmin } from "@/domains/support/queries";
 import { SupportMessageResolvedToggle } from "@/components/admin/SupportMessageResolvedToggle";
 import { toPersianDigits } from "@/lib/utils/persian-digits";
+import { Avatar, buildHref, EmptyState, FilterTabs, formatDateTime, PageHeader, Pagination, StatusBadge } from "@/components/admin/ui/layout";
+import { MailIcon, MessageIcon } from "@/components/admin/ui/icons";
 
 export const metadata = { title: "پیام‌های پشتیبانی", robots: { index: false, follow: false } };
 
@@ -17,61 +18,81 @@ export default async function AdminSupportPage({
   const totalPages = Math.max(1, Math.ceil(messagePage.total / messagePage.pageSize));
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-[1.15rem] font-bold text-ink">پیام‌های پشتیبانی</h1>
-        <Link
-          href={{ query: onlyUnresolved ? {} : { unresolved: "1" } }}
-          className={`rounded-full px-4 py-2 text-[0.82rem] ${
-            onlyUnresolved ? "bg-ink text-white" : "bg-header text-ink hover:opacity-80"
-          }`}
-        >
-          فقط بدون پاسخ
-        </Link>
-      </div>
+    <div className="flex flex-col gap-5">
+      <PageHeader
+        title="پیام‌های پشتیبانی"
+        description="پیام‌هایی که مشتریان از فرم «تماس با ما» فرستاده‌اند. پس از پاسخ‌گویی (با ایمیل یا تماس)، پیام را «حل شده» علامت بزنید."
+      />
 
-      <div className="flex flex-col gap-4">
-        {messagePage.rows.length === 0 ? (
-          <p className="rounded-[var(--radius-lg)] border border-line bg-white p-6 text-center text-[0.85rem] text-text-secondary">
-            پیامی یافت نشد
-          </p>
-        ) : (
-          messagePage.rows.map((message) => (
-            <div key={message.id} className="flex flex-col gap-2 rounded-[var(--radius-lg)] border border-line bg-white p-5">
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div>
-                  <p className="font-medium text-ink">{message.subject}</p>
-                  <p className="text-[0.8rem] text-text-secondary">
-                    {message.name} — <span dir="ltr">{message.email}</span>
-                    {message.mobile && <span dir="ltr"> — {message.mobile}</span>}
-                  </p>
-                </div>
-                <SupportMessageResolvedToggle id={message.id} isResolved={message.isResolved} />
-              </div>
-              <p className="text-[0.88rem] leading-7 whitespace-pre-line text-ink/85">{message.message}</p>
-              <p className="text-[0.75rem] text-text-secondary">
-                {new Intl.DateTimeFormat("fa-IR", { dateStyle: "medium", timeStyle: "short" }).format(message.createdAt)}
-              </p>
-            </div>
-          ))
-        )}
-      </div>
+      <FilterTabs
+        items={[
+          { label: "همه", href: buildHref("/admin/support"), active: !onlyUnresolved },
+          { label: "فقط بدون پاسخ", href: buildHref("/admin/support", { unresolved: "1" }), active: onlyUnresolved },
+        ]}
+      />
 
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2 text-[0.85rem]">
-          {Array.from({ length: totalPages }, (_, index) => index + 1).map((pageNumber) => (
-            <Link
-              key={pageNumber}
-              href={{ query: { ...params, page: String(pageNumber) } }}
-              className={`rounded-full px-3.5 py-1.5 ${
-                pageNumber === page ? "bg-ink text-white" : "bg-header text-ink hover:opacity-80"
-              }`}
+      {messagePage.rows.length === 0 ? (
+        <EmptyState
+          icon={<MessageIcon width={26} height={26} />}
+          title={onlyUnresolved ? "پیام بی‌پاسخی وجود ندارد" : "هنوز پیامی دریافت نشده است"}
+          description={onlyUnresolved ? "همه پیام‌ها حل شده‌اند." : undefined}
+        />
+      ) : (
+        <ul className="m-0 flex list-none flex-col gap-4 p-0">
+          {messagePage.rows.map((message) => (
+            <li
+              key={message.id}
+              className={`flex flex-col gap-4 rounded-[var(--radius-lg)] border bg-white p-5 sm:p-6 ${message.isResolved ? "border-line" : "border-yellow"}`}
             >
-              {toPersianDigits(pageNumber)}
-            </Link>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <Avatar name={message.name} />
+                  <div className="flex flex-col leading-tight">
+                    <span className="text-[0.92rem] font-semibold text-ink">{message.name}</span>
+                    <span className="text-[0.76rem] text-text-secondary">{formatDateTime(message.createdAt)}</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <StatusBadge tone={message.isResolved ? "success" : "warning"}>{message.isResolved ? "حل شده" : "بدون پاسخ"}</StatusBadge>
+                  <SupportMessageResolvedToggle id={message.id} isResolved={message.isResolved} />
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <h2 className="m-0 text-[1rem] font-bold text-ink">{message.subject}</h2>
+                <p className="m-0 text-[0.9rem] leading-8 whitespace-pre-line text-ink/85">{message.message}</p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3 border-t border-line pt-4 text-[0.82rem]">
+                <a
+                  href={`mailto:${message.email}?subject=${encodeURIComponent(`پاسخ: ${message.subject}`)}`}
+                  className="inline-flex items-center gap-2 rounded-full border border-ink/20 px-4 py-2 font-semibold text-ink transition-colors hover:border-ink/40 hover:bg-ink/[0.04]"
+                >
+                  <MailIcon width={16} height={16} />
+                  پاسخ با ایمیل
+                </a>
+                <span dir="ltr" className="text-text-secondary">
+                  {message.email}
+                </span>
+                {message.mobile && (
+                  <a href={`tel:${message.mobile}`} dir="ltr" className="text-text-secondary hover:text-brand">
+                    {toPersianDigits(message.mobile)}
+                  </a>
+                )}
+              </div>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
+
+      <Pagination
+        pathname="/admin/support"
+        params={{ unresolved: onlyUnresolved ? "1" : undefined }}
+        page={page}
+        totalPages={totalPages}
+        total={messagePage.total}
+        pageSize={messagePage.pageSize}
+      />
     </div>
   );
 }

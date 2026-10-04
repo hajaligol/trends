@@ -23,7 +23,10 @@ export type AdminDashboardSummary = {
   recentOrders: { orderNumber: string; status: string; totalToman: number; createdAt: Date }[];
 };
 
-const ACTION_NEEDED_STATUSES = ["pending_payment", "paid", "processing"] as const;
+// Orders the *operator* has to act on (pack / ship). `pending_payment` is
+// deliberately excluded: that is waiting on the customer, not on staff.
+// The sidebar badge (`getAdminNavBadges`) uses the same definition.
+const ACTION_NEEDED_STATUSES = ["paid", "processing"] as const;
 const REVENUE_COUNTED_STATUSES = ["paid", "processing", "shipped", "delivered"] as const;
 
 export async function getAdminDashboardSummary(): Promise<AdminDashboardSummary> {
@@ -64,5 +67,36 @@ export async function getAdminDashboardSummary(): Promise<AdminDashboardSummary>
     pendingReviewCount,
     unresolvedSupportMessageCount,
     recentOrders,
+  };
+}
+
+/**
+ * The handful of "needs attention" counts shown as badges on the admin
+ * sidebar. Four cheap `COUNT(*)` reads, run by the admin layout on every
+ * admin page view — kept separate from `getAdminDashboardSummary` so the
+ * shell never pays for the dashboard's revenue/recent-orders queries.
+ */
+export type AdminNavBadges = {
+  orders: number;
+  inventory: number;
+  reviews: number;
+  support: number;
+};
+
+export async function getAdminNavBadges(): Promise<AdminNavBadges> {
+  const [awaitingRows, lowStockRows, reviews, support] = await Promise.all([
+    db.select({ total: count() }).from(orders).where(inArray(orders.status, ["paid", "processing"])),
+    db
+      .select({ total: count() })
+      .from(productVariants)
+      .where(and(eq(productVariants.isActive, true), sql`${productVariants.stock} <= ${productVariants.lowStockThreshold}`)),
+    countPendingReviews(),
+    countUnresolvedSupportMessages(),
+  ]);
+  return {
+    orders: awaitingRows[0]?.total ?? 0,
+    inventory: lowStockRows[0]?.total ?? 0,
+    reviews,
+    support,
   };
 }

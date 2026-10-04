@@ -6,6 +6,11 @@ import { CategoryForm } from "@/components/admin/CategoryForm";
 import { ConfirmButton } from "@/components/admin/ConfirmButton";
 import { deleteCategoryAction } from "@/domains/categories/actions";
 import type { AdminCategoryRow as AdminCategoryRowType, CategoryOption } from "@/domains/categories/queries";
+import { toPersianDigits } from "@/lib/utils/persian-digits";
+import { StatusBadge, TD, TD_MUTED, TR } from "@/components/admin/ui/layout";
+import { PencilIcon } from "@/components/admin/ui/icons";
+
+const DEPTH_LABELS: Record<number, string> = { 1: "مخاطب", 2: "گروه", 3: "نوع" };
 
 export function CategoryRow({
   category,
@@ -18,66 +23,63 @@ export function CategoryRow({
 
   if (isEditing) {
     return (
-      <tr className="border-b border-line last:border-0">
-        <td colSpan={6} className="px-4 py-4">
-          <CategoryForm category={category} parentOptions={parentOptions} onDone={() => setIsEditing(false)} />
-          <button
-            type="button"
-            onClick={() => setIsEditing(false)}
-            className="mt-2 text-[0.8rem] text-text-secondary underline underline-offset-2"
-          >
-            انصراف
-          </button>
+      <tr className="border-b border-line bg-bg/60 last:border-0">
+        <td colSpan={5} className="p-4 sm:p-5">
+          <p className="m-0 mb-4 text-[0.9rem] font-bold text-ink">ویرایش «{category.name}»</p>
+          <CategoryForm category={category} parentOptions={parentOptions} onDone={() => setIsEditing(false)} onCancel={() => setIsEditing(false)} />
         </td>
       </tr>
     );
   }
 
   return (
-    <tr className="border-b border-line last:border-0">
-      <td className="px-4 py-2.5">
+    <tr className={TR}>
+      <td className={TD}>
         {/* Indented by tree depth so the table reads as an outline. */}
-        <div className="flex items-center gap-2.5" style={{ marginInlineStart: `${(category.depth - 1) * 22}px` }}>
+        <div className="flex items-center gap-3" style={{ marginInlineStart: `${(category.depth - 1) * 24}px` }}>
           {category.imageUrl ? (
-            <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-full bg-card-image">
-              <Image src={category.imageUrl} alt="" fill sizes="36px" className="object-cover" />
+            <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full bg-card-image">
+              <Image src={category.imageUrl} alt="" fill sizes="40px" className="object-cover" />
             </div>
           ) : (
-            <div className="h-9 w-9 shrink-0 rounded-full border border-dashed border-line bg-header" aria-hidden="true" />
+            <div className="h-10 w-10 shrink-0 rounded-full border border-dashed border-ink/20 bg-header-bg" aria-hidden="true" />
           )}
-          <span className={category.depth === 1 ? "font-bold" : category.depth === 2 ? "font-semibold" : undefined}>
-            {category.name}
-          </span>
+          <div className="flex min-w-0 flex-col">
+            <span className={category.depth === 1 ? "font-bold" : category.depth === 2 ? "font-semibold" : "font-medium"}>{category.name}</span>
+            <span className="text-[0.74rem] text-text-secondary">
+              {DEPTH_LABELS[category.depth] ?? ""}
+              {category.parentName ? ` · زیرمجموعه ${category.parentName}` : ""}
+            </span>
+          </div>
         </div>
       </td>
-      <td className="px-4 py-2.5 text-text-secondary" dir="ltr">
-        {category.slug}
+      <td className={TD_MUTED} dir="ltr">
+        <span className="block text-end text-[0.8rem]">{category.slug}</span>
       </td>
-      <td className="px-4 py-2.5 text-text-secondary">{category.parentName ?? "—"}</td>
-      <td
-        className="px-4 py-2.5"
-        title={`${category.productCount} محصول مستقیماً در همین دسته`}
-      >
-        {category.subtreeProductCount}
+      <td className={TD} title={`${toPersianDigits(category.productCount)} محصول مستقیماً در همین دسته`}>
+        {toPersianDigits(category.subtreeProductCount)}
       </td>
-      <td className="px-4 py-2.5">
-        <span
-          className={`rounded-full px-3 py-1 text-[0.75rem] ${
-            category.isActive ? "bg-sage text-ink" : "bg-header text-text-secondary"
-          }`}
-        >
-          {category.isActive ? "فعال" : "غیرفعال"}
-        </span>
+      <td className={TD}>
+        <StatusBadge tone={category.isActive ? "success" : "neutral"}>{category.isActive ? "فعال" : "غیرفعال"}</StatusBadge>
       </td>
-      <td className="px-4 py-2.5">
-        <div className="flex items-center gap-3">
-          <button type="button" onClick={() => setIsEditing(true)} className="text-[0.8rem] underline underline-offset-2">
-            ویرایش
+      <td className={TD}>
+        <div className="flex items-center justify-end gap-1">
+          <button
+            type="button"
+            onClick={() => setIsEditing(true)}
+            aria-label={`ویرایش ${category.name}`}
+            title="ویرایش"
+            className="grid h-9 w-9 cursor-pointer place-items-center rounded-full text-ink transition-colors hover:bg-ink/[0.06]"
+          >
+            <PencilIcon width={17} height={17} />
           </button>
           <ConfirmButton
+            trigger="icon"
             action={() => deleteCategoryAction(category.id)}
-            confirmMessage={`دسته «${category.name}» حذف شود؟`}
-            label="حذف"
+            title="حذف دسته‌بندی"
+            confirmMessage={`دسته «${category.name}» حذف شود؟ دسته‌ای که زیرمجموعه یا محصول دارد قابل حذف نیست.`}
+            label={`حذف ${category.name}`}
+            successMessage="دسته‌بندی حذف شد"
           />
         </div>
       </td>

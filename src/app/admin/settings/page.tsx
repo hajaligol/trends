@@ -1,5 +1,7 @@
 import { getPaymentProviderStatus, getSiteSettings } from "@/domains/admin/settings-queries";
 import { SiteSettingsForm } from "@/components/admin/SiteSettingsForm";
+import { Card, PageHeader, StatusBadge } from "@/components/admin/ui/layout";
+import { InfoIcon } from "@/components/admin/ui/icons";
 
 export const metadata = { title: "تنظیمات", robots: { index: false, follow: false } };
 
@@ -7,24 +9,27 @@ export default async function AdminSettingsPage() {
   const [settings, paymentStatus] = await Promise.all([getSiteSettings(), Promise.resolve(getPaymentProviderStatus())]);
 
   return (
-    <div className="flex max-w-xl flex-col gap-8">
-      <section className="flex flex-col gap-4">
-        <h1 className="text-[1.15rem] font-bold text-ink">تنظیمات فروشگاه و ارسال</h1>
-        <SiteSettingsForm settings={settings} />
-      </section>
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
+      <PageHeader title="تنظیمات" description="اطلاعات فروشگاه، هزینه‌های ارسال و وضعیت درگاه پرداخت." />
 
-      <section className="flex flex-col gap-2 rounded-[var(--radius-lg)] border border-line bg-white p-5">
-        <h2 className="text-[1rem] font-bold text-ink">وضعیت درگاه پرداخت</h2>
-        <p className="text-[0.85rem] text-text-secondary">
+      <SiteSettingsForm settings={settings} />
+
+      <Card
+        title="درگاه پرداخت"
+        actions={
+          <StatusBadge tone={paymentStatus.configured ? "success" : "warning"}>{paymentStatus.configured ? "پیکربندی‌شده" : "آزمایشی (mock)"}</StatusBadge>
+        }
+      >
+        <p className="m-0 text-[0.88rem] leading-7 text-ink/85">
           {paymentStatus.configured
             ? `درگاه فعلی از طریق متغیر محیطی پیکربندی شده است: ${paymentStatus.provider}`
             : "هیچ درگاه پرداخت واقعی پیکربندی نشده است — سفارش‌ها با ارائه‌دهنده آزمایشی (mock) پردازش می‌شوند."}
         </p>
-        <p className="text-[0.78rem] text-text-secondary">
-          تغییر درگاه پرداخت یا وارد کردن اطلاعات محرمانه از این صفحه ممکن نیست؛ این تنظیمات فقط از طریق متغیرهای محیطی
-          سرور و استقرار مجدد قابل تغییر است.
+        <p className="m-0 mt-3 flex items-start gap-2.5 rounded-[var(--radius-md)] bg-bg px-4 py-3 text-[0.8rem] leading-6 text-text-secondary">
+          <InfoIcon width={18} height={18} className="mt-0.5 shrink-0" />
+          تغییر درگاه پرداخت یا وارد کردن اطلاعات محرمانه از این صفحه ممکن نیست؛ این تنظیمات فقط از طریق متغیرهای محیطی سرور و استقرار مجدد قابل تغییر است.
         </p>
-      </section>
+      </Card>
     </div>
   );
 }

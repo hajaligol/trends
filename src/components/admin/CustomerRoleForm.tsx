@@ -1,16 +1,15 @@
 "use client";
 
-import { useActionState } from "react";
-import { SubmitButton } from "@/components/ui/SubmitButton";
 import { updateCustomerRoleAction } from "@/domains/customers/actions";
 import type { ActionResult } from "@/domains/auth/roles";
+import { AdminSubmitButton, FormAlert, SelectField, useAdminAction } from "@/components/admin/ui/form";
 
 const initialState: ActionResult = { ok: true };
 
 const ROLE_OPTIONS: { value: "customer" | "staff" | "admin"; label: string }[] = [
-  { value: "customer", label: "مشتری" },
-  { value: "staff", label: "کارمند" },
-  { value: "admin", label: "مدیر کل" },
+  { value: "customer", label: "مشتری — فقط خرید" },
+  { value: "staff", label: "کارمند — دسترسی به پنل مدیریت" },
+  { value: "admin", label: "مدیر کل — دسترسی کامل و تغییر نقش‌ها" },
 ];
 
 export function CustomerRoleForm({
@@ -22,32 +21,27 @@ export function CustomerRoleForm({
   currentRole: string;
   isSelf: boolean;
 }) {
-  const [state, formAction] = useActionState(updateCustomerRoleAction, initialState);
+  const [state, formAction] = useAdminAction(updateCustomerRoleAction, initialState, {
+    successMessage: "نقش کاربر ذخیره شد",
+  });
 
   return (
-    <form action={formAction} className="flex flex-col gap-3">
+    <form action={formAction} className="flex flex-col gap-4">
       <input type="hidden" name="userId" value={userId} />
-
-      {!state.ok && (
-        <p role="alert" className="text-[0.8rem] text-red-700">
-          {state.error}
-        </p>
-      )}
-      {isSelf && <p className="text-[0.78rem] text-text-secondary">شما نمی‌توانید نقش خودتان را کاهش دهید.</p>}
-
-      <select
+      <FormAlert state={state} />
+      <SelectField
+        label="نقش کاربر"
         name="role"
         defaultValue={currentRole}
-        className="w-full rounded-[var(--radius-md)] border border-line bg-white px-4 py-3 text-[0.92rem] text-ink outline-none focus:outline-2 focus:outline-ink"
+        hint={isSelf ? "شما نمی‌توانید نقش خودتان را کاهش دهید." : "کارمند و مدیر کل می‌توانند وارد پنل مدیریت شوند."}
       >
         {ROLE_OPTIONS.map((option) => (
           <option key={option.value} value={option.value}>
             {option.label}
           </option>
         ))}
-      </select>
-
-      <SubmitButton pendingLabel="در حال ذخیره...">ذخیره نقش</SubmitButton>
+      </SelectField>
+      <AdminSubmitButton className="w-fit">ذخیره نقش</AdminSubmitButton>
     </form>
   );
 }

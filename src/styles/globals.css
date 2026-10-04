@@ -118,3 +118,13 @@ body {
     scroll-behavior: auto !important;
   }
 }
+
+/* Admin mobile navigation drawer (components/admin/AdminShell.tsx). It
+   slides in from the inline-start edge, which is the right side in RTL;
+   the reduced-motion block above collapses it to instant. */
+@keyframes admin-drawer-in {
+  from { transform: translateX(var(--drawer-from, 100%)); }
+  to { transform: none; }
+}
+.admin-drawer-in { --drawer-from: 100%; animation: admin-drawer-in 240ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+[dir="ltr"] .admin-drawer-in { --drawer-from: -100%; }

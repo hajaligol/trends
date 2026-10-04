@@ -1,14 +1,23 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { FormField } from "@/components/ui/FormField";
-import { SubmitButton } from "@/components/ui/SubmitButton";
 import { createProductAction, updateProductAction } from "@/domains/catalog/admin-actions";
 import type { AdminProductDetail } from "@/domains/catalog/admin-queries";
 import type { ActionResult } from "@/domains/auth/roles";
 import type { CategoryOption } from "@/domains/categories/queries";
 import { CATEGORY_PATH_SEPARATOR } from "@/domains/categories/tree";
+import { Card } from "@/components/admin/ui/layout";
+import {
+  AdminSubmitButton,
+  FieldGrid,
+  FormActionBar,
+  FormAlert,
+  SelectField,
+  SwitchField,
+  TextareaField,
+  TextField,
+  useAdminAction,
+} from "@/components/admin/ui/form";
 
 const createInitialState: ActionResult<{ id: string }> = { ok: true, data: { id: "" } };
 const updateInitialState: ActionResult = { ok: true };
@@ -21,45 +30,44 @@ export function ProductForm({
   categoryOptions: CategoryOption[];
 }) {
   if (product) {
-    return <ProductEditFields product={product} categoryOptions={categoryOptions} />;
+    return <ProductEditForm product={product} categoryOptions={categoryOptions} />;
   }
-  return <ProductCreateFields categoryOptions={categoryOptions} />;
+  return <ProductCreateForm categoryOptions={categoryOptions} />;
 }
 
-function ProductCreateFields({ categoryOptions }: { categoryOptions: CategoryOption[] }) {
+function ProductCreateForm({ categoryOptions }: { categoryOptions: CategoryOption[] }) {
   const router = useRouter();
-  const [state, formAction] = useActionState(createProductAction, createInitialState);
-
-  // `state.data.id` only becomes truthy after a successful create — an
-  // effect (not branching inside the render/submit path) is the correct
-  // place to react to that, since `useActionState`'s returned `state` is
-  // what actually drives re-renders here.
-  useEffect(() => {
-    if (state.ok && state.data.id) router.push(`/admin/products/${state.data.id}`);
-  }, [state, router]);
+  const [state, formAction] = useAdminAction(createProductAction, createInitialState, {
+    successMessage: "محصول ساخته شد؛ حالا سایز، رنگ و تصاویر را اضافه کنید",
+    onSuccess: (result) => {
+      if (result.ok && result.data.id) router.push(`/admin/products/${result.data.id}`);
+    },
+  });
 
   return (
-    <form action={formAction} className="flex flex-col gap-4">
-      <ProductFields state={state} categoryOptions={categoryOptions} />
-      <SubmitButton pendingLabel="در حال ایجاد...">ایجاد محصول</SubmitButton>
+    <form action={formAction} className="flex flex-col gap-6">
+      <FormAlert state={state} />
+      <ProductFields categoryOptions={categoryOptions} />
+      <FormActionBar hint="بعد از ساخت محصول به صفحه ویرایش می‌روید تا انواع و تصاویر را اضافه کنید.">
+        <AdminSubmitButton pendingLabel="در حال ساخت...">ساخت محصول</AdminSubmitButton>
+      </FormActionBar>
     </form>
   );
 }
 
-function ProductEditFields({
-  product,
-  categoryOptions,
-}: {
-  product: AdminProductDetail;
-  categoryOptions: CategoryOption[];
-}) {
-  const [state, formAction] = useActionState(updateProductAction, updateInitialState);
+function ProductEditForm({ product, categoryOptions }: { product: AdminProductDetail; categoryOptions: CategoryOption[] }) {
+  const [state, formAction] = useAdminAction(updateProductAction, updateInitialState, {
+    successMessage: "تغییرات محصول ذخیره شد",
+  });
 
   return (
-    <form action={formAction} className="flex flex-col gap-4">
+    <form action={formAction} className="flex flex-col gap-6">
       <input type="hidden" name="id" value={product.id} />
-      <ProductFields state={state} categoryOptions={categoryOptions} product={product} />
-      <SubmitButton pendingLabel="در حال ذخیره...">ذخیره تغییرات</SubmitButton>
+      <FormAlert state={state} />
+      <ProductFields categoryOptions={categoryOptions} product={product} />
+      <FormActionBar>
+        <AdminSubmitButton>ذخیره تغییرات</AdminSubmitButton>
+      </FormActionBar>
     </form>
   );
 }
@@ -76,94 +84,80 @@ function groupCategoryOptions(options: CategoryOption[]): Array<{ group: string;
   return groups;
 }
 
-function ProductFields({
-  state,
-  categoryOptions,
-  product,
-}: {
-  state: { ok: boolean; error?: string };
-  categoryOptions: CategoryOption[];
-  product?: AdminProductDetail;
-}) {
+function ProductFields({ categoryOptions, product }: { categoryOptions: CategoryOption[]; product?: AdminProductDetail }) {
   return (
-    <>
-      {!state.ok && (
-        <p role="alert" className="rounded-[var(--radius-sm)] bg-red-50 px-4 py-2.5 text-[0.85rem] text-red-700">
-          {state.error}
-        </p>
-      )}
+    <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="flex min-w-0 flex-col gap-6">
+        <Card title="اطلاعات اصلی" description="عنوان و توضیحاتی که مشتری در صفحه محصول می‌بیند.">
+          <div className="flex flex-col gap-4">
+            <FieldGrid>
+              <TextField label="عنوان محصول" name="title" defaultValue={product?.title} required placeholder="مثال: پیراهن کلاسیک مردانه" />
+              <TextField
+                label="نامک (بخشی از آدرس صفحه)"
+                name="slug"
+                defaultValue={product?.slug}
+                required
+                ltr
+                placeholder="classic-shirt"
+                hint={
+                  product
+                    ? "با تغییر نامک، آدرس صفحه محصول هم عوض می‌شود. فقط حروف کوچک انگلیسی، عدد و خط تیره."
+                    : "فقط حروف کوچک انگلیسی، عدد و خط تیره؛ مثلاً classic-shirt"
+                }
+              />
+            </FieldGrid>
+            <TextField label="توضیح کوتاه" name="shortDescription" defaultValue={product?.shortDescription ?? ""} optional hint="یک جمله برای کارت محصول و نتایج جستجو." />
+            <TextareaField label="توضیح کامل" name="longDescription" defaultValue={product?.longDescription ?? ""} optional rows={6} />
+          </div>
+        </Card>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <FormField label="عنوان محصول" name="title" defaultValue={product?.title} required />
-        <FormField label="نامک (slug)" name="slug" defaultValue={product?.slug} required placeholder="مثال: classic-shirt" />
+        <Card title="سئو (نمایش در گوگل)" description="اگر خالی بماند، از عنوان و توضیح کوتاه محصول استفاده می‌شود.">
+          <FieldGrid>
+            <TextField label="عنوان سئو" name="seoTitle" defaultValue={product?.seoTitle ?? ""} optional />
+            <TextField label="توضیح سئو" name="seoDescription" defaultValue={product?.seoDescription ?? ""} optional />
+          </FieldGrid>
+        </Card>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <label className="flex flex-col gap-1.5">
-          <span className="text-[0.85rem] text-ink">دسته‌بندی</span>
-          <select
-            name="categoryId"
-            defaultValue={product?.categoryId ?? ""}
-            required
-            className="w-full rounded-[var(--radius-md)] border border-line bg-white px-4 py-3 text-[0.92rem] text-ink outline-none focus:outline-2 focus:outline-ink"
-          >
-            <option value="" disabled>
-              انتخاب دسته
-            </option>
-            {groupCategoryOptions(categoryOptions).map(({ group, options }) => (
-              // One <optgroup> per parent group ("مردانه › لباس مردانه"), so
-              // the ~180 type categories stay scannable.
-              <optgroup key={group} label={group}>
-                {options.map((option) => (
-                  <option key={option.id} value={option.id}>
-                    {option.name.split(CATEGORY_PATH_SEPARATOR).pop()}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
-        </label>
-        <FormField label="برند (اختیاری)" name="brand" defaultValue={product?.brand ?? ""} />
+      <div className="flex min-w-0 flex-col gap-6 lg:sticky lg:top-6">
+        <Card title="نمایش در فروشگاه">
+          <div className="flex flex-col gap-3">
+            <SwitchField name="isActive" label="فعال" description="غیرفعال‌ها در فروشگاه دیده نمی‌شوند." defaultChecked={product?.isActive ?? true} />
+            <SwitchField name="isFeatured" label="محصول ویژه" description="در بخش «شگفت‌انگیزها» صفحه اصلی." defaultChecked={product?.isFeatured ?? false} />
+            <SwitchField name="isNewArrival" label="جدید" description="در بخش «جدیدترین محصولات»." defaultChecked={product?.isNewArrival ?? false} />
+          </div>
+        </Card>
+
+        <Card title="دسته‌بندی و برچسب">
+          <div className="flex flex-col gap-4">
+            <SelectField label="دسته‌بندی" name="categoryId" defaultValue={product?.categoryId ?? ""} required>
+              <option value="" disabled>
+                انتخاب دسته
+              </option>
+              {groupCategoryOptions(categoryOptions).map(({ group, options }) => (
+                // One <optgroup> per parent group ("مردانه › لباس مردانه"), so
+                // the ~180 type categories stay scannable.
+                <optgroup key={group} label={group}>
+                  {options.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.name.split(CATEGORY_PATH_SEPARATOR).pop()}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </SelectField>
+            <TextField label="برند" name="brand" defaultValue={product?.brand ?? ""} optional />
+            <TextField
+              label="برچسب‌ها"
+              name="tags"
+              defaultValue={product?.tags?.join(", ") ?? ""}
+              optional
+              placeholder="پاییزه, پنبه"
+              hint="با کاما جدا کنید."
+            />
+          </div>
+        </Card>
       </div>
-
-      <FormField label="توضیح کوتاه (اختیاری)" name="shortDescription" defaultValue={product?.shortDescription ?? ""} />
-
-      <label className="flex flex-col gap-1.5">
-        <span className="text-[0.85rem] text-ink">توضیح کامل (اختیاری)</span>
-        <textarea
-          name="longDescription"
-          defaultValue={product?.longDescription ?? ""}
-          rows={4}
-          className="w-full rounded-[var(--radius-md)] border border-line bg-white px-4 py-3 text-[0.92rem] text-ink outline-none focus:outline-2 focus:outline-ink"
-        />
-      </label>
-
-      <FormField
-        label="برچسب‌ها (با کاما جدا کنید، اختیاری)"
-        name="tags"
-        defaultValue={product?.tags?.join(", ") ?? ""}
-        placeholder="مثال: پاییزه, پنبه"
-      />
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <FormField label="عنوان سئو (اختیاری)" name="seoTitle" defaultValue={product?.seoTitle ?? ""} />
-        <FormField label="توضیح سئو (اختیاری)" name="seoDescription" defaultValue={product?.seoDescription ?? ""} />
-      </div>
-
-      <div className="flex flex-wrap gap-5 text-[0.88rem] text-ink">
-        <label className="flex items-center gap-2">
-          <input type="checkbox" name="isActive" defaultChecked={product?.isActive ?? true} className="h-4 w-4" />
-          فعال
-        </label>
-        <label className="flex items-center gap-2">
-          <input type="checkbox" name="isFeatured" defaultChecked={product?.isFeatured ?? false} className="h-4 w-4" />
-          محصول ویژه
-        </label>
-        <label className="flex items-center gap-2">
-          <input type="checkbox" name="isNewArrival" defaultChecked={product?.isNewArrival ?? false} className="h-4 w-4" />
-          جدید
-        </label>
-      </div>
-    </>
+    </div>
   );
 }

@@ -4,6 +4,25 @@ import { listOrdersForAdmin } from "@/domains/orders/queries";
 import { ORDER_STATUS_LABELS, type OrderStatus } from "@/domains/orders/lifecycle";
 import { formatToman } from "@/lib/utils/money";
 import { toPersianDigits } from "@/lib/utils/persian-digits";
+import { ORDER_STATUS_TONES } from "@/components/admin/status";
+import {
+  buildHref,
+  EmptyRow,
+  FilterBar,
+  FilterTabs,
+  formatDate,
+  PageHeader,
+  Pagination,
+  SearchField,
+  StatusBadge,
+  TABLE,
+  TD,
+  TD_MUTED,
+  TableCard,
+  TH,
+  THEAD,
+  TR,
+} from "@/components/admin/ui/layout";
 
 export const metadata: Metadata = {
   title: "سفارش‌ها — مدیریت",
@@ -11,10 +30,9 @@ export const metadata: Metadata = {
 };
 
 /**
- * Phase 11 update: `listOrdersForAdmin` is now paginated/filterable/
- * searchable (see that function's header comment) — this page was
- * previously an unpaginated-but-capped `limit(200)` list, per the
- * explicit hand-off note left in Phase 10.
+ * `listOrdersForAdmin` is paginated/filterable/searchable (see that
+ * function's header comment). Status is a row of quick tabs; search
+ * keeps the chosen status via a hidden field.
  */
 export default async function AdminOrdersPage({
   searchParams,
@@ -23,99 +41,90 @@ export default async function AdminOrdersPage({
 }) {
   const params = await searchParams;
   const page = Number(params.page ?? "1") || 1;
-  const status = params.status ? (params.status as OrderStatus) : undefined;
+  const validStatuses = Object.keys(ORDER_STATUS_LABELS) as OrderStatus[];
+  const status = validStatuses.includes(params.status as OrderStatus) ? (params.status as OrderStatus) : undefined;
 
   const orderPage = await listOrdersForAdmin({ status, search: params.q, page });
   const totalPages = Math.max(1, Math.ceil(orderPage.total / orderPage.pageSize));
 
+  const tabHref = (value?: string) => buildHref("/admin/orders", { status: value, q: params.q });
+
   return (
-    <div className="flex flex-col gap-4">
-      <h1 className="m-0 text-[1.3rem] font-bold">سفارش‌ها ({toPersianDigits(orderPage.total)})</h1>
+    <div className="flex flex-col gap-5">
+      <PageHeader
+        title="سفارش‌ها"
+        description={`${toPersianDigits(orderPage.total)} سفارش${status || params.q ? " مطابق فیلتر" : " ثبت شده"}. برای مشاهده جزئیات و تغییر وضعیت، روی شماره سفارش بزنید.`}
+      />
 
-      <form className="flex flex-wrap gap-3 text-[0.85rem]" method="get">
-        <input
-          type="search"
-          name="q"
-          defaultValue={params.q}
-          placeholder="جستجوی شماره سفارش یا موبایل گیرنده..."
-          className="min-w-[240px] flex-1 rounded-[var(--radius-md)] border border-line px-4 py-2.5 outline-none focus:border-ink"
-        />
-        <select
-          name="status"
-          defaultValue={params.status ?? ""}
-          className="rounded-[var(--radius-md)] border border-line px-4 py-2.5 outline-none focus:border-ink"
-        >
-          <option value="">همه وضعیت‌ها</option>
-          {Object.entries(ORDER_STATUS_LABELS).map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
-        </select>
-        <button type="submit" className="rounded-full bg-header px-5 py-2.5 text-ink hover:opacity-80">
-          اعمال فیلتر
-        </button>
-      </form>
+      <FilterTabs
+        items={[
+          { label: "همه", href: tabHref(), active: !status },
+          ...validStatuses.map((value) => ({
+            label: ORDER_STATUS_LABELS[value],
+            href: tabHref(value),
+            active: status === value,
+          })),
+        ]}
+      />
 
-      <div className="overflow-x-auto rounded-[var(--radius-lg)] border border-line bg-white">
-        <table className="w-full text-right text-[0.85rem]">
-          <thead className="border-b border-line text-text-secondary">
+      <FilterBar resetHref={status ? `/admin/orders?status=${status}` : "/admin/orders"} isFiltered={Boolean(params.q)} submitLabel="جستجو">
+        {status && <input type="hidden" name="status" value={status} />}
+        <SearchField defaultValue={params.q} placeholder="جستجوی شماره سفارش یا موبایل گیرنده..." />
+      </FilterBar>
+
+      <TableCard>
+        <table className={`${TABLE} min-w-[720px]`}>
+          <thead className={THEAD}>
             <tr>
-              <th className="px-4 py-3 font-medium">شماره سفارش</th>
-              <th className="px-4 py-3 font-medium">تاریخ</th>
-              <th className="px-4 py-3 font-medium">وضعیت</th>
-              <th className="px-4 py-3 font-medium">مبلغ</th>
+              <th className={TH}>شماره سفارش</th>
+              <th className={TH}>گیرنده</th>
+              <th className={TH}>تاریخ</th>
+              <th className={TH}>وضعیت</th>
+              <th className={TH}>مبلغ کل</th>
             </tr>
           </thead>
           <tbody>
             {orderPage.rows.map((order) => (
-              <tr key={order.id} className="border-b border-line last:border-0 hover:bg-ink/[0.03]">
-                <td className="px-4 py-3">
-                  <Link href={`/admin/orders/${order.orderNumber}`} dir="ltr" className="text-right font-semibold text-ink underline underline-offset-2">
+              <tr key={order.id} className={TR}>
+                <td className={TD}>
+                  <Link
+                    href={`/admin/orders/${order.orderNumber}`}
+                    dir="ltr"
+                    className="inline-block font-semibold text-ink hover:text-brand hover:underline"
+                  >
                     {order.orderNumber}
                   </Link>
                 </td>
-                <td className="px-4 py-3 text-text-secondary">
-                  {toPersianDigits(
-                    new Intl.DateTimeFormat("fa-IR", { year: "numeric", month: "short", day: "numeric" }).format(
-                      order.createdAt,
-                    ),
-                  )}
-                </td>
-                <td className="px-4 py-3">
-                  <span className="rounded-full bg-ink/[0.06] px-3 py-1 text-[0.78rem] text-ink">
-                    {ORDER_STATUS_LABELS[order.status] ?? order.status}
+                <td className={TD}>
+                  <span className="block font-medium text-ink">{order.recipientName}</span>
+                  <span dir="ltr" className="block text-end text-[0.78rem] text-text-secondary">
+                    {toPersianDigits(order.recipientMobile.replace("+98", "0"))}
                   </span>
                 </td>
-                <td className="px-4 py-3 font-semibold text-ink">{formatToman(order.totalToman)}</td>
+                <td className={TD_MUTED}>{formatDate(order.createdAt)}</td>
+                <td className={TD}>
+                  <StatusBadge tone={ORDER_STATUS_TONES[order.status] ?? "neutral"}>
+                    {ORDER_STATUS_LABELS[order.status] ?? order.status}
+                  </StatusBadge>
+                </td>
+                <td className={`${TD} font-semibold`}>{formatToman(order.totalToman)}</td>
               </tr>
             ))}
             {orderPage.rows.length === 0 && (
-              <tr>
-                <td colSpan={4} className="px-4 py-6 text-center text-text-secondary">
-                  هیچ سفارشی یافت نشد.
-                </td>
-              </tr>
+              <EmptyRow colSpan={5}>{status || params.q ? "سفارشی مطابق این فیلتر پیدا نشد." : "هنوز سفارشی ثبت نشده است."}</EmptyRow>
             )}
           </tbody>
         </table>
-      </div>
+      </TableCard>
 
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2 text-[0.85rem]">
-          {Array.from({ length: totalPages }, (_, index) => index + 1).map((pageNumber) => (
-            <Link
-              key={pageNumber}
-              href={{ query: { ...params, page: String(pageNumber) } }}
-              className={`rounded-full px-3.5 py-1.5 ${
-                pageNumber === page ? "bg-ink text-white" : "bg-header text-ink hover:opacity-80"
-              }`}
-            >
-              {toPersianDigits(pageNumber)}
-            </Link>
-          ))}
-        </div>
-      )}
+      <Pagination
+        pathname="/admin/orders"
+        params={{ status, q: params.q }}
+        page={page}
+        totalPages={totalPages}
+        total={orderPage.total}
+        pageSize={orderPage.pageSize}
+      />
     </div>
   );
 }

@@ -1,57 +1,52 @@
 "use client";
 
-import { useActionState } from "react";
-import { FormField } from "@/components/ui/FormField";
-import { SubmitButton } from "@/components/ui/SubmitButton";
 import { updateSiteSettingsAction } from "@/domains/admin/settings-actions";
 import type { SiteSettings } from "@/lib/db/schema";
 import type { ActionResult } from "@/domains/auth/roles";
+import { Card } from "@/components/admin/ui/layout";
+import { AdminSubmitButton, FieldGrid, FormActionBar, FormAlert, TextField, useAdminAction } from "@/components/admin/ui/form";
 
 const initialState: ActionResult = { ok: true };
 
 export function SiteSettingsForm({ settings }: { settings: SiteSettings }) {
-  const [state, formAction] = useActionState(updateSiteSettingsAction, initialState);
+  const [state, formAction] = useAdminAction(updateSiteSettingsAction, initialState, {
+    successMessage: "تنظیمات ذخیره شد",
+  });
 
   return (
-    <form action={formAction} className="flex flex-col gap-4 rounded-[var(--radius-lg)] border border-line bg-white p-5">
-      {!state.ok && (
-        <p role="alert" className="rounded-[var(--radius-sm)] bg-red-50 px-4 py-2.5 text-[0.85rem] text-red-700">
-          {state.error}
-        </p>
-      )}
+    <form action={formAction} className="flex flex-col gap-6">
+      <FormAlert state={state} />
 
-      <FormField label="نام فروشگاه" name="storeName" defaultValue={settings.storeName} required />
+      <Card title="اطلاعات فروشگاه">
+        <div className="flex flex-col gap-4">
+          <TextField label="نام فروشگاه" name="storeName" defaultValue={settings.storeName} required />
+          <FieldGrid>
+            <TextField label="ایمیل پشتیبانی" name="supportEmail" type="email" defaultValue={settings.supportEmail ?? ""} optional ltr />
+            <TextField label="تلفن پشتیبانی" name="supportPhone" defaultValue={settings.supportPhone ?? ""} optional ltr />
+          </FieldGrid>
+        </div>
+      </Card>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <FormField label="ایمیل پشتیبانی (اختیاری)" name="supportEmail" type="email" defaultValue={settings.supportEmail ?? ""} />
-        <FormField label="تلفن پشتیبانی (اختیاری)" name="supportPhone" defaultValue={settings.supportPhone ?? ""} />
-      </div>
+      <Card title="هزینه ارسال" description="این مبالغ در مرحله پرداخت برای مشتری محاسبه می‌شود. سفارش‌هایی که بالاتر از آستانه باشند، ارسال رایگان دارند.">
+        <FieldGrid columns={3}>
+          <TextField label="ارسال استاندارد" name="standardShippingFeeToman" type="number" min={0} suffix="تومان" defaultValue={String(settings.standardShippingFeeToman)} required />
+          <TextField label="ارسال اکسپرس" name="expressShippingFeeToman" type="number" min={0} suffix="تومان" defaultValue={String(settings.expressShippingFeeToman)} required />
+          <TextField
+            label="آستانه ارسال رایگان"
+            name="freeShippingThresholdToman"
+            type="number"
+            min={0}
+            suffix="تومان"
+            defaultValue={String(settings.freeShippingThresholdToman)}
+            required
+            hint="صفر یعنی ارسال رایگان خاموش است."
+          />
+        </FieldGrid>
+      </Card>
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <FormField
-          label="هزینه ارسال استاندارد (تومان)"
-          name="standardShippingFeeToman"
-          type="number"
-          defaultValue={String(settings.standardShippingFeeToman)}
-          required
-        />
-        <FormField
-          label="هزینه ارسال اکسپرس (تومان)"
-          name="expressShippingFeeToman"
-          type="number"
-          defaultValue={String(settings.expressShippingFeeToman)}
-          required
-        />
-        <FormField
-          label="آستانه ارسال رایگان (تومان)"
-          name="freeShippingThresholdToman"
-          type="number"
-          defaultValue={String(settings.freeShippingThresholdToman)}
-          required
-        />
-      </div>
-
-      <SubmitButton pendingLabel="در حال ذخیره...">ذخیره تنظیمات</SubmitButton>
+      <FormActionBar>
+        <AdminSubmitButton>ذخیره تنظیمات</AdminSubmitButton>
+      </FormActionBar>
     </form>
   );
 }

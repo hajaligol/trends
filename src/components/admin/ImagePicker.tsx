@@ -2,6 +2,8 @@
 
 import { useId, useRef, useState } from "react";
 import Image from "next/image";
+import { ImageIcon } from "@/components/admin/ui/icons";
+import { Spinner } from "@/components/admin/ui/form";
 
 type ImagePickerProps = {
   /** Form field name the resulting URL is submitted under (e.g. "url"
@@ -15,11 +17,20 @@ type ImagePickerProps = {
   label: string;
   defaultValue?: string | null;
   required?: boolean;
+  /** Preview shape: `square` (default), `wide` (hero/banners) or `portrait` (products). */
+  shape?: "square" | "wide" | "portrait";
+  hint?: string;
 };
 
+const SHAPES = {
+  square: "aspect-square w-28",
+  wide: "aspect-[16/9] w-44",
+  portrait: "aspect-[3/4] w-24",
+} as const;
+
 /**
- * Browse-for-a-file image picker: a visible "انتخاب تصویر" button opens
- * the OS file picker, the chosen file uploads immediately to
+ * Browse-for-a-file image picker: a visible preview tile (click to choose)
+ * opens the OS file picker, the chosen file uploads immediately to
  * `POST /api/admin/media`, and the returned URL is written into a hidden
  * input under `name` so the surrounding form's existing Server Action
  * needs no changes — it still just reads a URL string.
@@ -30,7 +41,7 @@ type ImagePickerProps = {
  * without re-uploading it — the browse button is the primary path, not
  * the only path.
  */
-export function ImagePicker({ name, folder, label, defaultValue, required }: ImagePickerProps) {
+export function ImagePicker({ name, folder, label, defaultValue, required, shape = "square", hint }: ImagePickerProps) {
   const inputId = useId();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [url, setUrl] = useState(defaultValue ?? "");
@@ -68,34 +79,35 @@ export function ImagePicker({ name, folder, label, defaultValue, required }: Ima
 
   return (
     <div className="flex flex-col gap-2">
-      <span className="text-[0.85rem] text-ink">
+      <span className="flex items-center gap-2 text-[0.84rem] font-medium text-ink">
         {label}
-        {required && !url ? " *" : ""}
+        {required && (
+          <span aria-hidden="true" className="text-red-600">
+            *
+          </span>
+        )}
       </span>
 
       <input type="hidden" name={name} value={url} required={required} />
 
-      <div className="flex items-center gap-3">
-        {url ? (
-          <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-[var(--radius-md)] border border-line bg-card-image">
-            <Image src={url} alt="" fill sizes="64px" className="object-cover" />
-          </div>
-        ) : (
-          <div
-            aria-hidden="true"
-            className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[var(--radius-md)] border border-dashed border-line bg-header text-[0.7rem] text-text-secondary"
-          >
-            بدون تصویر
-          </div>
-        )}
-
-        <div className="flex flex-col gap-1.5">
-          <label
-            htmlFor={inputId}
-            className="w-fit cursor-pointer rounded-[var(--radius-md)] border border-line bg-white px-4 py-2 text-[0.82rem] text-ink transition-colors hover:bg-header"
-          >
-            {isUploading ? "در حال آپلود..." : url ? "تغییر تصویر" : "انتخاب تصویر"}
-          </label>
+      <div className="flex flex-wrap items-center gap-4">
+        <label
+          htmlFor={inputId}
+          className={`relative grid shrink-0 cursor-pointer place-items-center overflow-hidden rounded-[var(--radius-md)] border border-dashed border-ink/25 bg-card-image transition-colors hover:border-brand has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-brand/50 ${SHAPES[shape]}`}
+        >
+          {url ? (
+            <Image src={url} alt="" fill sizes="176px" className="object-cover" />
+          ) : (
+            <span className="flex flex-col items-center gap-1 px-2 text-center text-[0.72rem] text-text-secondary">
+              <ImageIcon width={24} height={24} />
+              انتخاب تصویر
+            </span>
+          )}
+          {isUploading && (
+            <span className="absolute inset-0 grid place-items-center bg-white/75">
+              <Spinner className="h-6 w-6 text-brand" />
+            </span>
+          )}
           <input
             id={inputId}
             ref={fileInputRef}
@@ -105,20 +117,30 @@ export function ImagePicker({ name, folder, label, defaultValue, required }: Ima
             disabled={isUploading}
             className="sr-only"
           />
+        </label>
+
+        <div className="flex flex-col items-start gap-1.5">
+          <label
+            htmlFor={inputId}
+            className="cursor-pointer rounded-full border border-ink/20 bg-white px-4 py-2 text-[0.82rem] font-semibold text-ink transition-colors hover:border-ink/40 hover:bg-ink/[0.04]"
+          >
+            {isUploading ? "در حال آپلود..." : url ? "تغییر تصویر" : "انتخاب فایل"}
+          </label>
           {url && (
             <button
               type="button"
               onClick={() => setUrl("")}
-              className="w-fit text-[0.78rem] text-text-secondary underline underline-offset-2"
+              className="cursor-pointer rounded-full px-1 text-[0.78rem] text-red-700 hover:underline"
             >
               حذف تصویر
             </button>
           )}
+          <p className="m-0 text-[0.74rem] leading-5 text-text-secondary">{hint ?? "JPG، PNG، WebP یا GIF"}</p>
         </div>
       </div>
 
       {error && (
-        <p role="alert" className="text-[0.78rem] text-red-600">
+        <p role="alert" className="m-0 text-[0.78rem] text-red-700">
           {error}
         </p>
       )}
@@ -126,7 +148,7 @@ export function ImagePicker({ name, folder, label, defaultValue, required }: Ima
       <button
         type="button"
         onClick={() => setShowUrlFallback((value) => !value)}
-        className="w-fit text-[0.76rem] text-text-secondary underline underline-offset-2"
+        className="w-fit cursor-pointer text-[0.76rem] text-text-secondary underline underline-offset-2 hover:text-brand"
       >
         {showUrlFallback ? "بستن" : "یا آدرس تصویر را وارد کنید"}
       </button>
@@ -137,7 +159,8 @@ export function ImagePicker({ name, folder, label, defaultValue, required }: Ima
           onChange={(event) => setUrl(event.target.value)}
           placeholder="/assets/products/example.webp"
           dir="ltr"
-          className="w-full rounded-[var(--radius-md)] border border-line bg-white px-4 py-2.5 text-[0.85rem] text-ink outline-none focus:outline-2 focus:outline-ink"
+          aria-label="آدرس تصویر"
+          className="w-full rounded-[var(--radius-md)] border border-line bg-white px-4 py-2.5 text-[0.85rem] text-ink outline-none transition-colors focus:border-brand focus:outline-2 focus:outline-offset-1 focus:outline-brand/30"
         />
       )}
     </div>

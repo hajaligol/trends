@@ -2,10 +2,24 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/Button";
+import { useToast } from "@/components/feedback/ToastProvider";
 import { adminTransitionOrderStatusAction } from "@/domains/orders/admin-actions";
 import { ORDER_STATUS_LABELS } from "@/domains/orders/lifecycle";
 import type { OrderStatus } from "@/domains/orders/lifecycle";
+import { ORDER_STATUS_TONES } from "@/components/admin/status";
+import { adminButton, StatusBadge } from "@/components/admin/ui/layout";
+import { AlertTriangleIcon, CheckCircleIcon } from "@/components/admin/ui/icons";
+import { Spinner, TextareaField, TextField } from "@/components/admin/ui/form";
+
+/** What each next step means in plain words, so the operator sees the
+ * consequence before pressing the button. */
+const STATUS_HINTS: Partial<Record<OrderStatus, string>> = {
+  processing: "سفارش در حال بسته‌بندی است.",
+  shipped: "سفارش به پست یا پیک تحویل داده شده است.",
+  delivered: "سفارش به دست مشتری رسیده است.",
+  cancelled: "موجودی کالاهای این سفارش به انبار برمی‌گردد و این کار قابل بازگشت نیست.",
+  refunded: "فقط ثبت می‌کند که بازپرداخت خارج از سیستم انجام شده؛ هیچ پولی از درگاه برگردانده نمی‌شود.",
+};
 
 /**
  * Renders only the transitions `getAdminAllowedNextStatuses` (server
@@ -19,9 +33,11 @@ import type { OrderStatus } from "@/domains/orders/lifecycle";
 export function AdminOrderStatusForm({
   orderNumber,
   allowedNextStatuses,
+  currentStatus,
 }: {
   orderNumber: string;
   allowedNextStatuses: readonly OrderStatus[];
+  currentStatus: OrderStatus;
 }) {
   const [toStatus, setToStatus] = useState<OrderStatus | "">(allowedNextStatuses[0] ?? "");
   const [trackingNumber, setTrackingNumber] = useState("");
@@ -29,76 +45,110 @@ export function AdminOrderStatusForm({
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
+  const { showToast } = useToast();
 
   if (allowedNextStatuses.length === 0) {
-    return <p className="text-[0.85rem] text-text-secondary">این سفارش در وضعیت نهایی قرار دارد.</p>;
+    return (
+      <div className="flex items-start gap-3 rounded-[var(--radius-md)] bg-bg p-4 text-[0.86rem] leading-6 text-text-secondary">
+        <CheckCircleIcon width={20} height={20} className="mt-0.5 shrink-0 text-[#6b7d3e]" />
+        <p className="m-0">
+          این سفارش در وضعیت نهایی («{ORDER_STATUS_LABELS[currentStatus]}») قرار دارد و دیگر قابل تغییر نیست.
+        </p>
+      </div>
+    );
   }
+
+  const isDestructive = toStatus === "cancelled";
 
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     if (!toStatus) return;
     setError(null);
+    const target = toStatus;
     startTransition(async () => {
-      const result = await adminTransitionOrderStatusAction(orderNumber, toStatus, trackingNumber, note);
+      const result = await adminTransitionOrderStatusAction(orderNumber, target, trackingNumber, note);
       if (!result.ok) {
         setError(result.error);
         return;
       }
       setTrackingNumber("");
       setNote("");
+      showToast(`وضعیت سفارش به «${ORDER_STATUS_LABELS[target]}» تغییر کرد`);
       router.refresh();
     });
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-3 text-[0.85rem]">
-      <label className="flex flex-col gap-1">
-        <span className="text-text-secondary">وضعیت جدید</span>
-        <select
-          value={toStatus}
-          onChange={(event) => setToStatus(event.target.value as OrderStatus)}
-          className="rounded-[var(--radius-sm)] border border-line px-3 py-2 outline-none focus:border-ink"
-        >
-          {allowedNextStatuses.map((status) => (
-            <option key={status} value={status}>
-              {ORDER_STATUS_LABELS[status]}
-            </option>
-          ))}
-        </select>
-      </label>
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <div className="flex items-center gap-2 text-[0.82rem] text-text-secondary">
+        وضعیت فعلی:
+        <StatusBadge tone={ORDER_STATUS_TONES[currentStatus]}>{ORDER_STATUS_LABELS[currentStatus]}</StatusBadge>
+      </div>
+
+      <fieldset className="m-0 flex min-w-0 flex-col gap-2 border-0 p-0">
+        <legend className="mb-2 p-0 text-[0.84rem] font-medium text-ink">انتقال به</legend>
+        {allowedNextStatuses.map((status) => (
+          <label
+            key={status}
+            className={`flex cursor-pointer items-start gap-3 rounded-[var(--radius-md)] border p-3.5 transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-brand/50 ${
+              toStatus === status ? "border-ink bg-ink/[0.03]" : "border-line hover:border-ink/30"
+            }`}
+          >
+            <input
+              type="radio"
+              name="toStatus"
+              value={status}
+              checked={toStatus === status}
+              onChange={() => setToStatus(status)}
+              className="mt-1 h-4 w-4 accent-[var(--color-brand)]"
+            />
+            <span className="flex flex-col gap-0.5">
+              <span className="text-[0.9rem] font-semibold text-ink">{ORDER_STATUS_LABELS[status]}</span>
+              {STATUS_HINTS[status] && <span className="text-[0.78rem] leading-5 text-text-secondary">{STATUS_HINTS[status]}</span>}
+            </span>
+          </label>
+        ))}
+      </fieldset>
 
       {toStatus === "shipped" && (
-        <label className="flex flex-col gap-1">
-          <span className="text-text-secondary">کد رهگیری مرسوله (اختیاری)</span>
-          <input
-            type="text"
-            value={trackingNumber}
-            onChange={(event) => setTrackingNumber(event.target.value)}
-            className="rounded-[var(--radius-sm)] border border-line px-3 py-2 outline-none focus:border-ink"
-            dir="ltr"
-          />
-        </label>
+        <TextField
+          label="کد رهگیری مرسوله"
+          name="trackingNumber"
+          optional
+          ltr
+          value={trackingNumber}
+          onChange={(event) => setTrackingNumber(event.target.value)}
+          hint="این کد در صفحه سفارش برای مشتری نمایش داده می‌شود."
+        />
       )}
 
-      <label className="flex flex-col gap-1">
-        <span className="text-text-secondary">یادداشت داخلی (اختیاری)</span>
-        <textarea
-          value={note}
-          onChange={(event) => setNote(event.target.value)}
-          rows={2}
-          className="rounded-[var(--radius-sm)] border border-line px-3 py-2 outline-none focus:border-ink"
-        />
-      </label>
+      <TextareaField
+        label="یادداشت داخلی"
+        name="note"
+        optional
+        rows={2}
+        value={note}
+        onChange={(event) => setNote(event.target.value)}
+        hint="فقط در تاریخچه سفارش ثبت می‌شود."
+      />
+
+      {isDestructive && (
+        <p className="m-0 flex items-start gap-2.5 rounded-[var(--radius-md)] border border-red-200 bg-red-50 px-4 py-3 text-[0.82rem] leading-6 text-red-800">
+          <AlertTriangleIcon width={18} height={18} className="mt-0.5 shrink-0" />
+          لغو سفارش برگشت‌ناپذیر است. لطفاً پیش از ادامه مطمئن شوید.
+        </p>
+      )}
 
       {error && (
-        <p role="alert" className="text-red-700">
+        <p role="alert" className="m-0 rounded-[var(--radius-md)] bg-red-50 px-4 py-2.5 text-[0.84rem] text-red-800">
           {error}
         </p>
       )}
 
-      <Button type="submit" disabled={isPending} className="w-fit disabled:opacity-60">
-        {isPending ? "در حال اعمال..." : "اعمال تغییر وضعیت"}
-      </Button>
+      <button type="submit" disabled={isPending || !toStatus} className={adminButton(isDestructive ? "danger" : "primary", "md", "w-full")}>
+        {isPending && <Spinner />}
+        {isPending ? "در حال اعمال..." : isDestructive ? "لغو سفارش" : "اعمال تغییر وضعیت"}
+      </button>
     </form>
   );
 }

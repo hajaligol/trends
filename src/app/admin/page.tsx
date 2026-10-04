@@ -1,88 +1,196 @@
 import Link from "next/link";
 import { getAdminDashboardSummary } from "@/domains/admin/dashboard";
-import { ORDER_STATUS_LABELS } from "@/domains/orders/lifecycle";
+import { ORDER_STATUS_LABELS, type OrderStatus } from "@/domains/orders/lifecycle";
 import { formatToman } from "@/lib/utils/money";
 import { toPersianDigits } from "@/lib/utils/persian-digits";
+import { ORDER_STATUS_TONES } from "@/components/admin/status";
+import {
+  adminButton,
+  Card,
+  EmptyRow,
+  formatDate,
+  PageHeader,
+  StatCard,
+  StatusBadge,
+  TABLE,
+  TD,
+  TD_MUTED,
+  TableCard,
+  TH,
+  THEAD,
+  TR,
+} from "@/components/admin/ui/layout";
+import {
+  ArchiveIcon,
+  CheckCircleIcon,
+  MessageIcon,
+  PackageIcon,
+  PlusIcon,
+  StarIcon,
+  UsersIcon,
+  WalletIcon,
+} from "@/components/admin/ui/icons";
 
 export const metadata = { title: "داشبورد مدیریت", robots: { index: false, follow: false } };
 
 /**
- * Landing page for `/admin` — a small set of at-a-glance numbers plus a
- * shortcut to the most recent orders, so a store operator's first click
- * every day answers "does anything need my attention right now" without
- * navigating into every sub-page.
+ * Landing page for `/admin`. Top to bottom: the two headline numbers, then a
+ * "needs your attention" row (red-dotted when non-zero, calm when all clear),
+ * then the latest orders — so the first look every day answers "what should
+ * I do right now?".
  */
 export default async function AdminDashboardPage() {
   const summary = await getAdminDashboardSummary();
 
-  const cards = [
-    { label: "سفارش‌های نیازمند پیگیری", value: toPersianDigits(summary.ordersAwaitingAction), href: "/admin/orders" },
-    { label: "درآمد این ماه", value: formatToman(summary.revenueThisMonthToman), href: "/admin/orders" },
-    { label: "تعداد مشتریان", value: toPersianDigits(summary.totalCustomers), href: "/admin/customers" },
-    { label: "کالاهای رو به اتمام", value: toPersianDigits(summary.lowStockVariantCount), href: "/admin/inventory" },
-    { label: "دیدگاه‌های در انتظار بررسی", value: toPersianDigits(summary.pendingReviewCount), href: "/admin/reviews" },
-    { label: "پیام‌های پشتیبانی حل‌نشده", value: toPersianDigits(summary.unresolvedSupportMessageCount), href: "/admin/support" },
+  const attention = [
+    {
+      label: "سفارش آماده رسیدگی",
+      hint: "پرداخت‌شده و در انتظار ارسال",
+      count: summary.ordersAwaitingAction,
+      href: "/admin/orders?status=paid",
+      icon: <PackageIcon />,
+      color: "blue" as const,
+    },
+    {
+      label: "کالای رو به اتمام",
+      hint: "موجودی کمتر از آستانه",
+      count: summary.lowStockVariantCount,
+      href: "/admin/inventory",
+      icon: <ArchiveIcon />,
+      color: "yellow" as const,
+    },
+    {
+      label: "دیدگاه در انتظار بررسی",
+      hint: "نیازمند تأیید یا رد",
+      count: summary.pendingReviewCount,
+      href: "/admin/reviews?status=pending",
+      icon: <StarIcon />,
+      color: "lavender" as const,
+    },
+    {
+      label: "پیام پشتیبانی بدون پاسخ",
+      hint: "از فرم تماس با ما",
+      count: summary.unresolvedSupportMessageCount,
+      href: "/admin/support?unresolved=1",
+      icon: <MessageIcon />,
+      color: "pink" as const,
+    },
   ];
+  const allClear = attention.every((item) => item.count === 0);
 
   return (
     <div className="flex flex-col gap-8">
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {cards.map((card) => (
-          <Link
-            key={card.label}
-            href={card.href}
-            className="flex flex-col gap-1.5 rounded-[var(--radius-lg)] border border-line bg-white p-5 transition-colors hover:border-ink"
-          >
-            <span className="text-[0.8rem] text-text-secondary">{card.label}</span>
-            <span className="text-[1.4rem] font-bold text-ink">{card.value}</span>
-          </Link>
-        ))}
-      </div>
+      <PageHeader
+        title="داشبورد"
+        description="خلاصه‌ای از وضعیت فروشگاه و کارهایی که امروز منتظر شما هستند."
+        actions={
+          <>
+            <Link href="/admin/coupons/new" className={adminButton("secondary", "md")}>
+              کد تخفیف جدید
+            </Link>
+            <Link href="/admin/products/new" className={adminButton("primary", "md")}>
+              <PlusIcon width={18} height={18} />
+              محصول جدید
+            </Link>
+          </>
+        }
+      />
 
-      <div className="flex flex-col gap-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-[1rem] font-bold text-ink">سفارش‌های اخیر</h2>
-          <Link href="/admin/orders" className="text-[0.82rem] text-text-secondary underline underline-offset-2">
-            مشاهده همه
+      <section aria-label="آمار کلی" className="grid gap-4 sm:grid-cols-2">
+        <StatCard
+          label="درآمد این ماه"
+          value={formatToman(summary.revenueThisMonthToman)}
+          hint="سفارش‌های پرداخت‌شده، در حال آماده‌سازی، ارسال‌شده و تحویل‌شده"
+          icon={<WalletIcon />}
+          color="sage"
+          href="/admin/orders"
+        />
+        <StatCard
+          label="تعداد مشتریان"
+          value={toPersianDigits(summary.totalCustomers)}
+          hint="حساب‌های ثبت‌نام‌شده"
+          icon={<UsersIcon />}
+          color="aqua"
+          href="/admin/customers"
+        />
+      </section>
+
+      <section aria-labelledby="attention-title" className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 id="attention-title" className="m-0 text-[1.05rem] font-bold text-ink">
+            نیازمند توجه
+          </h2>
+          {allClear && (
+            <span className="inline-flex items-center gap-1.5 text-[0.82rem] text-[#4f5f2a]">
+              <CheckCircleIcon width={17} height={17} />
+              فعلاً همه‌چیز مرتب است
+            </span>
+          )}
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {attention.map((item) => (
+            <StatCard
+              key={item.label}
+              label={item.label}
+              value={toPersianDigits(item.count)}
+              hint={item.hint}
+              icon={item.icon}
+              color={item.color}
+              href={item.href}
+              attention={item.count > 0}
+            />
+          ))}
+        </div>
+      </section>
+
+      <section aria-labelledby="recent-orders-title" className="flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-3">
+          <h2 id="recent-orders-title" className="m-0 text-[1.05rem] font-bold text-ink">
+            سفارش‌های اخیر
+          </h2>
+          <Link href="/admin/orders" className="text-[0.84rem] font-medium text-brand hover:underline">
+            مشاهده همه سفارش‌ها
           </Link>
         </div>
-        <div className="overflow-x-auto rounded-[var(--radius-lg)] border border-line">
-          <table className="w-full min-w-[560px] text-[0.85rem]">
-            <thead>
-              <tr className="border-b border-line bg-header text-start text-text-secondary">
-                <th className="px-4 py-2.5 text-start font-medium">شماره سفارش</th>
-                <th className="px-4 py-2.5 text-start font-medium">وضعیت</th>
-                <th className="px-4 py-2.5 text-start font-medium">مبلغ</th>
-                <th className="px-4 py-2.5 text-start font-medium">تاریخ</th>
+        <TableCard>
+          <table className={`${TABLE} min-w-[560px]`}>
+            <thead className={THEAD}>
+              <tr>
+                <th className={TH}>شماره سفارش</th>
+                <th className={TH}>وضعیت</th>
+                <th className={TH}>مبلغ</th>
+                <th className={TH}>تاریخ</th>
               </tr>
             </thead>
             <tbody>
               {summary.recentOrders.length === 0 ? (
-                <tr>
-                  <td colSpan={4} className="px-4 py-6 text-center text-text-secondary">
-                    هنوز سفارشی ثبت نشده است
-                  </td>
-                </tr>
+                <EmptyRow colSpan={4}>هنوز سفارشی ثبت نشده است.</EmptyRow>
               ) : (
                 summary.recentOrders.map((order) => (
-                  <tr key={order.orderNumber} className="border-b border-line last:border-0">
-                    <td className="px-4 py-2.5">
-                      <Link href={`/admin/orders/${order.orderNumber}`} className="underline underline-offset-2">
+                  <tr key={order.orderNumber} className={TR}>
+                    <td className={TD}>
+                      <Link
+                        href={`/admin/orders/${order.orderNumber}`}
+                        dir="ltr"
+                        className="inline-block font-semibold text-ink hover:text-brand hover:underline"
+                      >
                         {order.orderNumber}
                       </Link>
                     </td>
-                    <td className="px-4 py-2.5">{ORDER_STATUS_LABELS[order.status as keyof typeof ORDER_STATUS_LABELS]}</td>
-                    <td className="px-4 py-2.5">{formatToman(order.totalToman)}</td>
-                    <td className="px-4 py-2.5 text-text-secondary">
-                      {new Intl.DateTimeFormat("fa-IR").format(order.createdAt)}
+                    <td className={TD}>
+                      <StatusBadge tone={ORDER_STATUS_TONES[order.status as OrderStatus] ?? "neutral"}>
+                        {ORDER_STATUS_LABELS[order.status as OrderStatus] ?? order.status}
+                      </StatusBadge>
                     </td>
+                    <td className={`${TD} font-semibold`}>{formatToman(order.totalToman)}</td>
+                    <td className={TD_MUTED}>{formatDate(order.createdAt)}</td>
                   </tr>
                 ))
               )}
             </tbody>
           </table>
-        </div>
-      </div>
+        </TableCard>
+      </section>
     </div>
   );
 }

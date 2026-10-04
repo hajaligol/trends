@@ -1,11 +1,21 @@
 "use client";
 
-import { useActionState, useState } from "react";
-import { FormField } from "@/components/ui/FormField";
-import { SubmitButton } from "@/components/ui/SubmitButton";
+import { useState } from "react";
 import { createCouponAction, updateCouponAction } from "@/domains/promotions/admin-actions";
 import type { Coupon } from "@/lib/db/schema";
 import type { ActionResult } from "@/domains/auth/roles";
+import { Card } from "@/components/admin/ui/layout";
+import {
+  AdminSubmitButton,
+  FieldGrid,
+  FormActionBar,
+  FormAlert,
+  SelectField,
+  SwitchField,
+  TextField,
+  useAdminAction,
+} from "@/components/admin/ui/form";
+import { useRouter } from "next/navigation";
 
 const initialState: ActionResult = { ok: true };
 
@@ -21,87 +31,103 @@ function toDatetimeLocalValue(date: Date | null): string {
 }
 
 export function CouponForm({ coupon }: { coupon?: Coupon }) {
+  const router = useRouter();
   const action = coupon ? updateCouponAction : createCouponAction;
-  const [state, formAction] = useActionState(action, initialState);
+  const [state, formAction] = useAdminAction(action, initialState, {
+    successMessage: coupon ? "کد تخفیف ذخیره شد" : "کد تخفیف ساخته شد",
+    // The create action does not redirect; send the operator back to the
+    // list so they see the new code. Edits stay on the page.
+    onSuccess: () => {
+      if (!coupon) router.push("/admin/coupons");
+    },
+  });
   const [discountType, setDiscountType] = useState<"percentage" | "fixed">(coupon?.discountType ?? "percentage");
 
   return (
-    <form action={formAction} className="flex flex-col gap-4">
+    <form action={formAction} className="flex flex-col gap-6">
       {coupon && <input type="hidden" name="id" value={coupon.id} />}
+      <FormAlert state={state} />
 
-      {!state.ok && (
-        <p role="alert" className="rounded-[var(--radius-sm)] bg-red-50 px-4 py-2.5 text-[0.85rem] text-red-700">
-          {state.error}
-        </p>
-      )}
+      <Card title="مقدار تخفیف">
+        <div className="flex flex-col gap-4">
+          <TextField
+            label="کد تخفیف"
+            name="code"
+            defaultValue={coupon?.code}
+            required
+            ltr
+            placeholder="WELCOME20"
+            hint="مشتری این کد را در مرحله پرداخت وارد می‌کند. حروف بزرگ و کوچک فرقی ندارد."
+          />
+          <FieldGrid>
+            <SelectField
+              label="نوع تخفیف"
+              name="discountType"
+              value={discountType}
+              onChange={(event) => setDiscountType(event.target.value as "percentage" | "fixed")}
+            >
+              <option value="percentage">درصدی</option>
+              <option value="fixed">مبلغ ثابت</option>
+            </SelectField>
+            <TextField
+              label={discountType === "percentage" ? "درصد تخفیف" : "مبلغ تخفیف"}
+              name="discountValue"
+              type="number"
+              min={1}
+              max={discountType === "percentage" ? 100 : undefined}
+              suffix={discountType === "percentage" ? "درصد" : "تومان"}
+              defaultValue={coupon ? String(coupon.discountValue) : ""}
+              required
+              hint={discountType === "percentage" ? "عددی از ۱ تا ۱۰۰." : undefined}
+            />
+          </FieldGrid>
+          <TextField
+            label="حداقل مبلغ سبد خرید"
+            name="minBasketToman"
+            type="number"
+            min={0}
+            suffix="تومان"
+            defaultValue={String(coupon?.minBasketToman ?? 0)}
+            hint="صفر یعنی بدون حداقل."
+          />
+        </div>
+      </Card>
 
-      <FormField label="کد تخفیف" name="code" defaultValue={coupon?.code} required placeholder="مثال: WELCOME20" />
+      <Card title="زمان‌بندی و محدودیت‌ها" description="همه این موارد اختیاری‌اند؛ خالی گذاشتن یعنی «بدون محدودیت».">
+        <div className="flex flex-col gap-4">
+          <FieldGrid>
+            <TextField label="شروع اعتبار" name="startsAt" type="datetime-local" optional defaultValue={toDatetimeLocalValue(coupon?.startsAt ?? null)} />
+            <TextField label="پایان اعتبار" name="endsAt" type="datetime-local" optional defaultValue={toDatetimeLocalValue(coupon?.endsAt ?? null)} />
+          </FieldGrid>
+          <FieldGrid>
+            <TextField
+              label="سقف کل استفاده"
+              name="usageLimit"
+              type="number"
+              min={1}
+              suffix="بار"
+              optional
+              defaultValue={coupon?.usageLimit ? String(coupon.usageLimit) : ""}
+              hint="مجموع دفعاتی که همه مشتریان می‌توانند استفاده کنند."
+            />
+            <TextField
+              label="سقف استفاده هر مشتری"
+              name="perCustomerLimit"
+              type="number"
+              min={1}
+              suffix="بار"
+              optional
+              defaultValue={coupon?.perCustomerLimit ? String(coupon.perCustomerLimit) : ""}
+            />
+          </FieldGrid>
+        </div>
+      </Card>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <label className="flex flex-col gap-1.5">
-          <span className="text-[0.85rem] text-ink">نوع تخفیف</span>
-          <select
-            name="discountType"
-            value={discountType}
-            onChange={(event) => setDiscountType(event.target.value as "percentage" | "fixed")}
-            className="w-full rounded-[var(--radius-md)] border border-line bg-white px-4 py-3 text-[0.92rem] text-ink outline-none focus:outline-2 focus:outline-ink"
-          >
-            <option value="percentage">درصدی</option>
-            <option value="fixed">مبلغ ثابت (تومان)</option>
-          </select>
-        </label>
-        <FormField
-          label={discountType === "percentage" ? "درصد تخفیف (۱ تا ۱۰۰)" : "مبلغ تخفیف (تومان)"}
-          name="discountValue"
-          type="number"
-          defaultValue={coupon ? String(coupon.discountValue) : ""}
-          required
-        />
-      </div>
+      <SwitchField name="isActive" label="فعال" description="کد غیرفعال در فروشگاه پذیرفته نمی‌شود." defaultChecked={coupon?.isActive ?? true} />
 
-      <FormField
-        label="حداقل مبلغ سبد خرید (تومان)"
-        name="minBasketToman"
-        type="number"
-        defaultValue={String(coupon?.minBasketToman ?? 0)}
-      />
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <FormField
-          label="تاریخ شروع (اختیاری)"
-          name="startsAt"
-          type="datetime-local"
-          defaultValue={toDatetimeLocalValue(coupon?.startsAt ?? null)}
-        />
-        <FormField
-          label="تاریخ پایان (اختیاری)"
-          name="endsAt"
-          type="datetime-local"
-          defaultValue={toDatetimeLocalValue(coupon?.endsAt ?? null)}
-        />
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <FormField
-          label="سقف کل استفاده (اختیاری)"
-          name="usageLimit"
-          type="number"
-          defaultValue={coupon?.usageLimit ? String(coupon.usageLimit) : ""}
-        />
-        <FormField
-          label="سقف استفاده هر مشتری (اختیاری)"
-          name="perCustomerLimit"
-          type="number"
-          defaultValue={coupon?.perCustomerLimit ? String(coupon.perCustomerLimit) : ""}
-        />
-      </div>
-
-      <label className="flex items-center gap-2 text-[0.88rem] text-ink">
-        <input type="checkbox" name="isActive" defaultChecked={coupon?.isActive ?? true} className="h-4 w-4" />
-        فعال
-      </label>
-
-      <SubmitButton pendingLabel="در حال ذخیره...">{coupon ? "ذخیره تغییرات" : "ایجاد کد تخفیف"}</SubmitButton>
+      <FormActionBar>
+        <AdminSubmitButton>{coupon ? "ذخیره تغییرات" : "ساخت کد تخفیف"}</AdminSubmitButton>
+      </FormActionBar>
     </form>
   );
 }

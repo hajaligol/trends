@@ -1,5 +1,21 @@
-import Link from "next/link";
 import { listAuditLogEntityTypes, listAuditLogs } from "@/domains/analytics/audit";
+import {
+  EmptyRow,
+  FilterBar,
+  formatDateTime,
+  PageHeader,
+  Pagination,
+  SelectInput,
+  StatusBadge,
+  TABLE,
+  TD,
+  TD_MUTED,
+  TableCard,
+  TH,
+  THEAD,
+  TR,
+  type Tone,
+} from "@/components/admin/ui/layout";
 import { toPersianDigits } from "@/lib/utils/persian-digits";
 
 export const metadata = { title: "گزارش فعالیت‌ها", robots: { index: false, follow: false } };
@@ -31,6 +47,28 @@ const ACTION_LABELS: Record<string, string> = {
   "customer.role_change": "تغییر نقش کاربر",
 };
 
+const ENTITY_LABELS: Record<string, string> = {
+  order: "سفارش",
+  category: "دسته‌بندی",
+  product: "محصول",
+  product_variant: "نوع محصول",
+  product_image: "تصویر محصول",
+  inventory: "موجودی",
+  coupon: "کد تخفیف",
+  hero_slide: "اسلاید",
+  promo_banner: "بنر",
+  settings: "تنظیمات",
+  customer: "مشتری",
+};
+
+/** Colour the action by what it did, so deletions stand out when scanning. */
+function actionTone(action: string): Tone {
+  if (action.endsWith(".delete")) return "danger";
+  if (action.endsWith(".create")) return "success";
+  if (action === "customer.role_change") return "purple";
+  return "info";
+}
+
 export default async function AdminAuditLogPage({
   searchParams,
 }: {
@@ -46,84 +84,82 @@ export default async function AdminAuditLogPage({
   const totalPages = Math.max(1, Math.ceil(logPage.total / logPage.pageSize));
 
   return (
-    <div className="flex flex-col gap-6">
-      <h1 className="text-[1.15rem] font-bold text-ink">گزارش فعالیت‌ها</h1>
+    <div className="flex flex-col gap-5">
+      <PageHeader
+        title="گزارش فعالیت‌ها"
+        description={`${toPersianDigits(logPage.total)} رویداد ثبت شده. هر تغییر حساس در پنل مدیریت (چه کسی، چه کاری، چه زمانی) اینجا نگه‌داری می‌شود و قابل ویرایش نیست.`}
+      />
 
-      <form className="flex gap-3 text-[0.85rem]" method="get">
-        <select
-          name="entityType"
-          defaultValue={params.entityType ?? ""}
-          className="rounded-[var(--radius-md)] border border-line px-4 py-2.5 outline-none focus:border-ink"
-        >
+      <FilterBar resetHref="/admin/audit-log" isFiltered={Boolean(params.entityType)}>
+        <SelectInput name="entityType" defaultValue={params.entityType ?? ""} label="موضوع">
           <option value="">همه موضوعات</option>
           {entityTypes.map((entityType) => (
             <option key={entityType} value={entityType}>
-              {entityType}
+              {ENTITY_LABELS[entityType] ?? entityType}
             </option>
           ))}
-        </select>
-        <button type="submit" className="rounded-full bg-header px-5 py-2.5 text-ink hover:opacity-80">
-          اعمال فیلتر
-        </button>
-      </form>
+        </SelectInput>
+      </FilterBar>
 
-      <div className="overflow-x-auto rounded-[var(--radius-lg)] border border-line">
-        <table className="w-full min-w-[720px] text-[0.85rem]">
-          <thead>
-            <tr className="border-b border-line bg-header text-text-secondary">
-              <th className="px-4 py-2.5 text-start font-medium">تاریخ</th>
-              <th className="px-4 py-2.5 text-start font-medium">انجام‌دهنده</th>
-              <th className="px-4 py-2.5 text-start font-medium">عملیات</th>
-              <th className="px-4 py-2.5 text-start font-medium">موضوع</th>
-              <th className="px-4 py-2.5 text-start font-medium">جزئیات</th>
+      <TableCard>
+        <table className={`${TABLE} min-w-[760px]`}>
+          <thead className={THEAD}>
+            <tr>
+              <th className={TH}>زمان</th>
+              <th className={TH}>انجام‌دهنده</th>
+              <th className={TH}>عملیات</th>
+              <th className={TH}>موضوع</th>
+              <th className={TH}>جزئیات</th>
             </tr>
           </thead>
           <tbody>
             {logPage.rows.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-text-secondary">
-                  فعالیتی ثبت نشده است
-                </td>
-              </tr>
+              <EmptyRow colSpan={5}>فعالیتی ثبت نشده است.</EmptyRow>
             ) : (
               logPage.rows.map((log) => (
-                <tr key={log.id} className="border-b border-line align-top last:border-0">
-                  <td className="px-4 py-2.5 whitespace-nowrap text-text-secondary">
-                    {new Intl.DateTimeFormat("fa-IR", { dateStyle: "short", timeStyle: "short" }).format(log.createdAt)}
+                <tr key={log.id} className={`${TR} align-top`}>
+                  <td className={`${TD_MUTED} whitespace-nowrap`}>{formatDateTime(log.createdAt)}</td>
+                  <td className={TD_MUTED} dir="ltr">
+                    <span className="block text-end">{log.actorMobile ? toPersianDigits(log.actorMobile.replace("+98", "0")) : "—"}</span>
                   </td>
-                  <td className="px-4 py-2.5 text-text-secondary" dir="ltr">
-                    {log.actorMobile ?? "—"}
+                  <td className={TD}>
+                    <StatusBadge tone={actionTone(log.action)}>{ACTION_LABELS[log.action] ?? log.action}</StatusBadge>
                   </td>
-                  <td className="px-4 py-2.5">{ACTION_LABELS[log.action] ?? log.action}</td>
-                  <td className="px-4 py-2.5 text-text-secondary">
-                    {log.entityType}
-                    {log.entityId ? ` · ${log.entityId.slice(0, 8)}` : ""}
+                  <td className={TD_MUTED}>
+                    {ENTITY_LABELS[log.entityType] ?? log.entityType}
+                    {log.entityId ? (
+                      <span dir="ltr" className="ms-1.5 text-[0.74rem]">
+                        {log.entityId.slice(0, 8)}
+                      </span>
+                    ) : null}
                   </td>
-                  <td className="max-w-[280px] truncate px-4 py-2.5 text-[0.78rem] text-text-secondary" dir="ltr">
-                    {log.payload ?? "—"}
+                  <td className="max-w-[300px] px-4 py-3.5">
+                    {log.payload ? (
+                      <details className="group text-[0.76rem] text-text-secondary">
+                        <summary className="cursor-pointer list-none text-brand hover:underline">نمایش جزئیات</summary>
+                        <pre dir="ltr" className="m-0 mt-2 max-h-40 overflow-auto rounded-[var(--radius-sm)] bg-bg p-2.5 text-start whitespace-pre-wrap break-all">
+                          {log.payload}
+                        </pre>
+                      </details>
+                    ) : (
+                      <span className="text-text-secondary">—</span>
+                    )}
                   </td>
                 </tr>
               ))
             )}
           </tbody>
         </table>
-      </div>
+      </TableCard>
 
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2 text-[0.85rem]">
-          {Array.from({ length: totalPages }, (_, index) => index + 1).map((pageNumber) => (
-            <Link
-              key={pageNumber}
-              href={{ query: { ...params, page: String(pageNumber) } }}
-              className={`rounded-full px-3.5 py-1.5 ${
-                pageNumber === page ? "bg-ink text-white" : "bg-header text-ink hover:opacity-80"
-              }`}
-            >
-              {toPersianDigits(pageNumber)}
-            </Link>
-          ))}
-        </div>
-      )}
+      <Pagination
+        pathname="/admin/audit-log"
+        params={{ entityType: params.entityType }}
+        page={page}
+        totalPages={totalPages}
+        total={logPage.total}
+        pageSize={logPage.pageSize}
+      />
     </div>
   );
 }

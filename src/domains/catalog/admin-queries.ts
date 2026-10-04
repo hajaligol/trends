@@ -23,11 +23,15 @@ export type AdminProductListRow = {
   variantCount: number;
   totalStock: number;
   minPriceToman: number | null;
+  /** Primary (or first) gallery image, for the list thumbnail. */
+  imageUrl: string | null;
 };
 
 export type AdminProductListFilter = {
   search?: string;
   categoryId?: string;
+  /** `true` = only active, `false` = only inactive, omitted = all. */
+  isActive?: boolean;
   page?: number;
   pageSize?: number;
 };
@@ -42,6 +46,7 @@ export type AdminProductListPage = {
 export async function listProductsForAdmin({
   search,
   categoryId,
+  isActive,
   page = 1,
   pageSize = 20,
 }: AdminProductListFilter = {}): Promise<AdminProductListPage> {
@@ -56,6 +61,7 @@ export async function listProductsForAdmin({
     const subtreeIds = await getCategorySubtreeIds(categoryId);
     conditions.push(subtreeIds.length > 0 ? inArray(products.categoryId, subtreeIds) : sql`false`);
   }
+  if (isActive !== undefined) conditions.push(eq(products.isActive, isActive));
   const where = conditions.length > 0 ? and(...conditions) : undefined;
 
   const [rows, totalRows] = await Promise.all([
@@ -71,6 +77,9 @@ export async function listProductsForAdmin({
         variantCount: sql<number>`count(distinct ${productVariants.id})`,
         totalStock: sql<number>`coalesce(sum(${productVariants.stock}), 0)`,
         minPriceToman: sql<number | null>`min(${productVariants.priceToman})`,
+        // One scalar subquery per page row (page size ≤ 100), served by
+        // the `product_images.product_id` index — not an N+1 from app code.
+        imageUrl: sql<string | null>`(select ${productImages.url} from ${productImages} where ${productImages.productId} = ${products.id} order by ${productImages.isPrimary} desc, ${productImages.displayOrder} asc limit 1)`,
       })
       .from(products)
       .innerJoin(categories, eq(products.categoryId, categories.id))
