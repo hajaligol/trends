@@ -1,4 +1,5 @@
-import { and, asc, count, desc, eq, ilike, inArray, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
+import { toLatinDigits } from "@/lib/utils/digits";
 import { db } from "@/lib/db/client";
 import { categories, productImages, productVariants, products } from "@/lib/db/schema";
 import type { Product, ProductImage, ProductVariant } from "@/lib/db/schema";
@@ -14,6 +15,7 @@ import { listProductSpecifications, type SpecificationRow } from "@/domains/cata
 
 export type AdminProductListRow = {
   id: string;
+  productCode: number;
   slug: string;
   title: string;
   categoryName: string;
@@ -54,7 +56,20 @@ export async function listProductsForAdmin({
   const safePageSize = Math.min(100, Math.max(1, pageSize));
 
   const conditions = [];
-  if (search?.trim()) conditions.push(ilike(products.title, `%${search.trim()}%`));
+  const term = search?.trim();
+  if (term) {
+    // Title, «کد کالا» (digits in Persian or Latin; prefix match so a
+    // partial code narrows the list) and any variant SKU.
+    const digits = toLatinDigits(term).replace(/[\s-]/g, "");
+    const escaped = term.replace(/[\\%_]/g, (char) => `\\${char}`);
+    conditions.push(
+      or(
+        ilike(products.title, `%${escaped}%`),
+        /^\d+$/.test(digits) ? sql`cast(${products.productCode} as text) like ${`${digits}%`}` : undefined,
+        sql`exists (select 1 from ${productVariants} pv where pv.product_id = ${products.id} and pv.sku ilike ${`%${escaped}%`})`,
+      )!,
+    );
+  }
   if (categoryId) {
     // Filtering by an audience or group includes everything beneath it;
     // an unknown/garbage id matches nothing instead of erroring.
@@ -68,6 +83,7 @@ export async function listProductsForAdmin({
     db
       .select({
         id: products.id,
+        productCode: products.productCode,
         slug: products.slug,
         title: products.title,
         categoryName: categories.name,

@@ -5,7 +5,9 @@ import { useState } from "react";
 import { ConfirmButton } from "@/components/admin/ConfirmButton";
 import { ImagePicker } from "@/components/admin/ImagePicker";
 import { VariantForm } from "@/components/admin/VariantForm";
-import { createImageAction, deleteImageAction, deleteVariantAction } from "@/domains/catalog/admin-actions";
+import { createImageAction, createVariantsAction, deleteImageAction, deleteVariantAction } from "@/domains/catalog/admin-actions";
+import { VariantMatrixBuilder } from "@/components/admin/VariantMatrixBuilder";
+import { useToast } from "@/components/feedback/ToastProvider";
 import { formatToman } from "@/lib/utils/money";
 import { toPersianDigits } from "@/lib/utils/persian-digits";
 import type { ProductImage, ProductVariant } from "@/lib/db/schema";
@@ -24,10 +26,12 @@ import { AdminSubmitButton, FieldGrid, FormAlert, SelectField, SwitchField, Text
  */
 export function ProductVariantsAndImages({
   productId,
+  productCode,
   variants,
   images,
 }: {
   productId: string;
+  productCode: number;
   variants: ProductVariant[];
   images: ProductImage[];
 }) {
@@ -40,25 +44,30 @@ export function ProductVariantsAndImages({
       <Card
         id="variants"
         title="انواع محصول (سایز و رنگ)"
-        description="هر ترکیب سایز/رنگ، قیمت و موجودی خودش را دارد. محصولی که هیچ نوعی نداشته باشد در فروشگاه قابل خرید نیست."
+        description="هر ترکیب سایز/رنگ، قیمت، موجودی و کد کالای (SKU) خودش را دارد. محصولی که هیچ نوعی نداشته باشد در فروشگاه قابل خرید نیست."
         actions={
           !isAddingVariant && (
             <button type="button" onClick={() => setIsAddingVariant(true)} className={adminButton("secondary", "sm")}>
               <PlusIcon width={16} height={16} />
-              نوع جدید
+              افزودن سایز / رنگ
             </button>
           )
         }
       >
         <div className="flex flex-col gap-4">
           {isAddingVariant && (
-            <VariantForm productId={productId} onDone={() => setIsAddingVariant(false)} onCancel={() => setIsAddingVariant(false)} />
+            <AddVariantsPanel
+              productId={productId}
+              productCode={productCode}
+              variants={variants}
+              onClose={() => setIsAddingVariant(false)}
+            />
           )}
 
           {variants.length === 0 ? (
             !isAddingVariant && (
               <p className="m-0 rounded-[var(--radius-md)] border border-dashed border-ink/15 px-4 py-8 text-center text-[0.86rem] leading-7 text-text-secondary">
-                این محصول هنوز نوعی ندارد. با «نوع جدید» اولین سایز/رنگ را اضافه کنید.
+                این محصول هنوز نوعی ندارد. با «افزودن سایز / رنگ» چند سایز و رنگ را یکجا اضافه کنید.
               </p>
             )
           ) : (
@@ -206,6 +215,48 @@ export function ProductVariantsAndImages({
         </div>
       </Card>
     </>
+  );
+}
+
+const bulkInitialState: ActionResult<{ created: number; skipped: number }> = { ok: true, data: { created: 0, skipped: 0 } };
+
+function AddVariantsPanel({
+  productId,
+  productCode,
+  variants,
+  onClose,
+}: {
+  productId: string;
+  productCode: number;
+  variants: ProductVariant[];
+  onClose: () => void;
+}) {
+  const { showToast } = useToast();
+  const [state, formAction] = useAdminAction(createVariantsAction, bulkInitialState, {
+    onSuccess: (result) => {
+      if (!result.ok) return;
+      const { created, skipped } = result.data;
+      showToast(skipped > 0 ? `${toPersianDigits(created)} نوع اضافه شد؛ ${toPersianDigits(skipped)} ترکیب تکراری رد شد` : `${toPersianDigits(created)} نوع محصول اضافه شد`);
+      onClose();
+    },
+  });
+
+  return (
+    <form action={formAction} className="flex flex-col gap-5 rounded-[var(--radius-md)] border border-line bg-bg p-4 sm:p-5">
+      <input type="hidden" name="productId" value={productId} />
+      <FormAlert state={state} />
+      <VariantMatrixBuilder
+        productCode={productCode}
+        existing={variants.map((variant) => ({ size: variant.size, color: variant.color }))}
+        compact
+      />
+      <div className="flex flex-wrap items-center gap-2.5">
+        <AdminSubmitButton pendingLabel="در حال افزودن...">افزودن انواع انتخاب‌شده</AdminSubmitButton>
+        <button type="button" onClick={onClose} className={adminButton("ghost", "md")}>
+          انصراف
+        </button>
+      </div>
+    </form>
   );
 }
 

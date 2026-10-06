@@ -36,7 +36,7 @@ export function ProductSpecs({ product }: { product: CatalogProductDetail }) {
     ...new Set(variants.map((variant) => variant.material?.trim()).filter((value): value is string => !!value)),
   ];
 
-  const rows: SpecRow[] = [];
+  const rows: SpecRow[] = [{ label: "کد کالا", value: toPersianDigits(product.productCode) }];
 
   if (product.brand) rows.push({ label: "برند", value: product.brand });
 

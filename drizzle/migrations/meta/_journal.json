@@ -85,6 +85,13 @@
       "when": 1790282095362,
       "tag": "0011_product_specifications",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1791143376728,
+      "tag": "0012_product_code",
+      "breakpoints": true
     }
   ]
 }

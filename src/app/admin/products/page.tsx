@@ -73,7 +73,7 @@ export default async function AdminProductsPage({
 
       <FilterBar resetHref="/admin/products" isFiltered={isFiltered}>
         {status && <input type="hidden" name="status" value={status} />}
-        <SearchField defaultValue={params.q} placeholder="جستجوی عنوان محصول..." />
+        <SearchField defaultValue={params.q} placeholder="جستجوی عنوان، کد کالا یا SKU..." />
         <SelectInput name="category" defaultValue={params.category ?? ""} label="دسته‌بندی">
           <option value="">همه دسته‌ها</option>
           {categoryOptions.map((option) => (
@@ -100,10 +100,11 @@ export default async function AdminProductsPage({
         />
       ) : (
         <TableCard>
-          <table className={`${TABLE} min-w-[760px]`}>
+          <table className={`${TABLE} min-w-[820px]`}>
             <thead className={THEAD}>
               <tr>
                 <th className={TH}>محصول</th>
+                <th className={TH}>کد کالا</th>
                 <th className={TH}>دسته</th>
                 <th className={TH}>انواع</th>
                 <th className={TH}>موجودی کل</th>
@@ -134,6 +135,7 @@ export default async function AdminProductsPage({
                       </span>
                     </Link>
                   </td>
+                  <td className={`${TD} text-[0.82rem] font-medium`}>{toPersianDigits(product.productCode)}</td>
                   <td className={TD_MUTED}>{product.categoryName.split(" › ").pop()}</td>
                   <td className={TD}>
                     {product.variantCount === 0 ? (

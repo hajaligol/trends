@@ -1,5 +1,47 @@
 # Trends Progress Report
 
+## Latest change: admin product form overhaul (out-of-phase, user-requested)
+
+Status: COMPLETE. Typecheck, lint, `next build`, 120 unit and 57 integration
+tests pass; flows were also driven through the real admin UI in headless
+Chromium (create with bulk variants, edit, add variants, edit a variant,
+admin + storefront search by code).
+
+- **Slug from title** (`src/domains/catalog/slug.ts`): generated on the server
+  in `createProductAction` (dictionary of fashion words → English, else letter
+  transliteration; `-2`, `-3` on collision; `product` fallback). Create form
+  shows a live preview only. On edit the slug is an optional field; renaming a
+  title never changes the URL.
+- **کد کالا** = `products.product_code` (integer, DB sequence `product_code_seq`
+  starting at 100001, unique index `products_product_code_idx`). Migration
+  `0012_product_code` backfills existing products oldest-first. Never editable.
+  Shown in admin list/edit header, product page, and the specs table. Admin
+  search: title OR code prefix OR variant SKU. Storefront search: exact code
+  (Persian/Latin digits, active products only).
+- **Category**: `CategoryCascadeSelect` (جنسیت → گروه → نوع), submits one
+  `categoryId`; server still checks the category exists and is a leaf.
+- **SKU**: `<code>-<SIZE>-<COLORCODE>` e.g. `100042-M-BLK`
+  (`src/domains/catalog/sku.ts`). Not an input anymore. Existing variants keep
+  their old SKUs (not rewritten, orders may reference them). Seed uses the rule.
+- **Bulk variants**: `VariantMatrixBuilder` (sizes × colours, shared price/stock,
+  per-row override) posts `variantsJson`; `insertVariantsBulk`
+  (`product-service.ts`) resolves colours from the server palette by code,
+  builds SKUs, skips existing size+colour pairs (`ON CONFLICT DO NOTHING`), runs
+  in the product-creation transaction. Row numbers are strict JSON numbers so a
+  blank price is rejected, never saved as 0. Max 150 rows per submit.
+  `createVariantAction` was replaced by `createVariantsAction`; single-variant
+  editing is `updateVariantAction` (colour via palette, SKU untouched).
+- **Colour palette**: `color-palette.ts` (77 colours: code, Persian name, hex).
+  `ColorPalettePicker` replaces hex typing. To add a colour, append one line
+  with a unique 3-letter code, name and hex (a unit test enforces uniqueness).
+  Legacy off-palette colours remain editable via a "(فعلی)" option.
+- Deleted orphan `src/components/overlays/CartDrawer.tsx` (it broke `next build`
+  after the cart-drawer removal; nothing imported it).
+
+Notes: the Auth.js client logs a harmless "Failed to fetch" when the browser is
+closed mid-session-refresh (seen only in the headless test). Product code
+format was confirmed by the owner: keep as is.
+
 ## Current Status
 - Overall status: **All 15 phases complete** (unchanged from the Phase 14
   write-up below). This session was a **user-requested change, not a

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { MAX_SPEC_ROWS } from "@/lib/validation/spec-limits";
+import { MAX_BULK_VARIANTS } from "@/lib/validation/admin-limits";
 import { normalizeSpecLabel } from "@/lib/utils/spec-label";
 
 /**
@@ -52,7 +53,12 @@ export const categorySchema = z.object({
 
 export const productSchema = z.object({
   title: z.string().trim().min(1, "عنوان محصول را وارد کنید").max(200),
-  slug: slugSchema,
+  // Create: ignored — the slug is always generated from the title on the
+  // server. Edit: optional; blank keeps the current slug.
+  slug: z
+    .union([slugSchema, z.literal("")])
+    .optional()
+    .transform((value) => (value ? value : null)),
   categoryId: z.string().uuid("دسته را انتخاب کنید"),
   brand: optionalTrimmed(120),
   shortDescription: optionalTrimmed(500),
@@ -76,14 +82,11 @@ export const productSchema = z.object({
   isNewArrival: checkbox,
 });
 
+/** Editing ONE existing variant. The SKU is deliberately not an input: it is
+ * generated once (from the product code) and never edited by hand. */
 export const productVariantSchema = z.object({
-  sku: z.string().trim().min(1, "SKU را وارد کنید").max(64),
   size: z.string().trim().min(1, "سایز را وارد کنید").max(40),
-  color: z.string().trim().min(1, "رنگ را وارد کنید").max(60),
-  colorHex: z
-    .union([z.string().trim().regex(/^#[0-9a-fA-F]{6}$/, "کد رنگ نامعتبر است"), z.literal("")])
-    .optional()
-    .transform((value) => (value ? value : null)),
+  colorCode: z.string().trim().min(1, "رنگ را انتخاب کنید").max(40),
   material: optionalTrimmed(80),
   priceToman: nonNegativeIntToman,
   compareAtPriceToman: z
@@ -94,6 +97,62 @@ export const productVariantSchema = z.object({
   lowStockThreshold: z.coerce.number().int().min(0).default(5),
   isActive: checkbox,
 });
+
+
+/** One row of the size × colour matrix. Colour arrives as a palette `code`;
+ * its name/hex are resolved on the server. The numbers are strict JSON
+ * numbers — NOT coerced — so a blank price (`null`) is rejected instead of
+ * silently becoming 0 (a free product). */
+const bulkVariantRow = z.object({
+  size: z.string().trim().min(1, "سایز را وارد کنید").max(40),
+  colorCode: z.string().trim().min(1, "رنگ را انتخاب کنید").max(10),
+  priceToman: z
+    .number({ error: "قیمت همه‌ی انواع را وارد کنید" })
+    .int("قیمت باید عدد صحیح باشد")
+    .min(0, "قیمت نمی‌تواند منفی باشد")
+    .max(2_000_000_000, "قیمت بیش از حد بزرگ است"),
+  compareAtPriceToman: z
+    .number()
+    .int()
+    .min(0)
+    .max(2_000_000_000)
+    .nullish()
+    .transform((value) => value ?? null),
+  stock: z
+    .number({ error: "موجودی همه‌ی انواع را وارد کنید" })
+    .int("موجودی باید عدد صحیح باشد")
+    .min(0, "موجودی نمی‌تواند منفی باشد")
+    .max(1_000_000, "موجودی بیش از حد بزرگ است"),
+});
+
+/** The whole "many variants at once" payload (`variantsJson` form field). */
+export const bulkVariantsSchema = z.object({
+  material: optionalTrimmed(80),
+  lowStockThreshold: z.coerce.number().int().min(0).default(5),
+  isActive: z.boolean().default(true),
+  rows: z.array(bulkVariantRow).min(1, "حداقل یک سایز و یک رنگ انتخاب کنید").max(MAX_BULK_VARIANTS, `حداکثر ${MAX_BULK_VARIANTS} نوع در هر بار قابل ثبت است`),
+});
+
+export type BulkVariantsInput = z.infer<typeof bulkVariantsSchema>;
+
+/** Parses the `variantsJson` form field; `null` when absent/blank. */
+export function parseBulkVariantsField(
+  raw: FormDataEntryValue | null,
+): { ok: true; value: BulkVariantsInput | null } | { ok: false; error: string } {
+  if (raw === null || raw === undefined) return { ok: true, value: null };
+  const text = String(raw).trim();
+  if (text === "" || text === "null") return { ok: true, value: null };
+  if (text.length > 100_000) return { ok: false, error: "اطلاعات انواع محصول بیش از حد بزرگ است" };
+  let json: unknown;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    return { ok: false, error: "اطلاعات انواع محصول معتبر نیست" };
+  }
+  const parsed = bulkVariantsSchema.safeParse(json);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "اطلاعات انواع محصول معتبر نیست" };
+  return { ok: true, value: parsed.data };
+}
 
 export const productImageSchema = z.object({
   url: z.string().trim().min(1, "آدرس تصویر را وارد کنید").max(2000),

@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
+import { toPersianDigits } from "@/lib/utils/persian-digits";
 import { getProductForAdmin } from "@/domains/catalog/admin-queries";
-import { listLeafCategoryOptions } from "@/domains/categories/queries";
+import { listCategoryPickerNodes } from "@/domains/categories/queries";
 import { ProductForm } from "@/components/admin/ProductForm";
 import { ProductSpecificationsEditor } from "@/components/admin/ProductSpecificationsEditor";
 import { ProductVariantsAndImages } from "@/components/admin/ProductVariantsAndImages";
@@ -12,7 +13,7 @@ export const metadata = { title: "ویرایش محصول", robots: { index: fal
 
 export default async function EditProductPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [product, categoryOptions] = await Promise.all([getProductForAdmin(id), listLeafCategoryOptions()]);
+  const [product, categoryNodes] = await Promise.all([getProductForAdmin(id), listCategoryPickerNodes()]);
   if (!product) notFound();
 
   return (
@@ -40,6 +41,8 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
         }
         description={
           <>
+            <span className="font-semibold text-ink">کد کالا: {toPersianDigits(product.productCode)}</span>
+            {" · "}
             <a href="#variants" className="text-brand hover:underline">انواع و قیمت</a>
             {" · "}
             <a href="#images" className="text-brand hover:underline">تصاویر</a>
@@ -49,9 +52,9 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
         }
       />
 
-      <ProductForm product={product} categoryOptions={categoryOptions} />
+      <ProductForm product={product} categoryNodes={categoryNodes} />
 
-      <ProductVariantsAndImages productId={product.id} variants={product.variants} images={product.images} />
+      <ProductVariantsAndImages productId={product.id} productCode={product.productCode} variants={product.variants} images={product.images} />
 
       <Card
         id="specs"

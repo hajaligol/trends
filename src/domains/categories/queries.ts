@@ -170,6 +170,31 @@ export async function listLeafCategoryOptions(): Promise<CategoryOption[]> {
     });
 }
 
+export type CategoryPickerNode = {
+  id: string;
+  name: string;
+  parentId: string | null;
+  /** 1 = gender/audience, 2 = group, 3 = type. */
+  depth: number;
+  isActive: boolean;
+};
+
+/**
+ * The whole tree as a flat, tree-ordered list for the product form's three
+ * linked dropdowns (gender → group → type). The table is a couple of
+ * hundred rows, so the client receives it once and filters locally.
+ */
+export async function listCategoryPickerNodes(): Promise<CategoryPickerNode[]> {
+  const rows = await loadAllRowsForAdmin();
+  return flattenCategoryTree(buildCategoryTree(rows)).map((node) => ({
+    id: node.id,
+    name: node.name,
+    parentId: node.parentId,
+    depth: node.depth,
+    isActive: node.isActive,
+  }));
+}
+
 /** Id of the category plus all its descendants (`[]` if it doesn't exist),
  * for filtering products by an audience/group/type in the admin. */
 export async function getCategorySubtreeIds(categoryId: string): Promise<string[]> {

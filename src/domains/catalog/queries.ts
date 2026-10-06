@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { toLatinDigits } from "@/lib/utils/digits";
 import { and, asc, desc, eq, ilike, inArray, ne, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { categories, orderItems, orders, productImages, products, productVariants } from "@/lib/db/schema";
@@ -363,6 +364,8 @@ export async function getTopSellingProducts(limit?: number): Promise<CatalogProd
 }
 
 export type CatalogProductDetail = CatalogProductSummary & {
+  /** Public «کد کالا» — shown on the product page and searchable. */
+  productCode: number;
   shortDescription: string | null;
   longDescription: string | null;
   brand: string | null;
@@ -387,6 +390,7 @@ export async function getProductDetailBySlug(slug: string): Promise<CatalogProdu
   const [row] = await db
     .select({
       id: products.id,
+      productCode: products.productCode,
       slug: products.slug,
       title: products.title,
       shortDescription: products.shortDescription,
@@ -430,6 +434,7 @@ export async function getProductDetailBySlug(slug: string): Promise<CatalogProdu
 
   return {
     ...summary,
+    productCode: row.productCode,
     shortDescription: row.shortDescription,
     longDescription: row.longDescription,
     brand: row.brand,
@@ -543,6 +548,10 @@ export async function searchProducts(params: {
   }
 
   const pattern = `%${q}%`;
+  // «کد کالا» lookup: typed in Persian or Latin digits, matched exactly
+  // (a prefix match would make "1000" return half the catalog).
+  const codeQuery = toLatinDigits(q).replace(/[\s-]/g, "");
+  const exactCode = /^\d{1,9}$/.test(codeQuery) ? Number(codeQuery) : null;
   const productRows = await db
     .select({
       id: products.id,
@@ -557,6 +566,7 @@ export async function searchProducts(params: {
       and(
         eq(products.isActive, true),
         or(
+          exactCode === null ? undefined : eq(products.productCode, exactCode),
           ilike(products.title, pattern),
           ilike(products.shortDescription, pattern),
           ilike(products.brand, pattern),

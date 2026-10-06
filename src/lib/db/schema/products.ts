@@ -1,7 +1,9 @@
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import {
   boolean,
   index,
+  integer,
+  pgSequence,
   pgTable,
   text,
   timestamp,
@@ -11,6 +13,14 @@ import {
 import { categories } from "./categories";
 import { productImages } from "./product-images";
 import { productVariants } from "./product-variants";
+
+/**
+ * Source of the human-friendly product code («کد کالا»). A database
+ * sequence (not `max()+1` in app code) so concurrent product creation can
+ * never hand out the same code; gaps after a rolled-back insert are
+ * harmless. Starts at 100001 so every code has six digits.
+ */
+export const productCodeSeq = pgSequence("product_code_seq", { startWith: 100001, increment: 1 });
 
 /**
  * A sellable clothing product. Price/stock live on `product_variants`
@@ -33,6 +43,11 @@ export const products = pgTable(
   "products",
   {
     id: uuid("id").defaultRandom().primaryKey(),
+    /** Unique, auto-assigned «کد کالا». Never edited by hand; variant SKUs
+     * are derived from it. Searchable in the admin and on the storefront. */
+    productCode: integer("product_code")
+      .notNull()
+      .default(sql`nextval('product_code_seq')`),
     slug: text("slug").notNull(),
     title: text("title").notNull(),
     shortDescription: text("short_description"),
@@ -52,6 +67,7 @@ export const products = pgTable(
   },
   (table) => [
     uniqueIndex("products_slug_idx").on(table.slug),
+    uniqueIndex("products_product_code_idx").on(table.productCode),
     index("products_category_id_idx").on(table.categoryId),
     index("products_is_active_idx").on(table.isActive),
     index("products_is_featured_idx").on(table.isFeatured),

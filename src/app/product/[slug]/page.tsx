@@ -120,6 +120,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
             <div className="flex flex-col gap-2">
               {product.brand && <p className="text-[0.88rem] text-text-secondary">{product.brand}</p>}
               <h1 className="m-0 text-[clamp(1.5rem,3vw,2.1rem)] leading-snug font-bold">{product.title}</h1>
+              <p className="m-0 text-[0.82rem] text-text-secondary">کد کالا: {toPersianDigits(product.productCode)}</p>
               {reviewSummary.averageRating !== null && (
                 <a
                   href="#reviews"

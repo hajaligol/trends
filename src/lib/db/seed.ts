@@ -21,6 +21,7 @@
  *   open until real photography exists.
  */
 import { db } from "./client";
+import { buildVariantSku } from "@/domains/catalog/sku";
 import { categories, heroSlides, productImages, products, productVariants, promoBanners } from "./schema";
 import { syncCategoryTaxonomy } from "@/domains/categories/sync";
 import { CATEGORY_TAXONOMY, DEMO_PRODUCT_CATEGORY_SLUG } from "@/domains/categories/taxonomy";
@@ -135,16 +136,25 @@ async function seedProducts(categoriesBySlug: Map<string, string>) {
     }
 
     const variants = variantsFor(demoProduct.source, priceToman);
+    // SKUs follow the same rule as the admin: <product code>-<size>-<colour>.
+    // The index suffix only resolves the rare case of two demo variants that
+    // map to the same size/colour token.
+    const usedSkus = new Set<string>();
     await db.insert(productVariants).values(
-      variants.map((variant, index) => ({
-        productId: insertedProduct.id,
-        sku: `${demoProduct.id}-${index + 1}`.toUpperCase(),
-        size: variant.size,
-        color: variant.color,
-        colorHex: variant.colorHex,
-        priceToman,
-        stock: 25,
-      })),
+      variants.map((variant, index) => {
+        let sku = buildVariantSku(insertedProduct.productCode, variant.size, { name: variant.color, hex: variant.colorHex });
+        if (usedSkus.has(sku)) sku = `${sku}-${index + 1}`;
+        usedSkus.add(sku);
+        return {
+          productId: insertedProduct.id,
+          sku,
+          size: variant.size,
+          color: variant.color,
+          colorHex: variant.colorHex,
+          priceToman,
+          stock: 25,
+        };
+      }),
     );
   }
 }
