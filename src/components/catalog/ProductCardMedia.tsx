@@ -28,12 +28,15 @@ export function ProductCardMedia({
   colorOptions,
   sharedImage,
   sizes = "(min-width: 1024px) 20vw, (min-width: 640px) 33vw, 50vw",
+  showOptions = true,
   children,
 }: {
   title: string;
   href: string;
   colorOptions: CatalogColorOption[];
   sharedImage: CardImage | null;
+  /** Show the hover panel (colours + sizes). Off for the small homepage cards. */
+  showOptions?: boolean;
   /** `next/image` sizes hint for the card's grid. */
   sizes?: string;
   /** Server-rendered overlays (discount badge, wishlist button). */
@@ -63,7 +66,7 @@ export function ProductCardMedia({
     }
   }
 
-  const showPanel = colorOptions.length > 1 || (colorOptions[0]?.sizes.length ?? 0) > 0;
+  const showPanel = showOptions && (colorOptions.length > 1 || (colorOptions[0]?.sizes.length ?? 0) > 0);
 
   return (
     <div
@@ -95,7 +98,7 @@ export function ProductCardMedia({
       {showPanel && (
         <div
           onPointerLeave={() => setPreviewColor(null)}
-          className="pointer-events-none absolute inset-x-2 bottom-2 hidden translate-y-1 flex-col gap-2 rounded-[10px] bg-white/92 p-2.5 opacity-0 backdrop-blur-sm transition-[opacity,transform] duration-200 motion-reduce:transition-none [@media(hover:hover)]:flex group-focus-within:pointer-events-auto group-focus-within:translate-y-0 group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100"
+          className="pointer-events-none absolute inset-x-2 bottom-2 hidden translate-y-1 flex-col gap-2 rounded-[10px] border border-white/40 bg-lavender/50 p-2.5 opacity-0 shadow-[0_4px_18px_-6px_rgba(91,15,165,0.35)] backdrop-blur-md transition-[opacity,transform] duration-200 motion-reduce:transition-none [@media(hover:hover)]:flex group-focus-within:pointer-events-auto group-focus-within:translate-y-0 group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100"
         >
           {colorOptions.length > 1 && (
             <div role="group" aria-label="رنگ‌ها" className="flex flex-wrap items-center gap-1.5">
@@ -111,7 +114,7 @@ export function ProductCardMedia({
                     onFocus={() => setPreviewColor(option.color)}
                     onBlur={() => setPreviewColor(null)}
                     className={`grid h-7 w-7 place-items-center rounded-full border transition-colors duration-150 ${
-                      active ? "border-ink" : "border-transparent hover:border-ink/40"
+                      active ? "border-brand" : "border-transparent hover:border-brand/40"
                     }`}
                   >
                     {option.colorHex ? (
@@ -134,13 +137,13 @@ export function ProductCardMedia({
               <>
                 <span className="sr-only">سایزهای موجود:</span>
                 {shownOption.sizes.map((size) => (
-                  <span key={size} className="min-w-6 rounded-full border border-line bg-white px-2 py-0.5 text-center text-ink">
+                  <span key={size} className="min-w-6 rounded-full border border-brand/20 bg-white/60 px-2 py-0.5 text-center font-medium text-brand-dark">
                     {toPersianDigits(size)}
                   </span>
                 ))}
               </>
             ) : (
-              <span className="text-text-secondary">ناموجود</span>
+              <span className="rounded-full bg-white/60 px-2 py-0.5 text-brand-dark/80">ناموجود</span>
             )}
           </p>
         </div>

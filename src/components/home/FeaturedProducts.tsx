@@ -66,7 +66,7 @@ export function FeaturedProducts({
                   key={product.id}
                   className="w-full rounded-[24px] bg-white/85 p-2.5 shadow-[0_2px_14px_-6px_rgba(24,38,48,0.18)] ring-1 ring-white"
                 >
-                  <ProductCard product={product} />
+                  <ProductCard product={product} showOptions={false} />
                 </div>
               ))}
               {hasMore && (

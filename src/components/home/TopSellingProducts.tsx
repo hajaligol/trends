@@ -34,7 +34,7 @@ export function TopSellingProducts({ products }: { products: CatalogProductSumma
           itemClassName="basis-[calc((100%_-_20px)/2)] sm:basis-[calc((100%_-_40px)/3)] lg:basis-[calc((100%_-_80px)/5)]"
         >
           {visible.map((product) => (
-            <ProductCard key={product.id} product={product} />
+            <ProductCard key={product.id} product={product} showOptions={false} />
           ))}
           {hasMore && (
             <ShowAllTile key="show-all" href="/collection/top-selling" label="مشاهده همه" productsLabel={COLLECTIONS["top-selling"].title} />

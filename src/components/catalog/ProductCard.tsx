@@ -18,7 +18,14 @@ import { productHref } from "@/domains/catalog/slug";
  * `images` is empty for every product today; the `next/image` branch is
  * wired up and ready for when Phase 11's admin media upload lands.
  */
-export function ProductCard({ product }: { product: CatalogProductSummary }) {
+export function ProductCard({
+  product,
+  showOptions = true,
+}: {
+  product: CatalogProductSummary;
+  /** Hover panel with colours + sizes. Off for the smaller homepage cards. */
+  showOptions?: boolean;
+}) {
   const colorSwatches = product.colorHexes.slice(0, 4);
 
   return (
@@ -28,6 +35,7 @@ export function ProductCard({ product }: { product: CatalogProductSummary }) {
         href={productHref(product.slug)}
         colorOptions={product.colorOptions}
         sharedImage={product.sharedImage}
+        showOptions={showOptions}
       >
         <DiscountBadge percent={product.discountPercent} />
         {/* Sibling of the image link, not nested inside it — a <button>

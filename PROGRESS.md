@@ -1,5 +1,27 @@
 # Trends Progress Report
 
+## Latest change: hover panel only on list pages (user-requested)
+`ProductCard` / `ProductCardMedia` take `showOptions` (default `true`). The
+three homepage rows (`FeaturedProducts`, `TopSellingProducts`, `NewArrivals`)
+pass `showOptions={false}`, so small home cards keep just the image + dots.
+Everything built on `ProductGrid` (category, collection, accessories, search,
+wishlist, related products on the product page) keeps the panel. Verified on
+a production build: 0 panels on `/`, panels on `/collection/featured` and
+`/category/men`. typecheck/lint/build pass.
+
+---
+
+## Latest change: hover panel restyle (user-requested)
+Card hover panel (`ProductCardMedia`) is now a translucent lavender glass
+(`bg-lavender/50`, `backdrop-blur-md`, soft purple shadow) instead of ~92%
+white; active/hovered swatch ring uses `brand`, size chips use `brand-dark`
+text on `white/60` with a `brand/20` border. All from existing theme tokens.
+Typecheck/lint/build pass; new classes confirmed in compiled CSS. Not viewed in
+a real browser — check legibility of the sizes over very busy/dark photos and
+raise the `/50` opacity if needed.
+
+---
+
 ## Latest change: `?color=` deep link from card swatches (user-requested)
 
 Status: COMPLETE. `typecheck`, `lint`, `next build`, 140 unit tests pass;

@@ -47,6 +47,7 @@ export function NewArrivals({ arrivals }: { arrivals: CatalogProductSummary[] })
                   colorOptions={arrival.colorOptions}
                   sharedImage={arrival.sharedImage}
                   sizes="(min-width: 1024px) 16vw, (min-width: 640px) 33vw, 50vw"
+                  showOptions={false}
                 >
                   {/* Sibling of the image link, not nested inside it — a <button>
                    * inside an <a> is invalid HTML and breaks keyboard/AT navigation. */}
