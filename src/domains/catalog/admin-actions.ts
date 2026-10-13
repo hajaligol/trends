@@ -27,6 +27,7 @@ import { replaceProductSpecifications } from "@/domains/catalog/specifications";
 import { isStaffOrAdmin, UNAUTHORIZED_ERROR, type ActionResult } from "@/domains/auth/roles";
 import { recordAuditLog } from "@/domains/analytics/audit";
 import { getProductCategoryError } from "@/domains/categories/queries";
+import { getProductBrandError } from "@/domains/brands/queries";
 
 /**
  * Admin products/variants/images CRUD. Price/stock/discount fields go
@@ -69,6 +70,10 @@ export async function createProductAction(
   // Products live on the type level of the category tree only.
   const categoryError = await getProductCategoryError(parsed.data.categoryId);
   if (categoryError) return { ok: false, error: categoryError };
+
+  // The brand must be an existing, active entry of the managed list.
+  const brandError = await getProductBrandError(parsed.data.brandId);
+  if (brandError) return { ok: false, error: brandError };
 
   const { slug: _ignoredSlug, ...fields } = parsed.data;
   void _ignoredSlug;
@@ -128,6 +133,11 @@ export async function updateProductAction(_prev: ActionResult, formData: FormDat
 
   const categoryError = await getProductCategoryError(parsed.data.categoryId);
   if (categoryError) return { ok: false, error: categoryError };
+
+  // A product may keep a brand that was deactivated after it was assigned,
+  // but cannot be newly assigned to an inactive or unknown one.
+  const brandError = await getProductBrandError(parsed.data.brandId, existing.brandId);
+  if (brandError) return { ok: false, error: brandError };
 
   // `productCode` is never part of the update — it is assigned once.
   // The slug change and its redirect row commit together: the old URL must

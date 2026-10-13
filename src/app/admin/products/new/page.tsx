@@ -1,11 +1,12 @@
 import { listCategoryPickerNodes } from "@/domains/categories/queries";
+import { listBrandOptions } from "@/domains/brands/queries";
 import { ProductForm } from "@/components/admin/ProductForm";
 import { PageHeader } from "@/components/admin/ui/layout";
 
 export const metadata = { title: "محصول جدید", robots: { index: false, follow: false } };
 
 export default async function NewProductPage() {
-  const categoryNodes = await listCategoryPickerNodes();
+  const [categoryNodes, brandOptions] = await Promise.all([listCategoryPickerNodes(), listBrandOptions()]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -15,7 +16,7 @@ export default async function NewProductPage() {
         backLabel="بازگشت به محصولات"
         description="اطلاعات اصلی را وارد کنید و در صورت تمایل چند سایز و رنگ را یکجا انتخاب کنید. تصاویر محصول را پس از ساخت در صفحه ویرایش اضافه می‌کنید."
       />
-      <ProductForm categoryNodes={categoryNodes} />
+      <ProductForm categoryNodes={categoryNodes} brandOptions={brandOptions} />
     </div>
   );
 }

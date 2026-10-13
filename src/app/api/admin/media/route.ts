@@ -52,7 +52,7 @@ import { checkRateLimit, getClientIp } from "@/lib/security/rate-limit";
  *   which Next.js only ever serves as static files.
  */
 
-const ALLOWED_FOLDERS = ["products", "hero", "categories", "banners"] as const;
+const ALLOWED_FOLDERS = ["products", "hero", "categories", "banners", "brands"] as const;
 type AllowedFolder = (typeof ALLOWED_FOLDERS)[number];
 
 function isAllowedFolder(value: FormDataEntryValue | null): value is AllowedFolder {

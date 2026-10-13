@@ -10,6 +10,7 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+import { brands } from "./brands";
 import { categories } from "./categories";
 import { productImages } from "./product-images";
 import { productVariants } from "./product-variants";
@@ -52,7 +53,9 @@ export const products = pgTable(
     title: text("title").notNull(),
     shortDescription: text("short_description"),
     longDescription: text("long_description"),
-    brand: text("brand"),
+    /** Optional managed brand (see `brands`); `restrict` so a brand with
+     * products can never be deleted out from under them. */
+    brandId: uuid("brand_id").references(() => brands.id, { onDelete: "restrict" }),
     categoryId: uuid("category_id")
       .notNull()
       .references(() => categories.id, { onDelete: "restrict" }),
@@ -69,6 +72,7 @@ export const products = pgTable(
     uniqueIndex("products_slug_idx").on(table.slug),
     uniqueIndex("products_product_code_idx").on(table.productCode),
     index("products_category_id_idx").on(table.categoryId),
+    index("products_brand_id_idx").on(table.brandId),
     index("products_is_active_idx").on(table.isActive),
     index("products_is_featured_idx").on(table.isFeatured),
     index("products_is_new_arrival_idx").on(table.isNewArrival),
@@ -79,6 +83,10 @@ export const productsRelations = relations(products, ({ one, many }) => ({
   category: one(categories, {
     fields: [products.categoryId],
     references: [categories.id],
+  }),
+  brand: one(brands, {
+    fields: [products.brandId],
+    references: [brands.id],
   }),
   variants: many(productVariants),
   images: many(productImages),

@@ -16,6 +16,7 @@ import {
   SettingsIcon,
   ShirtIcon,
   StarIcon,
+  TagIcon,
   TicketIcon,
   UsersIcon,
   PackageIcon,
@@ -41,6 +42,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/admin/products", label: "محصولات", icon: ShirtIcon },
       { href: "/admin/categories", label: "دسته‌بندی‌ها", icon: LayersIcon },
+      { href: "/admin/brands", label: "برندها", icon: TagIcon },
       { href: "/admin/inventory", label: "موجودی", icon: ArchiveIcon, badge: "inventory" },
     ],
   },

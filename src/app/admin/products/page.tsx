@@ -100,12 +100,13 @@ export default async function AdminProductsPage({
         />
       ) : (
         <TableCard>
-          <table className={`${TABLE} min-w-[820px]`}>
+          <table className={`${TABLE} min-w-[900px]`}>
             <thead className={THEAD}>
               <tr>
                 <th className={TH}>محصول</th>
                 <th className={TH}>کد کالا</th>
                 <th className={TH}>دسته</th>
+                <th className={TH}>برند</th>
                 <th className={TH}>انواع</th>
                 <th className={TH}>موجودی کل</th>
                 <th className={TH}>قیمت از</th>
@@ -137,6 +138,7 @@ export default async function AdminProductsPage({
                   </td>
                   <td className={`${TD} text-[0.82rem] font-medium`}>{toPersianDigits(product.productCode)}</td>
                   <td className={TD_MUTED}>{product.categoryName.split(" › ").pop()}</td>
+                  <td className={TD_MUTED}>{product.brandName ?? "—"}</td>
                   <td className={TD}>
                     {product.variantCount === 0 ? (
                       <StatusBadge tone="warning">بدون نوع</StatusBadge>

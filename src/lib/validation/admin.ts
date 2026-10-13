@@ -57,6 +57,38 @@ export const categorySchema = z.object({
 });
 
 // ---------------------------------------------------------------------
+// Brands
+// ---------------------------------------------------------------------
+
+/** Logos are always files we host (`/assets/...`, from the upload endpoint):
+ * `next/image` has no remote hosts configured, so an arbitrary external URL
+ * would crash the product page that renders it. */
+const localAssetPath = z
+  .string()
+  .max(500)
+  .regex(/^\/assets\/[A-Za-z0-9._\-/]+$/, "لوگو باید با دکمه‌ی بارگذاری تصویر انتخاب شود")
+  .refine((value) => !value.includes(".."), "مسیر تصویر نامعتبر است");
+
+export const brandSchema = z.object({
+  name: z.string().trim().min(1, "نام برند را وارد کنید").max(120),
+  nameEn: optionalTrimmed(120),
+  // Create: ignored — generated from the name on the server. Edit: optional;
+  // blank keeps the current slug.
+  slug: z
+    .union([productSlugSchema, z.literal("")])
+    .optional()
+    .transform((value) => (value ? value : null)),
+  description: optionalTrimmed(2000),
+  logoUrl: z
+    .union([localAssetPath, z.literal("")])
+    .optional()
+    .transform((value) => (value ? value : null)),
+  countryOfOrigin: optionalTrimmed(80),
+  displayOrder: z.coerce.number().int().min(-100000).max(100000).default(0),
+  isActive: checkbox,
+});
+
+// ---------------------------------------------------------------------
 // Products
 // ---------------------------------------------------------------------
 
@@ -69,7 +101,12 @@ export const productSchema = z.object({
     .optional()
     .transform((value) => (value ? value : null)),
   categoryId: z.string().uuid("دسته را انتخاب کنید"),
-  brand: optionalTrimmed(120),
+  // The brand is picked from the managed list (`brands`); the server checks
+  // that it exists and is selectable (`getProductBrandError`).
+  brandId: z
+    .union([z.string().uuid("برند نامعتبر است"), z.literal("")])
+    .optional()
+    .transform((value) => (value ? value : null)),
   shortDescription: optionalTrimmed(500),
   longDescription: optionalTrimmed(5000),
   tags: z

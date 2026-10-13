@@ -38,7 +38,8 @@ export function ProductSpecs({ product }: { product: CatalogProductDetail }) {
 
   const rows: SpecRow[] = [{ label: "کد کالا", value: toPersianDigits(product.productCode) }];
 
-  if (product.brand) rows.push({ label: "برند", value: product.brand });
+  if (product.brand) rows.push({ label: "برند", value: product.brand.name });
+  if (product.brand?.countryOfOrigin) rows.push({ label: "کشور سازنده", value: product.brand.countryOfOrigin });
 
   const ownCategory = product.categoryTrail[product.categoryTrail.length - 1];
   if (ownCategory) {

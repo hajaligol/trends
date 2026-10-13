@@ -1,6 +1,7 @@
 import { cache } from "react";
 import type { Metadata } from "next";
 import { notFound, permanentRedirect } from "next/navigation";
+import Image from "next/image";
 import Link from "next/link";
 import { Container } from "@/components/ui/Container";
 import { Breadcrumbs } from "@/components/catalog/Breadcrumbs";
@@ -75,7 +76,15 @@ export default async function ProductPage({ params, searchParams }: ProductPageP
     "@type": "Product",
     name: product.title,
     description: product.shortDescription ?? undefined,
-    brand: product.brand ? { "@type": "Brand", name: product.brand } : undefined,
+    brand: product.brand
+      ? {
+          "@type": "Brand",
+          name: product.brand.name,
+          alternateName: product.brand.nameEn ?? undefined,
+          description: product.brand.description ?? undefined,
+          logo: product.brand.logoUrl ? `${SITE_URL}${product.brand.logoUrl}` : undefined,
+        }
+      : undefined,
     image: product.images.map((image) => image.url),
     url: `${SITE_URL}${productHref(product.slug)}`,
     // Only present when there's at least one approved review — schema.org
@@ -136,7 +145,20 @@ export default async function ProductPage({ params, searchParams }: ProductPageP
 
             <div className="flex flex-col gap-6 lg:py-2">
               <div className="flex flex-col gap-2">
-                {product.brand && <p className="text-[0.88rem] text-text-secondary">{product.brand}</p>}
+                {product.brand && (
+                  <p className="m-0 flex items-center gap-2 text-[0.88rem] text-text-secondary">
+                    {product.brand.logoUrl && (
+                      <Image
+                        src={product.brand.logoUrl}
+                        alt=""
+                        width={56}
+                        height={24}
+                        className="h-6 w-auto max-w-14 object-contain"
+                      />
+                    )}
+                    <span>{product.brand.name}</span>
+                  </p>
+                )}
                 <h1 className="m-0 text-[clamp(1.5rem,3vw,2.1rem)] leading-snug font-bold">{product.title}</h1>
                 <p className="m-0 text-[0.82rem] text-text-secondary">کد کالا: {toPersianDigits(product.productCode)}</p>
                 {reviewSummary.averageRating !== null && (

@@ -1,5 +1,52 @@
 # Trends Progress Report
 
+## Latest change: managed brands (user-requested)
+Status: COMPLETE. `typecheck`, `lint`, `next build`, 147 unit and 75
+integration tests pass (new: `tests/unit/brand-validation.test.ts`,
+`tests/integration/brands.test.ts`). Migrations 0015 + 0016 applied on a
+fresh Postgres 16, and the data backfill was tested on messy legacy values.
+
+- **Model**: new `brands` table (`src/lib/db/schema/brands.ts`): name,
+  optional Latin name, slug, description, logo, country of origin, display
+  order, `isActive`. Unique `slug` and unique `lower(name)` (DB-enforced).
+  `products.brand_id` (nullable FK, `ON DELETE RESTRICT`, indexed) replaces the
+  free-text `products.brand`.
+- **Migrations**: `0015_brands` creates the table + `brand_id` and **backfills**
+  every distinct legacy text brand (whitespace-collapsed, case-insensitive
+  de-dup, slug clashes get -2/-3); `0016_drop_product_brand_text` drops the old
+  column. Blank/whitespace-only legacy values become "no brand". Not
+  reversible without restoring a backup.
+- **Admin** `/admin/brands` (nav: کاتالوگ › برندها): add, edit, logo upload
+  (new media folder `brands`), one-click active toggle, delete. Delete is
+  refused (action check + FK) when products use the brand — deactivate instead.
+  All actions re-check role, validate with Zod, write audit log
+  (`brand.create/update/toggle_active/delete`).
+- **Product form**: free-text field replaced by a select of **active** brands
+  (plus the product's own brand if it was later deactivated). Server enforces
+  it (`getProductBrandError`): unknown or inactive brand cannot be newly
+  assigned; a product may keep a deactivated one. Admin product list shows a
+  brand column.
+- **Storefront**: product page shows brand name (+ logo if set), spec table
+  gets «برند» and «کشور سازنده», JSON-LD `Brand` has name/alternateName/
+  description/logo. Search matches brand name and Latin name.
+- **Inactive brand semantics**: hidden everywhere on the storefront (page, specs,
+  JSON-LD, search); its products stay active and purchasable.
+- **Logo URL rule**: only `/assets/...` paths are accepted (next/image has no
+  remote hosts configured, so an external URL would crash the page).
+
+Known limitations / follow-ups:
+- No public brand page (`/brand/[slug]`) or brand filter yet; `slug`,
+  `description` are stored for that. Not built (out of scope).
+- Admin product search does not search by brand name.
+- Authenticated admin screens (`/admin/brands`, product form) were not clicked
+  through in a browser (no browser automation); verified via build, types,
+  domain-level integration tests, and HTTP checks of the storefront
+  (brand shown, search hit, hidden after deactivation, `/admin/brands`
+  redirects anonymous users to login).
+- Seed data has no brands; create them in the admin.
+
+---
+
 ## Latest change: hover panel only on list pages (user-requested)
 `ProductCard` / `ProductCardMedia` take `showOptions` (default `true`). The
 three homepage rows (`FeaturedProducts`, `TopSellingProducts`, `NewArrivals`)

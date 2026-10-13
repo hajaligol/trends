@@ -133,7 +133,7 @@ export class VariantInputError extends Error {}
 
 export async function loadProductCode(productId: string, executor: Executor = db) {
   const [row] = await executor
-    .select({ id: products.id, productCode: products.productCode, slug: products.slug })
+    .select({ id: products.id, productCode: products.productCode, slug: products.slug, brandId: products.brandId })
     .from(products)
     .where(eq(products.id, productId))
     .limit(1);

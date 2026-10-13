@@ -1,11 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { createProductAction, updateProductAction } from "@/domains/catalog/admin-actions";
 import type { AdminProductDetail } from "@/domains/catalog/admin-queries";
 import type { ActionResult } from "@/domains/auth/roles";
 import type { CategoryPickerNode } from "@/domains/categories/queries";
+import type { BrandOption } from "@/domains/brands/queries";
 import { toPersianDigits } from "@/lib/utils/persian-digits";
 import { slugifyTitle } from "@/domains/catalog/slug";
 import { CategoryCascadeSelect } from "@/components/admin/CategoryCascadeSelect";
@@ -16,6 +18,7 @@ import {
   FieldGrid,
   FormActionBar,
   FormAlert,
+  SelectField,
   SwitchField,
   TextareaField,
   TextField,
@@ -28,17 +31,19 @@ const updateInitialState: ActionResult = { ok: true };
 export function ProductForm({
   product,
   categoryNodes,
+  brandOptions,
 }: {
   product?: AdminProductDetail;
   categoryNodes: CategoryPickerNode[];
+  brandOptions: BrandOption[];
 }) {
   if (product) {
-    return <ProductEditForm product={product} categoryNodes={categoryNodes} />;
+    return <ProductEditForm product={product} categoryNodes={categoryNodes} brandOptions={brandOptions} />;
   }
-  return <ProductCreateForm categoryNodes={categoryNodes} />;
+  return <ProductCreateForm categoryNodes={categoryNodes} brandOptions={brandOptions} />;
 }
 
-function ProductCreateForm({ categoryNodes }: { categoryNodes: CategoryPickerNode[] }) {
+function ProductCreateForm({ categoryNodes, brandOptions }: { categoryNodes: CategoryPickerNode[]; brandOptions: BrandOption[] }) {
   const router = useRouter();
   const [state, formAction] = useAdminAction(createProductAction, createInitialState, {
     successMessage: "محصول ساخته شد؛ حالا سایز، رنگ و تصاویر را اضافه کنید",
@@ -50,7 +55,7 @@ function ProductCreateForm({ categoryNodes }: { categoryNodes: CategoryPickerNod
   return (
     <form action={formAction} className="flex flex-col gap-6">
       <FormAlert state={state} />
-      <ProductFields categoryNodes={categoryNodes} />
+      <ProductFields categoryNodes={categoryNodes} brandOptions={brandOptions} />
       <Card
         title="انواع محصول (سایز و رنگ)"
         description="چند سایز و چند رنگ را یکجا انتخاب کنید؛ هر ترکیب یک نوع جداگانه با کد کالای (SKU) خودکار می‌شود. این بخش اختیاری است و بعداً هم می‌توانید انواع را اضافه کنید."
@@ -64,7 +69,15 @@ function ProductCreateForm({ categoryNodes }: { categoryNodes: CategoryPickerNod
   );
 }
 
-function ProductEditForm({ product, categoryNodes }: { product: AdminProductDetail; categoryNodes: CategoryPickerNode[] }) {
+function ProductEditForm({
+  product,
+  categoryNodes,
+  brandOptions,
+}: {
+  product: AdminProductDetail;
+  categoryNodes: CategoryPickerNode[];
+  brandOptions: BrandOption[];
+}) {
   const [state, formAction] = useAdminAction(updateProductAction, updateInitialState, {
     successMessage: "تغییرات محصول ذخیره شد",
   });
@@ -73,7 +86,7 @@ function ProductEditForm({ product, categoryNodes }: { product: AdminProductDeta
     <form action={formAction} className="flex flex-col gap-6">
       <input type="hidden" name="id" value={product.id} />
       <FormAlert state={state} />
-      <ProductFields categoryNodes={categoryNodes} product={product} />
+      <ProductFields categoryNodes={categoryNodes} brandOptions={brandOptions} product={product} />
       <FormActionBar>
         <AdminSubmitButton>ذخیره تغییرات</AdminSubmitButton>
       </FormActionBar>
@@ -81,7 +94,15 @@ function ProductEditForm({ product, categoryNodes }: { product: AdminProductDeta
   );
 }
 
-function ProductFields({ categoryNodes, product }: { categoryNodes: CategoryPickerNode[]; product?: AdminProductDetail }) {
+function ProductFields({
+  categoryNodes,
+  brandOptions,
+  product,
+}: {
+  categoryNodes: CategoryPickerNode[];
+  brandOptions: BrandOption[];
+  product?: AdminProductDetail;
+}) {
   return (
     <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
       <div className="flex min-w-0 flex-col gap-6">
@@ -113,7 +134,28 @@ function ProductFields({ categoryNodes, product }: { categoryNodes: CategoryPick
         <Card title="دسته‌بندی و برچسب">
           <div className="flex flex-col gap-4">
             <CategoryCascadeSelect nodes={categoryNodes} defaultCategoryId={product?.categoryId} />
-            <TextField label="برند" name="brand" defaultValue={product?.brand ?? ""} optional />
+            <SelectField
+              label="برند"
+              name="brandId"
+              defaultValue={product?.brandId ?? ""}
+              optional
+              hint={
+                brandOptions.length === 0
+                  ? "هنوز برندی ثبت نشده است."
+                  : "فقط از میان برندهای ثبت‌شده انتخاب می‌شود."
+              }
+            >
+              <option value="">بدون برند</option>
+              {brandOptions.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.name}
+                  {option.isActive ? "" : " (غیرفعال)"}
+                </option>
+              ))}
+            </SelectField>
+            <Link href="/admin/brands" className="-mt-2 w-fit text-[0.78rem] text-brand hover:underline">
+              مدیریت برندها
+            </Link>
             <TextField
               label="برچسب‌ها"
               name="tags"

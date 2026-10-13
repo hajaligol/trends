@@ -1,7 +1,7 @@
 import { and, asc, count, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import { toLatinDigits } from "@/lib/utils/digits";
 import { db } from "@/lib/db/client";
-import { categories, productImages, productVariants, products } from "@/lib/db/schema";
+import { brands, categories, productImages, productVariants, products } from "@/lib/db/schema";
 import type { Product, ProductImage, ProductVariant } from "@/lib/db/schema";
 import { getCategorySubtreeIds } from "@/domains/categories/queries";
 import { listProductSpecifications, type SpecificationRow } from "@/domains/catalog/specifications";
@@ -19,6 +19,7 @@ export type AdminProductListRow = {
   slug: string;
   title: string;
   categoryName: string;
+  brandName: string | null;
   isActive: boolean;
   isFeatured: boolean;
   isNewArrival: boolean;
@@ -87,6 +88,7 @@ export async function listProductsForAdmin({
         slug: products.slug,
         title: products.title,
         categoryName: categories.name,
+        brandName: brands.name,
         isActive: products.isActive,
         isFeatured: products.isFeatured,
         isNewArrival: products.isNewArrival,
@@ -99,9 +101,10 @@ export async function listProductsForAdmin({
       })
       .from(products)
       .innerJoin(categories, eq(products.categoryId, categories.id))
+      .leftJoin(brands, eq(products.brandId, brands.id))
       .leftJoin(productVariants, eq(productVariants.productId, products.id))
       .where(where)
-      .groupBy(products.id, categories.name)
+      .groupBy(products.id, categories.name, brands.name)
       .orderBy(desc(products.updatedAt))
       .limit(safePageSize)
       .offset((safePage - 1) * safePageSize),

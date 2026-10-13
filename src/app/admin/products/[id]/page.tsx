@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { toPersianDigits } from "@/lib/utils/persian-digits";
 import { getProductForAdmin } from "@/domains/catalog/admin-queries";
 import { listCategoryPickerNodes } from "@/domains/categories/queries";
+import { listBrandOptions } from "@/domains/brands/queries";
 import { ProductForm } from "@/components/admin/ProductForm";
 import { ProductSpecificationsEditor } from "@/components/admin/ProductSpecificationsEditor";
 import { ProductVariantsAndImages } from "@/components/admin/ProductVariantsAndImages";
@@ -16,6 +17,8 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
   const { id } = await params;
   const [product, categoryNodes] = await Promise.all([getProductForAdmin(id), listCategoryPickerNodes()]);
   if (!product) notFound();
+  // Active brands, plus this product's own brand even if it was deactivated.
+  const brandOptions = await listBrandOptions(product.brandId);
 
   return (
     <div className="flex flex-col gap-6">
@@ -53,7 +56,7 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
         }
       />
 
-      <ProductForm product={product} categoryNodes={categoryNodes} />
+      <ProductForm product={product} categoryNodes={categoryNodes} brandOptions={brandOptions} />
 
       <ProductVariantsAndImages productId={product.id} productCode={product.productCode} variants={product.variants} images={product.images} />
 

@@ -3,7 +3,7 @@ import { toLatinDigits } from "@/lib/utils/digits";
 import { and, asc, desc, eq, ilike, inArray, ne, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import type { ColoredImage } from "@/domains/catalog/gallery";
-import { categories, orderItems, orders, productImages, productSlugRedirects, products, productVariants } from "@/lib/db/schema";
+import { brands, categories, orderItems, orders, productImages, productSlugRedirects, products, productVariants } from "@/lib/db/schema";
 import { discountPercent } from "@/lib/utils/money";
 import {
   buildCategoryTree,
@@ -408,6 +408,17 @@ export async function getTopSellingProducts(limit?: number): Promise<CatalogProd
   return summaries.sort((a, b) => (rankById.get(a.id) ?? 0) - (rankById.get(b.id) ?? 0));
 }
 
+/** The brand shown on a product page. Only ever present for an **active**
+ * brand — a deactivated brand is hidden from the storefront entirely. */
+export type CatalogBrand = {
+  name: string;
+  nameEn: string | null;
+  slug: string;
+  description: string | null;
+  logoUrl: string | null;
+  countryOfOrigin: string | null;
+};
+
 export type CatalogProductDetail = CatalogProductSummary & {
   /** Every image with its colour scope; the page picks per selected colour
    * (see `gallery.ts`). `images` (from the summary) stays the flat list. */
@@ -416,7 +427,7 @@ export type CatalogProductDetail = CatalogProductSummary & {
   productCode: number;
   shortDescription: string | null;
   longDescription: string | null;
-  brand: string | null;
+  brand: CatalogBrand | null;
   tags: string[];
   categoryName: string;
   /** Full breadcrumb path of the product's category, root first and the
@@ -459,7 +470,13 @@ export async function getProductDetailBySlug(rawSlug: string): Promise<CatalogPr
       title: products.title,
       shortDescription: products.shortDescription,
       longDescription: products.longDescription,
-      brand: products.brand,
+      brandName: brands.name,
+      brandNameEn: brands.nameEn,
+      brandSlug: brands.slug,
+      brandDescription: brands.description,
+      brandLogoUrl: brands.logoUrl,
+      brandCountryOfOrigin: brands.countryOfOrigin,
+      brandIsActive: brands.isActive,
       tags: products.tags,
       seoTitle: products.seoTitle,
       seoDescription: products.seoDescription,
@@ -469,6 +486,7 @@ export async function getProductDetailBySlug(rawSlug: string): Promise<CatalogPr
     })
     .from(products)
     .innerJoin(categories, eq(categories.id, products.categoryId))
+    .leftJoin(brands, eq(brands.id, products.brandId))
     .where(and(eq(products.slug, slug), eq(products.isActive, true)))
     .limit(1);
 
@@ -502,7 +520,17 @@ export async function getProductDetailBySlug(rawSlug: string): Promise<CatalogPr
     productCode: row.productCode,
     shortDescription: row.shortDescription,
     longDescription: row.longDescription,
-    brand: row.brand,
+    brand:
+      row.brandIsActive && row.brandName && row.brandSlug
+        ? {
+            name: row.brandName,
+            nameEn: row.brandNameEn,
+            slug: row.brandSlug,
+            description: row.brandDescription,
+            logoUrl: row.brandLogoUrl,
+            countryOfOrigin: row.brandCountryOfOrigin,
+          }
+        : null,
     tags: row.tags,
     seoTitle: row.seoTitle,
     seoDescription: row.seoDescription,
@@ -592,7 +620,7 @@ export type SearchResult = {
 
 /**
  * Real product search (Phase 5). Plain PostgreSQL `ILIKE` over
- * title/short description/brand — the "sensible PostgreSQL search first"
+ * title/short description/brand (active brands only) — the "sensible PostgreSQL search first"
  * TRENDS_PROJECT_CONTEXT.md §5 calls for, not Elasticsearch/Meilisearch,
  * which the same section explicitly says not to add until scale actually
  * requires it. Sorting/pagination happen in application code after one
@@ -627,6 +655,7 @@ export async function searchProducts(params: {
     })
     .from(products)
     .innerJoin(categories, eq(categories.id, products.categoryId))
+    .leftJoin(brands, and(eq(brands.id, products.brandId), eq(brands.isActive, true)))
     .where(
       and(
         eq(products.isActive, true),
@@ -634,7 +663,10 @@ export async function searchProducts(params: {
           exactCode === null ? undefined : eq(products.productCode, exactCode),
           ilike(products.title, pattern),
           ilike(products.shortDescription, pattern),
-          ilike(products.brand, pattern),
+          // Brand name (Persian or Latin) — an inactive brand is excluded by
+          // the join condition above, so it never matches.
+          ilike(brands.name, pattern),
+          ilike(brands.nameEn, pattern),
           // Category name too, so "کفش" or "هودی زنانه" finds products
           // whose own title doesn't repeat the word.
           ilike(categories.name, pattern),
