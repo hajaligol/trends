@@ -1,5 +1,41 @@
 # Trends Progress Report
 
+## Latest change: new demo catalog with brands (user-requested)
+Status: COMPLETE. `typecheck`, `lint`, `next build`, 147 unit and 75
+integration tests pass. Verified on Postgres 16: 20 brands, 176 products
+(1,020 variants), 0 leaf categories without a product, 0 brands without a
+product; homepage, `/category/men`, a kids category, `/collection/featured`,
+search by brand and a product page all return 200 with the brand shown.
+
+- **New command** `npm run db:seed-catalog` (dry run: prints what it would
+  delete) and `npm run db:seed-catalog -- --yes` (does it). In ONE transaction
+  it deletes all products and all brands, restarts the product-code sequence
+  at 100001, and seeds the new set. Categories, users, orders, coupons and
+  homepage content are untouched. Any failure rolls everything back.
+- **What it creates** (`src/lib/db/seed-catalog-data.ts`): 20 fictional active
+  brands (name, Latin name, country, description; no logos) and one product per
+  **leaf category found in the database** (so admin-added categories are
+  covered too), each assigned to a brand from a per-group pool (round-robin).
+  It asserts both guarantees at the end and throws (rolling back) if a leaf
+  category or a brand has no product. Variants use the same
+  `insertVariantsBulk` as the admin (palette colours, auto SKUs). Sizes:
+  letters (adult clothing), «۴/۶/۸ سال» (kids clothing), shoe numbers (men
+  40-45, women 36-41, kids 28-34), فری‌سایز (bags/accessories). About 1 in 5
+  products has a compare-at price, some variants are low/out of stock, 16
+  products are featured and 14 are new arrivals. No images/logos.
+- `npm run db:seed` now seeds the same catalog instead of the old 11 demo
+  products, and also clears brands. Old demo fixtures still feed the hero
+  slides/banners.
+- Deleting products cascades to variants, images, specs, reviews, wishlist
+  entries, cart lines and slug redirects. Past orders keep their item
+  snapshots; only the link to the product becomes empty. Uploaded image files
+  on disk are not removed.
+- Brand names are invented placeholders and may coincide with real brands by
+  accident; replace them in `/admin/brands`. Titles are generic (category name
+  + an adjective); descriptions are placeholders.
+
+---
+
 ## Latest change: managed brands (user-requested)
 Status: COMPLETE. `typecheck`, `lint`, `next build`, 147 unit and 75
 integration tests pass (new: `tests/unit/brand-validation.test.ts`,

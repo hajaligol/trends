@@ -12,6 +12,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
     "db:seed": "tsx --env-file=.env.local src/lib/db/seed.ts",
+    "db:seed-catalog": "tsx --env-file=.env.local src/lib/db/seed-catalog.ts",
     "db:sync-categories": "tsx --env-file=.env.local src/lib/db/sync-categories.ts",
     "db:persian-slugs": "tsx --env-file=.env.local src/lib/db/migrate-product-slugs.ts",
     "test": "vitest run tests/unit",
