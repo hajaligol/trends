@@ -8,6 +8,7 @@ import { ProductVariantsAndImages } from "@/components/admin/ProductVariantsAndI
 import { DeleteProductButton } from "@/components/admin/DeleteProductButton";
 import { Card, PageHeader, StatusBadge } from "@/components/admin/ui/layout";
 import { ExternalLinkIcon } from "@/components/admin/ui/icons";
+import { productHref } from "@/domains/catalog/slug";
 
 export const metadata = { title: "ویرایش محصول", robots: { index: false, follow: false } };
 
@@ -27,7 +28,7 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
           <>
             {product.isActive && (
               <a
-                href={`/product/${product.slug}`}
+                href={productHref(product.slug)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 rounded-full border border-ink/20 bg-white px-4 py-2 text-[0.82rem] font-semibold text-ink transition-colors hover:border-ink/40 hover:bg-ink/[0.04]"

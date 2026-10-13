@@ -249,7 +249,7 @@ export function SwitchField({
       <input type="checkbox" role="switch" name={name} defaultChecked={defaultChecked} className="peer sr-only" />
       <span
         aria-hidden="true"
-        className="relative mt-0.5 h-6 w-11 shrink-0 rounded-full bg-ink/20 transition-colors after:absolute after:start-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow-sm after:transition-transform peer-checked:bg-brand peer-checked:after:ltr:translate-x-5 peer-checked:after:rtl:-translate-x-5"
+        className="relative mt-0.5 h-6 w-11 shrink-0 rounded-full bg-ink/20 transition-colors after:absolute after:start-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow-sm after:transition-[inset-inline-start] peer-checked:bg-brand peer-checked:after:start-[1.375rem]"
       />
     </label>
   );

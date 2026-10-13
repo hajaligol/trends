@@ -2,6 +2,7 @@ import { z } from "zod";
 import { MAX_SPEC_ROWS } from "@/lib/validation/spec-limits";
 import { MAX_BULK_VARIANTS } from "@/lib/validation/admin-limits";
 import { normalizeSpecLabel } from "@/lib/utils/spec-label";
+import { isValidProductSlug } from "@/domains/catalog/slug";
 
 /**
  * Server-side validation for every Phase 11 admin mutation
@@ -19,6 +20,14 @@ const slugSchema = z
   .min(1, "نامک را وارد کنید")
   .max(160)
   .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, "نامک باید فقط شامل حروف انگلیسی کوچک، عدد و خط تیره باشد");
+
+/** Product slugs may contain Persian letters (category slugs stay ASCII). */
+const productSlugSchema = z
+  .string()
+  .trim()
+  .min(1, "نامک را وارد کنید")
+  .max(160)
+  .refine(isValidProductSlug, "نامک باید فقط شامل حروف فارسی یا انگلیسی کوچک، عدد و خط تیره باشد (بدون فاصله)");
 
 const optionalTrimmed = (max: number) =>
   z
@@ -56,7 +65,7 @@ export const productSchema = z.object({
   // Create: ignored — the slug is always generated from the title on the
   // server. Edit: optional; blank keeps the current slug.
   slug: z
-    .union([slugSchema, z.literal("")])
+    .union([productSlugSchema, z.literal("")])
     .optional()
     .transform((value) => (value ? value : null)),
   categoryId: z.string().uuid("دسته را انتخاب کنید"),

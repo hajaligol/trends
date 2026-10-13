@@ -13,10 +13,12 @@ import {
   productVariantSchema,
 } from "@/lib/validation/admin";
 import { getPaletteColor, KEEP_CURRENT_COLOR } from "@/domains/catalog/color-palette";
+import { revalidateProductPage } from "@/domains/catalog/revalidate";
 import {
   generateProductSlug,
   insertVariantsBulk,
   isSlugTakenByOther,
+  recordSlugRedirect,
   loadProductCode,
   VariantInputError,
   type BulkVariantResult,
@@ -43,7 +45,7 @@ function fieldErrors(error: { flatten: () => { fieldErrors: Record<string, strin
 function revalidateStorefrontForProduct(slug?: string) {
   revalidatePath("/admin/products");
   revalidatePath("/");
-  if (slug) revalidatePath(`/product/${slug}`);
+  if (slug) revalidateProductPage(slug);
 }
 
 // ---------------------------------------------------------------------
@@ -128,14 +130,19 @@ export async function updateProductAction(_prev: ActionResult, formData: FormDat
   if (categoryError) return { ok: false, error: categoryError };
 
   // `productCode` is never part of the update — it is assigned once.
-  await db
-    .update(products)
-    .set({ ...parsed.data, slug, updatedAt: new Date() })
-    .where(eq(products.id, id));
+  // The slug change and its redirect row commit together: the old URL must
+  // never be left without a destination.
+  await db.transaction(async (tx) => {
+    await tx
+      .update(products)
+      .set({ ...parsed.data, slug, updatedAt: new Date() })
+      .where(eq(products.id, id));
+    if (existing.slug !== slug) await recordSlugRedirect(tx, id, existing.slug, slug);
+  });
 
   await recordAuditLog(session.user, "product.update", "product", id, { ...parsed.data, slug });
 
-  if (existing.slug !== slug) revalidatePath(`/product/${existing.slug}`);
+  if (existing.slug !== slug) revalidateProductPage(existing.slug);
   revalidateStorefrontForProduct(slug);
   return { ok: true };
 }

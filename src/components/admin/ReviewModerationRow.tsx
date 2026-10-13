@@ -12,6 +12,7 @@ import { FormAlert, Spinner, TextareaField, useAdminAction } from "@/components/
 import { CheckIcon, XIcon } from "@/components/ui/icons";
 import { RatingStarIcon } from "@/components/ui/icons";
 import Link from "next/link";
+import { productHref } from "@/domains/catalog/slug";
 
 const STATUS_LABELS: Record<AdminReviewRow["status"], string> = {
   pending: "در انتظار بررسی",
@@ -63,7 +64,7 @@ export function ReviewModerationRow({ review }: { review: AdminReviewRow }) {
       </header>
 
       <div className="flex flex-col gap-2">
-        <Link href={`/product/${review.productSlug}`} target="_blank" className="w-fit text-[0.8rem] text-brand hover:underline">
+        <Link href={productHref(review.productSlug)} target="_blank" className="w-fit text-[0.8rem] text-brand hover:underline">
           {review.productTitle}
         </Link>
         <div className="flex items-center gap-2" role="img" aria-label={`امتیاز ${toPersianDigits(review.rating)} از ۵`}>

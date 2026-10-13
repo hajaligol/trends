@@ -1,5 +1,56 @@
 # Trends Progress Report
 
+## Latest change: Persian product slugs (out-of-phase, user-requested)
+
+Status: COMPLETE. `typecheck`, `lint`, `next build`, 129 unit and 62
+integration tests pass. Checked over HTTP against a production build with a
+real local Postgres (Persian URL, old-URL redirect, canonical, sitemap,
+JSON-LD, home-page links).
+
+- **Product slugs are now Persian, built from the title**
+  (`src/domains/catalog/slug.ts`): «پیراهن کلاسیک مردانه» →
+  `پیراهن-کلاسیک-مردانه`. Persian letters kept; Arabic ي/ك/ة/أ folded to
+  Persian; Persian/Arabic digits → ASCII digits; Latin brand words kept
+  lowercase; spaces, ZWNJ and punctuation → one `-` (ZWNJ becomes a dash,
+  e.g. `شلوار-پارچه-ای`); max 80 chars; `-2`, `-3` on collision; fallback
+  `محصول`. **Category slugs are unchanged (ASCII).**
+- **Validation**: product slug uses `isValidProductSlug` (Persian letters,
+  `a-z`, `0-9`, single dashes, no spaces). `categorySchema` still uses the
+  ASCII `slugSchema`.
+- **URLs**: `productHref(slug)` percent-encodes the slug; used for every
+  `/product/...` link, the sitemap, canonical, Open Graph and JSON-LD.
+  `normalizeSlugParam` decodes/NFC-normalises a route param (used inside
+  `getProductDetailBySlug`). `revalidateProductPage` revalidates both the raw
+  and encoded path (reviews, inventory and admin actions use it).
+- **Old URLs keep working**: new table `product_slug_redirects`
+  (migration `0013_product_slug_redirects`). Changing a slug (admin edit, or
+  the conversion script) stores the old slug; `/product/<old>` redirects to
+  the current URL (`permanentRedirect`). A live slug always wins; former slugs
+  are reserved (a new product or an admin edit cannot take another product's
+  old slug). Slug change + redirect row commit in one transaction.
+- **Existing products**: run `npm run db:persian-slugs -- --dry-run`, then
+  `npm run db:persian-slugs` (idempotent). `db:seed` already generates Persian
+  slugs. Restart/redeploy afterwards so cached product pages are rebuilt.
+- **SKUs are unaffected**: the old ASCII transliteration moved, frozen, to
+  `src/domains/catalog/ascii-transliteration.ts` and is used only by
+  `sku.ts` (a regression test keeps SKUs ASCII).
+- Admin edit form: slug field is no longer forced LTR; hint explains the
+  redirect. Create form still shows a live preview only.
+
+Known limitations (documented, not fixed here):
+- Old-slug redirect and `notFound()` are delivered by the streamed response
+  (HTTP 200 + meta refresh/`NEXT_REDIRECT`) because `product/[slug]/loading.tsx`
+  streams before the page resolves — the same known Next.js behaviour already
+  noted for 404s. A true HTTP 308/404 would need removing that `loading.tsx`
+  or doing the lookup in `proxy.ts`.
+- A malformed `%` escape in any dynamic URL returns 500 from Next.js itself
+  (also true for `/category/...`; not introduced by this change).
+- Shared URLs contain percent-encoded Persian (browsers display Persian).
+  Long titles make long encoded URLs; hence the 80-char cap.
+
+Next session: nothing required. Optional follow-ups: true 308 for old slugs
+(see above).
+
 ## Latest change: admin product form overhaul (out-of-phase, user-requested)
 
 Status: COMPLETE. Typecheck, lint, `next build`, 120 unit and 57 integration

@@ -155,16 +155,15 @@ function TitleAndSlug({ product }: { product?: AdminProductDetail }) {
             label="نامک (بخشی از آدرس صفحه)"
             name="slug"
             defaultValue={product.slug}
-            ltr
-            hint="با تغییر نامک، آدرس صفحه محصول هم عوض می‌شود. فقط حروف کوچک انگلیسی، عدد و خط تیره."
+            hint="با تغییر نامک، آدرس صفحه محصول هم عوض می‌شود (آدرس قبلی به آدرس جدید هدایت می‌شود). حروف فارسی یا انگلیسی کوچک، عدد و خط تیره؛ بدون فاصله."
           />
         ) : (
           <div className="flex flex-col gap-1.5">
             <span className="text-[0.84rem] font-medium text-ink">نامک (آدرس صفحه)</span>
             <output
-              dir="ltr"
+              dir="rtl"
               aria-live="polite"
-              className="flex min-h-[46px] items-center rounded-[var(--radius-md)] border border-dashed border-ink/20 bg-bg px-4 py-2.5 text-end text-[0.88rem] text-text-secondary"
+              className="flex min-h-[46px] items-center rounded-[var(--radius-md)] border border-dashed border-ink/20 bg-bg px-4 py-2.5 text-start text-[0.88rem] text-text-secondary"
             >
               {preview || "از روی عنوان ساخته می‌شود"}
             </output>

@@ -8,6 +8,7 @@ import { productVariants, products } from "@/lib/db/schema";
 import { stockAdjustmentSchema } from "@/lib/validation/admin";
 import { isStaffOrAdmin, UNAUTHORIZED_ERROR, type ActionResult } from "@/domains/auth/roles";
 import { recordAuditLog } from "@/domains/analytics/audit";
+import { revalidateProductPage } from "@/domains/catalog/revalidate";
 
 /**
  * A single, deliberately narrow "adjust stock by a signed delta with a
@@ -72,6 +73,6 @@ export async function adjustStockAction(_prev: ActionResult, formData: FormData)
   const [product] = await db.select({ slug: products.slug }).from(products).where(eq(products.id, updated.productId)).limit(1);
   revalidatePath("/admin/inventory");
   revalidatePath(`/admin/products/${updated.productId}`);
-  if (product?.slug) revalidatePath(`/product/${product.slug}`);
+  if (product?.slug) revalidateProductPage(product.slug);
   return { ok: true };
 }

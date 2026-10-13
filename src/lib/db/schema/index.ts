@@ -1,5 +1,6 @@
 export * from "./categories";
 export * from "./products";
+export * from "./product-slug-redirects";
 export * from "./product-variants";
 export * from "./product-images";
 export * from "./product-specifications";

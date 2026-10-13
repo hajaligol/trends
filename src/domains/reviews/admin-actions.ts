@@ -10,6 +10,7 @@ import { isStaffOrAdmin, UNAUTHORIZED_ERROR, type ActionResult } from "@/domains
 import { recordAuditLog } from "@/domains/analytics/audit";
 import { notifyEvent } from "@/domains/notifications/provider";
 import { getReviewForAdmin } from "@/domains/reviews/admin-queries";
+import { revalidateProductPage } from "@/domains/catalog/revalidate";
 
 /**
  * The only place a review's `status` is ever written after creation —
@@ -61,6 +62,6 @@ export async function moderateReviewAction(_prev: ActionResult, formData: FormDa
   );
 
   revalidatePath("/admin/reviews");
-  revalidatePath(`/product/${review.productSlug}`);
+  revalidateProductPage(review.productSlug);
   return { ok: true };
 }

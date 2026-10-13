@@ -2,7 +2,7 @@ import { cache } from "react";
 import { toLatinDigits } from "@/lib/utils/digits";
 import { and, asc, desc, eq, ilike, inArray, ne, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/lib/db/client";
-import { categories, orderItems, orders, productImages, products, productVariants } from "@/lib/db/schema";
+import { categories, orderItems, orders, productImages, productSlugRedirects, products, productVariants } from "@/lib/db/schema";
 import { discountPercent } from "@/lib/utils/money";
 import {
   buildCategoryTree,
@@ -14,6 +14,7 @@ import {
   type CategoryRow,
 } from "@/domains/categories/tree";
 import type { ProductSort } from "./presentation";
+import { normalizeSlugParam } from "./slug";
 import { listProductSpecifications, type SpecificationRow } from "@/domains/catalog/specifications";
 
 /**
@@ -386,7 +387,23 @@ export type CatalogProductDetail = CatalogProductSummary & {
   specifications: SpecificationRow[];
 };
 
-export async function getProductDetailBySlug(slug: string): Promise<CatalogProductDetail | null> {
+/**
+ * If `slug` is a *former* slug of an active product, returns that product's
+ * current slug so the page can redirect permanently. Live slugs are always
+ * resolved first by `getProductDetailBySlug`, so this only runs on a miss.
+ */
+export async function getCurrentSlugForFormerSlug(rawSlug: string): Promise<string | null> {
+  const [row] = await db
+    .select({ slug: products.slug })
+    .from(productSlugRedirects)
+    .innerJoin(products, eq(products.id, productSlugRedirects.productId))
+    .where(and(eq(productSlugRedirects.oldSlug, normalizeSlugParam(rawSlug)), eq(products.isActive, true)))
+    .limit(1);
+  return row?.slug ?? null;
+}
+
+export async function getProductDetailBySlug(rawSlug: string): Promise<CatalogProductDetail | null> {
+  const slug = normalizeSlugParam(rawSlug);
   const [row] = await db
     .select({
       id: products.id,

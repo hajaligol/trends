@@ -11,6 +11,7 @@ import { StockBadge } from "@/components/catalog/StockBadge";
 import { WishlistButton } from "@/components/ui/WishlistButton";
 import type { CatalogProductSummary } from "@/domains/catalog/queries";
 import { formatToman } from "@/lib/utils/money";
+import { productHref } from "@/domains/catalog/slug";
 
 /**
  * Swipeable row (6 cards visible on desktop, 3 from ~640px, ~2 below
@@ -43,7 +44,7 @@ export function NewArrivals({ arrivals }: { arrivals: CatalogProductSummary[] })
             return (
               <article key={arrival.id} className="flex w-full flex-col gap-2">
                 <div className="group relative aspect-[4/5] overflow-hidden rounded-[14px] bg-card-image">
-                  <Link href={`/product/${arrival.slug}`} className="absolute inset-0 block">
+                  <Link href={productHref(arrival.slug)} className="absolute inset-0 block">
                     {primaryImage ? (
                       <Image
                         src={primaryImage.url}
@@ -60,7 +61,7 @@ export function NewArrivals({ arrivals }: { arrivals: CatalogProductSummary[] })
                    * inside an <a> is invalid HTML and breaks keyboard/AT navigation. */}
                   <WishlistButton productId={arrival.id} productName={arrival.title} />
                 </div>
-                <Link href={`/product/${arrival.slug}`} className="text-[0.87rem] font-semibold">
+                <Link href={productHref(arrival.slug)} className="text-[0.87rem] font-semibold">
                   {arrival.title}
                 </Link>
                 <p className="text-[0.83rem] text-text-secondary">

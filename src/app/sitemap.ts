@@ -2,6 +2,7 @@ import type { MetadataRoute } from "next";
 import { getSitemapEntries } from "@/domains/catalog/queries";
 import { COLLECTIONS } from "@/domains/catalog/presentation";
 import { SITE_URL } from "@/lib/site-config";
+import { productHref } from "@/domains/catalog/slug";
 
 const STATIC_PAGES = [
   "/accessories",
@@ -39,7 +40,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.8,
     })),
     ...products.map((product) => ({
-      url: `${SITE_URL}/product/${product.slug}`,
+      url: `${SITE_URL}${productHref(product.slug)}`,
       lastModified: product.updatedAt,
       changeFrequency: "weekly" as const,
       priority: 0.7,

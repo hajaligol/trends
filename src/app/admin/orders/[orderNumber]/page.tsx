@@ -9,6 +9,7 @@ import { toPersianDigits } from "@/lib/utils/persian-digits";
 import { AdminOrderStatusForm } from "@/components/admin/AdminOrderStatusForm";
 import { ORDER_STATUS_TONES } from "@/components/admin/status";
 import { Card, DetailRow, formatDateTime, PageHeader, StatusBadge } from "@/components/admin/ui/layout";
+import { productHref } from "@/domains/catalog/slug";
 
 export const metadata: Metadata = {
   title: "جزئیات سفارش — مدیریت",
@@ -61,7 +62,7 @@ export default async function AdminOrderDetailPage({
                     {item.imageUrl && <Image src={item.imageUrl} alt="" fill sizes="64px" className="object-cover" />}
                   </div>
                   <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <Link href={`/product/${item.productSlug}`} target="_blank" className="truncate text-[0.92rem] font-semibold text-ink hover:text-brand hover:underline">
+                    <Link href={productHref(item.productSlug)} target="_blank" className="truncate text-[0.92rem] font-semibold text-ink hover:text-brand hover:underline">
                       {item.productTitle}
                     </Link>
                     <span className="text-[0.8rem] text-text-secondary">

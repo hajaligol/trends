@@ -20,6 +20,7 @@ import { useCart } from "@/components/cart/CartProvider";
 import { useWishlist } from "@/components/wishlist/WishlistProvider";
 import { useToast } from "@/components/feedback/ToastProvider";
 import { RemoveFromCartModal } from "@/components/checkout/RemoveFromCartModal";
+import { productHref } from "@/domains/catalog/slug";
 
 const CARD = "rounded-[var(--radius-lg)] border border-line bg-white";
 const INPUT =
@@ -745,7 +746,7 @@ function CartLine({
   const hasDiscount = item.compareAtPriceToman !== null && item.compareAtPriceToman > item.unitPriceToman;
   return (
     <article className={`${CARD} flex gap-4 p-4 sm:gap-5 sm:p-5`}>
-      <Link href={`/product/${item.productSlug}`} className="shrink-0" aria-label={item.productTitle}>
+      <Link href={productHref(item.productSlug)} className="shrink-0" aria-label={item.productTitle}>
         <span className="relative block h-[112px] w-[92px] overflow-hidden rounded-[var(--radius-md)] bg-card-image sm:h-[132px] sm:w-[108px]">
           {item.imageUrl ? (
             <Image src={item.imageUrl} alt={item.imageAlt ?? item.productTitle} fill sizes="108px" className="object-cover" />
@@ -758,7 +759,7 @@ function CartLine({
       <div className="flex min-w-0 flex-1 flex-col gap-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <Link href={`/product/${item.productSlug}`} className="block truncate text-[0.98rem] font-semibold text-ink hover:underline">
+            <Link href={productHref(item.productSlug)} className="block truncate text-[0.98rem] font-semibold text-ink hover:underline">
               {item.productTitle}
             </Link>
             <dl className="m-0 mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[0.82rem] text-text-secondary">

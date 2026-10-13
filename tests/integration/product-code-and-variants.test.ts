@@ -1,9 +1,16 @@
 import { afterAll, describe, expect, it } from "vitest";
 import { eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db/client";
-import { categories, productVariants, products } from "@/lib/db/schema";
-import { generateProductSlug, insertVariantsBulk, VariantInputError } from "@/domains/catalog/product-service";
-import { searchProducts } from "@/domains/catalog/queries";
+import { categories, productSlugRedirects, productVariants, products } from "@/lib/db/schema";
+import {
+  generateProductSlug,
+  insertVariantsBulk,
+  isSlugTakenByOther,
+  recordSlugRedirect,
+  VariantInputError,
+} from "@/domains/catalog/product-service";
+import { isValidProductSlug } from "@/domains/catalog/slug";
+import { getCurrentSlugForFormerSlug, getProductDetailBySlug, searchProducts } from "@/domains/catalog/queries";
 import { listProductsForAdmin } from "@/domains/catalog/admin-queries";
 import { bulkVariantsSchema } from "@/lib/validation/admin";
 import { createTestCategory, createTestProduct } from "./helpers";
@@ -62,22 +69,85 @@ describe("product code («کد کالا»)", () => {
   });
 });
 
-describe("generateProductSlug", () => {
-  it("derives the slug from the title and numbers collisions", async () => {
-    const title = `پیراهن کلاسیک مردانه`;
+describe("generateProductSlug (Persian slugs)", () => {
+  it("derives a Persian slug from the title and numbers collisions", async () => {
+    const title = `پیراهن کلاسیک مردانه t${Date.now()}`;
     const first = await generateProductSlug(title);
-    expect(first.startsWith("shirt-classic-men")).toBe(true);
+    expect(first.startsWith("پیراهن-کلاسیک-مردانه-t")).toBe(true);
+    expect(isValidProductSlug(first)).toBe(true);
 
     const product = await newProduct({ slug: first });
     expect(product.slug).toBe(first);
     const second = await generateProductSlug(title);
-    expect(second).not.toBe(first);
-    expect(second.startsWith(first)).toBe(true);
+    expect(second).toBe(`${first}-2`);
   });
 
-  it("falls back to a generic slug when the title has no usable letters", async () => {
+  it("falls back to a generic Persian slug when the title has no usable letters", async () => {
     const slug = await generateProductSlug("😀");
-    expect(slug).toMatch(/^product(-\d+)?$/);
+    expect(slug).toMatch(/^محصول(-\d+)?$/);
+  });
+
+  it("can keep a product's own slug when regenerating for that product", async () => {
+    const title = `هودی روزانه t${Date.now()}`;
+    const slug = await generateProductSlug(title);
+    const product = await newProduct({ slug, title });
+    expect(await generateProductSlug(title, db, product.id)).toBe(slug);
+  });
+});
+
+describe("product slug redirects", () => {
+  it("records the old slug and resolves it to the current slug (active products only)", async () => {
+    const token = `t${Date.now()}`;
+    const oldSlug = `old-${token}`;
+    const product = await newProduct({ slug: oldSlug });
+    const newSlug = `پیراهن-${token}`;
+
+    await db.transaction(async (tx) => {
+      await tx.update(products).set({ slug: newSlug }).where(eq(products.id, product.id));
+      await recordSlugRedirect(tx, product.id, oldSlug, newSlug);
+    });
+
+    expect(await getCurrentSlugForFormerSlug(oldSlug)).toBe(newSlug);
+    // Also works for the percent-encoded form a router may hand us.
+    expect(await getCurrentSlugForFormerSlug(encodeURIComponent(oldSlug))).toBe(newSlug);
+    expect(await getCurrentSlugForFormerSlug(`never-existed-${token}`)).toBeNull();
+
+    // A deactivated product must 404, not redirect.
+    await db.update(products).set({ isActive: false }).where(eq(products.id, product.id));
+    expect(await getCurrentSlugForFormerSlug(oldSlug)).toBeNull();
+  });
+
+  it("resolves a product by its Persian slug, raw or percent-encoded", async () => {
+    const slug = `کت-جین-t${Date.now()}`;
+    const product = await newProduct({ slug });
+    expect((await getProductDetailBySlug(slug))?.id).toBe(product.id);
+    expect((await getProductDetailBySlug(encodeURIComponent(slug)))?.id).toBe(product.id);
+    expect(await getProductDetailBySlug("%E0%A4%A")).toBeNull(); // malformed escape: no throw
+  });
+
+  it("reserves a former slug: neither a new title nor an admin edit can take it", async () => {
+    const token = `t${Date.now()}`;
+    const oldSlug = `کفش-قدیمی-${token}`;
+    const owner = await newProduct({ slug: `کفش-جدید-${token}` });
+    await recordSlugRedirect(db, owner.id, oldSlug, `کفش-جدید-${token}`);
+
+    // A new product titled the same gets -2 instead of hijacking the redirect.
+    expect(await generateProductSlug(`کفش قدیمی ${token}`)).toBe(`${oldSlug}-2`);
+
+    const other = await newProduct();
+    expect(await isSlugTakenByOther(oldSlug, other.id)).toBe(true);
+    expect(await isSlugTakenByOther(oldSlug, owner.id)).toBe(false);
+  });
+
+  it("returning to a former slug removes its now-pointless redirect row", async () => {
+    const token = `t${Date.now()}`;
+    const a = `الف-${token}`;
+    const b = `ب-${token}`;
+    const product = await newProduct({ slug: b });
+    await recordSlugRedirect(db, product.id, a, b); // a → b
+    await recordSlugRedirect(db, product.id, b, a); // product goes back to a
+    const rows = await db.select().from(productSlugRedirects).where(eq(productSlugRedirects.productId, product.id));
+    expect(rows.map((r) => r.oldSlug)).toEqual([b]);
   });
 });
 

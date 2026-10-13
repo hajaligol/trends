@@ -9,6 +9,7 @@ import { useDimPage } from "@/components/overlays/UIOverlayProvider";
 import { TRENDING_SEARCHES } from "@/lib/search/trending-searches";
 import { formatToman } from "@/lib/utils/money";
 import { toPersianDigits } from "@/lib/utils/persian-digits";
+import { productHref } from "@/domains/catalog/slug";
 
 const STORAGE_KEY = "trends:search-history";
 const MAX_HISTORY = 8;
@@ -334,7 +335,7 @@ export function HeaderSearch() {
                           {live.items.map((item) => (
                             <li key={item.slug}>
                               <Link
-                                href={`/product/${item.slug}`}
+                                href={productHref(item.slug)}
                                 onClick={() => {
                                   setOpen(false);
                                   inputRef.current?.blur();

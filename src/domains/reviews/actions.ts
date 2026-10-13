@@ -1,6 +1,5 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth/config";
 import { db } from "@/lib/db/client";
 import { reviews } from "@/lib/db/schema";
@@ -9,6 +8,7 @@ import type { ActionResult } from "@/domains/auth/roles";
 import { getProductDetailBySlug } from "@/domains/catalog/queries";
 import { getUserReviewForProduct, hasUserPurchasedProduct } from "@/domains/reviews/queries";
 import { checkIpRateLimit } from "@/lib/security/rate-limit";
+import { revalidateProductPage } from "@/domains/catalog/revalidate";
 
 function fieldErrors(error: { flatten: () => { fieldErrors: Record<string, string[] | undefined> } }) {
   const flat = error.flatten();
@@ -78,6 +78,6 @@ export async function submitReviewAction(_prev: ActionResult, formData: FormData
     return { ok: false, error: "شما قبلاً برای این محصول دیدگاه ثبت کرده‌اید" };
   }
 
-  revalidatePath(`/product/${slug}`);
+  revalidateProductPage(slug);
   return { ok: true };
 }

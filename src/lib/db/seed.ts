@@ -22,6 +22,7 @@
  */
 import { db } from "./client";
 import { buildVariantSku } from "@/domains/catalog/sku";
+import { generateProductSlug } from "@/domains/catalog/product-service";
 import { categories, heroSlides, productImages, products, productVariants, promoBanners } from "./schema";
 import { syncCategoryTaxonomy } from "@/domains/categories/sync";
 import { CATEGORY_TAXONOMY, DEMO_PRODUCT_CATEGORY_SLUG } from "@/domains/categories/taxonomy";
@@ -123,7 +124,8 @@ async function seedProducts(categoriesBySlug: Map<string, string>) {
     const [insertedProduct] = await db
       .insert(products)
       .values({
-        slug: demoProduct.id,
+        // Persian slug derived from the title (same rule as the admin).
+        slug: await generateProductSlug(demoProduct.name),
         title: demoProduct.name,
         categoryId,
         isFeatured: demoProduct.isFeatured,

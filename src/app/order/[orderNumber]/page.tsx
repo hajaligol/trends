@@ -12,6 +12,7 @@ import { formatToman } from "@/lib/utils/money";
 import { toPersianDigits } from "@/lib/utils/persian-digits";
 import { RetryPaymentButton } from "@/components/orders/RetryPaymentButton";
 import { CancelOrderButton } from "@/components/orders/CancelOrderButton";
+import { productHref } from "@/domains/catalog/slug";
 
 export const metadata: Metadata = {
   title: "سفارش من",
@@ -91,10 +92,10 @@ function OrderItemRow({ item }: { item: OrderPageItem }) {
   const rowClasses =
     "flex items-center gap-3 rounded-[var(--radius-md)] border border-line p-3 text-[0.88rem]";
 
-  if (!linked) return <div className={rowClasses}>{content}</div>;
+  if (!item.liveProductSlug) return <div className={rowClasses}>{content}</div>;
   return (
     <Link
-      href={`/product/${item.liveProductSlug}`}
+      href={productHref(item.liveProductSlug)}
       className={`${rowClasses} transition-colors duration-200 hover:border-brand/25 hover:bg-header-bg/60`}
     >
       {content}

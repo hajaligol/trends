@@ -1,6 +1,6 @@
 import { cache } from "react";
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import Link from "next/link";
 import { Container } from "@/components/ui/Container";
 import { Breadcrumbs } from "@/components/catalog/Breadcrumbs";
@@ -9,7 +9,8 @@ import { VariantSelector } from "@/components/catalog/VariantSelector";
 import { WishlistToggleButton } from "@/components/ui/WishlistButton";
 import { ScrollToTopOnMount } from "@/components/utility/ScrollToTopOnMount";
 import { ProductGrid } from "@/components/catalog/ProductGrid";
-import { getProductDetailBySlug, getRelatedProducts } from "@/domains/catalog/queries";
+import { getCurrentSlugForFormerSlug, getProductDetailBySlug, getRelatedProducts } from "@/domains/catalog/queries";
+import { productHref } from "@/domains/catalog/slug";
 import { getApprovedReviewsForProduct } from "@/domains/reviews/queries";
 import { ReviewsSection } from "@/components/catalog/ReviewsSection";
 import { ProductSpecs } from "@/components/catalog/ProductSpecs";
@@ -34,7 +35,7 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
 
   const title = product.seoTitle ?? product.title;
   const description = product.seoDescription ?? product.shortDescription ?? `${product.title} — خرید از ترندز`;
-  const canonicalPath = `/product/${product.slug}`;
+  const canonicalPath = productHref(product.slug);
   const firstImage = product.images[0];
 
   return {
@@ -54,7 +55,13 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
 export default async function ProductPage({ params }: ProductPageProps) {
   const { slug } = await params;
   const product = await loadProduct(slug);
-  if (!product) notFound();
+  if (!product) {
+    // A former slug (the product was renamed or moved to a Persian slug)
+    // gets a permanent redirect to the current URL instead of a 404.
+    const currentSlug = await getCurrentSlugForFormerSlug(slug);
+    if (currentSlug) permanentRedirect(productHref(currentSlug));
+    notFound();
+  }
 
   const relatedProducts = await getRelatedProducts(product.categorySlug, product.id);
   const reviewSummary = await getApprovedReviewsForProduct(product.id);
@@ -66,7 +73,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
     description: product.shortDescription ?? undefined,
     brand: product.brand ? { "@type": "Brand", name: product.brand } : undefined,
     image: product.images.map((image) => image.url),
-    url: `${SITE_URL}/product/${product.slug}`,
+    url: `${SITE_URL}${productHref(product.slug)}`,
     // Only present when there's at least one approved review — schema.org
     // recommends omitting `aggregateRating` entirely rather than
     // fabricating a rating from zero reviews.

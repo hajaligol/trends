@@ -24,6 +24,10 @@ import { useCart } from "@/components/cart/CartProvider";
  * `addItemToCart`), so nothing this component displays is trusted as
  * authoritative (rule A.11).
  */
+function isInStock(variant: CatalogProductVariant) {
+  return variant.stockState !== "out-of-stock";
+}
+
 export function VariantSelector({
   variants,
   secondaryAction,
@@ -39,7 +43,8 @@ export function VariantSelector({
   }
   const colors = [...colorMap.entries()].map(([color, colorHex]) => ({ color, colorHex }));
 
-  const firstVariant = variants[0];
+  // Start on a purchasable variant when there is one.
+  const firstVariant = variants.find(isInStock) ?? variants[0];
   const [selectedSize, setSelectedSize] = useState(firstVariant?.size ?? "");
   const [selectedColor, setSelectedColor] = useState(firstVariant?.color ?? "");
   const [quantity, setQuantity] = useState(1);
@@ -53,22 +58,30 @@ export function VariantSelector({
     firstVariant ??
     null;
 
+  /** A size can be chosen only if the selected colour has it in stock. */
+  function isSizeAvailable(size: string) {
+    return variants.some((variant) => variant.size === size && variant.color === selectedColor && isInStock(variant));
+  }
+
   function selectSize(size: string) {
+    if (!isSizeAvailable(size)) return;
     setSelectedSize(size);
+    setQuantity(1);
     setErrorMessage(null);
-    const stillValid = variants.some((variant) => variant.size === size && variant.color === selectedColor);
-    if (!stillValid) {
-      const fallback = variants.find((variant) => variant.size === size);
-      if (fallback) setSelectedColor(fallback.color);
-    }
   }
 
   function selectColor(color: string) {
     setSelectedColor(color);
+    setQuantity(1);
     setErrorMessage(null);
-    const stillValid = variants.some((variant) => variant.size === selectedSize && variant.color === color);
-    if (!stillValid) {
-      const fallback = variants.find((variant) => variant.color === color);
+    // Keep the current size if this colour has it in stock; otherwise move to
+    // the first size of this colour that is in stock (or any size, so an
+    // entirely sold-out colour still shows its «ناموجود» state).
+    const keep = variants.some((variant) => variant.size === selectedSize && variant.color === color && isInStock(variant));
+    if (!keep) {
+      const fallback =
+        variants.find((variant) => variant.color === color && isInStock(variant)) ??
+        variants.find((variant) => variant.color === color);
       if (fallback) setSelectedSize(fallback.size);
     }
   }
@@ -128,21 +141,30 @@ export function VariantSelector({
             سایز: <span className="font-semibold text-ink">{toPersianDigits(selectedSize)}</span>
           </legend>
           <div className="flex flex-wrap gap-2">
-            {sizes.map((size) => (
-              <button
-                key={size}
-                type="button"
-                onClick={() => selectSize(size)}
-                aria-pressed={selectedSize === size}
-                className={`min-h-11 min-w-11 cursor-pointer rounded-full border px-4 text-[0.88rem] transition-colors duration-200 ${
-                  selectedSize === size
-                    ? "border-ink bg-ink text-white"
-                    : "border-line bg-white text-ink hover:border-ink"
-                }`}
-              >
-                {toPersianDigits(size)}
-              </button>
-            ))}
+            {sizes.map((size) => {
+              const available = isSizeAvailable(size);
+              const selected = selectedSize === size;
+              return (
+                <button
+                  key={size}
+                  type="button"
+                  onClick={() => selectSize(size)}
+                  disabled={!available}
+                  aria-pressed={selected}
+                  title={available ? undefined : "ناموجود"}
+                  className={`min-h-11 min-w-11 rounded-full border px-4 text-[0.88rem] transition-colors duration-200 ${
+                    !available
+                      ? `cursor-not-allowed border-line bg-white text-text-secondary line-through opacity-45 ${selected ? "border-ink/40" : ""}`
+                      : selected
+                        ? "cursor-pointer border-ink bg-ink text-white"
+                        : "cursor-pointer border-line bg-white text-ink hover:border-ink"
+                  }`}
+                >
+                  {toPersianDigits(size)}
+                  {!available && <span className="sr-only"> (ناموجود)</span>}
+                </button>
+              );
+            })}
           </div>
         </fieldset>
       )}

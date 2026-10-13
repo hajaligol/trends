@@ -1,6 +1,6 @@
 import { and, eq, ne } from "drizzle-orm";
 import { db, type DbTransaction } from "@/lib/db/client";
-import { productVariants, products } from "@/lib/db/schema";
+import { productSlugRedirects, productVariants, products } from "@/lib/db/schema";
 import type { BulkVariantsInput } from "@/lib/validation/admin";
 import { getPaletteColor } from "@/domains/catalog/color-palette";
 import { pickAvailableSlug, slugifyTitle } from "@/domains/catalog/slug";
@@ -14,17 +14,63 @@ import { buildVariantSku } from "@/domains/catalog/sku";
 
 type Executor = typeof db | DbTransaction;
 
-/** A free slug for a new product: generated from the title, with `-2`,
- * `-3`… on collision, or `product-<code>` if the title has no usable
- * letters at all (then the product code makes it unique). */
-export async function generateProductSlug(title: string, executor: Executor = db): Promise<string> {
-  const base = slugifyTitle(title);
+/** Used when a title has no usable letters at all («محصول», then -2, -3…). */
+const FALLBACK_SLUG = "محصول";
+
+/**
+ * A free slug for a product: the Persian title itself (see `slug.ts`),
+ * with `-2`, `-3`… on collision. A slug is "taken" if a live product OR a
+ * redirect row uses it — otherwise a new product could silently steal an
+ * old URL that is still redirecting somewhere else.
+ *
+ * `exceptProductId` lets a product keep its own slug when its slug is being
+ * regenerated.
+ */
+export async function generateProductSlug(
+  title: string,
+  executor: Executor = db,
+  exceptProductId?: string,
+): Promise<string> {
+  const base = slugifyTitle(title) || FALLBACK_SLUG;
   const isTaken = async (candidate: string) => {
-    const [existing] = await executor.select({ id: products.id }).from(products).where(eq(products.slug, candidate)).limit(1);
-    return Boolean(existing);
+    const [live] = await executor
+      .select({ id: products.id })
+      .from(products)
+      .where(exceptProductId ? and(eq(products.slug, candidate), ne(products.id, exceptProductId)) : eq(products.slug, candidate))
+      .limit(1);
+    if (live) return true;
+    const [redirect] = await executor
+      .select({ id: productSlugRedirects.id })
+      .from(productSlugRedirects)
+      .where(
+        exceptProductId
+          ? and(eq(productSlugRedirects.oldSlug, candidate), ne(productSlugRedirects.productId, exceptProductId))
+          : eq(productSlugRedirects.oldSlug, candidate),
+      )
+      .limit(1);
+    return Boolean(redirect);
   };
-  if (!base) return pickAvailableSlug("product", isTaken);
   return pickAvailableSlug(base, isTaken);
+}
+
+/**
+ * Remembers `oldSlug` as a permanent redirect to `productId`. Idempotent;
+ * if the old slug was already a redirect it is re-pointed at this product.
+ * Also drops any redirect row for the product's *new* slug, so a product
+ * that returns to a former slug does not leave a pointless self-row.
+ */
+export async function recordSlugRedirect(
+  executor: Executor,
+  productId: string,
+  oldSlug: string,
+  newSlug: string,
+): Promise<void> {
+  if (oldSlug === newSlug) return;
+  await executor
+    .insert(productSlugRedirects)
+    .values({ oldSlug, productId })
+    .onConflictDoUpdate({ target: productSlugRedirects.oldSlug, set: { productId } });
+  await executor.delete(productSlugRedirects).where(eq(productSlugRedirects.oldSlug, newSlug));
 }
 
 export type BulkVariantResult = { created: number; skipped: number };
@@ -100,5 +146,12 @@ export async function isSlugTakenByOther(slug: string, productId: string, execut
     .from(products)
     .where(and(eq(products.slug, slug), ne(products.id, productId)))
     .limit(1);
-  return Boolean(existing);
+  if (existing) return true;
+  // Also reserved: another product's former slug (it still redirects there).
+  const [redirect] = await executor
+    .select({ id: productSlugRedirects.id })
+    .from(productSlugRedirects)
+    .where(and(eq(productSlugRedirects.oldSlug, slug), ne(productSlugRedirects.productId, productId)))
+    .limit(1);
+  return Boolean(redirect);
 }

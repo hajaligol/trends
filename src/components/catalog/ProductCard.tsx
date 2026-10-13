@@ -6,6 +6,7 @@ import { DiscountBadge } from "@/components/catalog/DiscountBadge";
 import { StockBadge } from "@/components/catalog/StockBadge";
 import type { CatalogProductSummary } from "@/domains/catalog/queries";
 import { formatToman } from "@/lib/utils/money";
+import { productHref } from "@/domains/catalog/slug";
 
 /**
  * Real catalog product card — mirrors `.product-card` in the prototype,
@@ -25,7 +26,7 @@ export function ProductCard({ product }: { product: CatalogProductSummary }) {
   return (
     <article className="flex flex-col gap-2.5">
       <div className="group relative aspect-[4/5] overflow-hidden rounded-[14px] bg-card-image">
-        <Link href={`/product/${product.slug}`} className="absolute inset-0 block">
+        <Link href={productHref(product.slug)} className="absolute inset-0 block">
           {primaryImage ? (
             <Image
               src={primaryImage.url}
@@ -44,7 +45,7 @@ export function ProductCard({ product }: { product: CatalogProductSummary }) {
         <WishlistButton productId={product.id} productName={product.title} />
       </div>
       <div>
-        <Link href={`/product/${product.slug}`} className="mb-1 block text-[0.95rem] font-semibold">
+        <Link href={productHref(product.slug)} className="mb-1 block text-[0.95rem] font-semibold">
           {product.title}
         </Link>
         <p className="mb-1.5 text-[0.9rem] text-text-secondary">

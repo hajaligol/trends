@@ -1,6 +1,6 @@
 import { FREE_SIZE_LABEL } from "@/domains/catalog/sizes";
 import { findPaletteColor } from "@/domains/catalog/color-palette";
-import { slugifyTitle } from "@/domains/catalog/slug";
+import { asciiSlugify } from "@/domains/catalog/ascii-transliteration";
 
 /**
  * Variant SKUs are derived from the product's unique code («کد کالا»):
@@ -14,7 +14,7 @@ export function sizeToken(size: string): string {
   if (trimmed === FREE_SIZE_LABEL || trimmed.replace(/[‌\s]/g, "") === FREE_SIZE_LABEL.replace(/[‌\s]/g, "")) return "FREE";
   const ascii = trimmed.toUpperCase().replace(/[^A-Z0-9]+/g, "");
   if (ascii && /^[\x20-\x7e]+$/.test(trimmed)) return ascii;
-  const transliterated = slugifyTitle(trimmed).replace(/-/g, "").toUpperCase();
+  const transliterated = asciiSlugify(trimmed).replace(/-/g, "").toUpperCase();
   return transliterated || "X";
 }
 
@@ -22,7 +22,7 @@ export function colorToken(color: { name: string; hex: string | null }): string 
   const palette = findPaletteColor({ name: color.name, hex: color.hex });
   if (palette) return palette.code;
   if (color.hex) return `C${color.hex.replace("#", "").toUpperCase()}`;
-  return slugifyTitle(color.name).replace(/-/g, "").toUpperCase().slice(0, 6) || "CLR";
+  return asciiSlugify(color.name).replace(/-/g, "").toUpperCase().slice(0, 6) || "CLR";
 }
 
 export function buildVariantSku(
