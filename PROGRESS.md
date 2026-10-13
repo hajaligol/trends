@@ -1,5 +1,31 @@
 # Trends Progress Report
 
+## Latest change: demo reviews for all products (user-requested)
+Status: COMPLETE. `typecheck` and `eslint` clean. Verified on Postgres 16
+(fresh migrate + `db:seed`, then `db:seed-reviews`): 176 products, every one
+with 3-7 approved reviews (917 total, ratings skewed 4-5 with some 1-3),
+re-run inserts 0 duplicates, `--reset` rebuilds identically, and a product
+page returns 200 showing the reviews tab with its count.
+
+- **New command** `npm run db:seed-reviews` (additive, idempotent) and
+  `npm run db:seed-reviews -- --reset` (deletes only reviews written by the
+  demo reviewer accounts, then re-seeds). Code:
+  `src/lib/db/seed-reviews-data.ts`, `src/lib/db/seed-reviews.ts`.
+- **Reviewer accounts**: `reviews` has a DB-unique (user_id, product_id), so
+  30 fictional `customer` users are created (mobiles `+989900000001..30`).
+  Their password hash is bcrypt of discarded random bytes: nobody can log in.
+- **Reviews**: `approved`, `isVerifiedPurchase = false` (no fake orders are
+  created, so the verified-purchase badge never shows on demo content),
+  `moderationNote = "demo seed"`. Texts are Persian, picked per product group
+  (clothing/shoes/bags/accessories) and rating. Deterministic per product slug;
+  dates spread over the last 120 days (never before the product existed).
+- Products added later get reviews by re-running the command.
+- Demo reviewer accounts will appear in `/admin/customers`; remove them (or
+  the reviews) before launch with real data. `db:seed` / `db:seed-catalog` do
+  not run this automatically.
+
+---
+
 ## Latest change: new demo catalog with brands (user-requested)
 Status: COMPLETE. `typecheck`, `lint`, `next build`, 147 unit and 75
 integration tests pass. Verified on Postgres 16: 20 brands, 176 products
