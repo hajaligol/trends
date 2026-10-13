@@ -190,6 +190,7 @@ const IMAGE_COLUMNS = {
   productId: productImages.productId,
   url: productImages.url,
   altText: productImages.altText,
+  color: productImages.color,
 } as const;
 
 export type CatalogProductSummary = {
@@ -365,6 +366,9 @@ export async function getTopSellingProducts(limit?: number): Promise<CatalogProd
 }
 
 export type CatalogProductDetail = CatalogProductSummary & {
+  /** Every image with its colour scope; the page picks per selected colour
+   * (see `gallery.ts`). `images` (from the summary) stays the flat list. */
+  galleryImages: Array<{ url: string; altText: string; color: string | null }>;
   /** Public «کد کالا» — shown on the product page and searchable. */
   productCode: number;
   shortDescription: string | null;
@@ -447,10 +451,12 @@ export async function getProductDetailBySlug(rawSlug: string): Promise<CatalogPr
 
   const variants = variantRows.map(toVariant);
   const images = imageRows.map((image) => ({ url: image.url, altText: image.altText }));
+  const galleryImages = imageRows.map((image) => ({ url: image.url, altText: image.altText, color: image.color }));
   const summary = buildSummary(row, variants, images);
 
   return {
     ...summary,
+    galleryImages,
     productCode: row.productCode,
     shortDescription: row.shortDescription,
     longDescription: row.longDescription,

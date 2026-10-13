@@ -39,6 +39,12 @@ export function ProductVariantsAndImages({
   const [editingVariantId, setEditingVariantId] = useState<string | null>(null);
   const [isAddingImage, setIsAddingImage] = useState(false);
 
+  // Distinct colours of this product, in the order they were first defined.
+  const colors = variants.reduce<Array<{ color: string; colorHex: string | null }>>((list, variant) => {
+    if (!list.some((entry) => entry.color === variant.color)) list.push({ color: variant.color, colorHex: variant.colorHex });
+    return list;
+  }, []);
+
   return (
     <>
       <Card
@@ -165,7 +171,7 @@ export function ProductVariantsAndImages({
       <Card
         id="images"
         title="تصاویر محصول"
-        description="تصویر اصلی در کارت محصول و ابتدای گالری نمایش داده می‌شود. اگر تصویری نباشد، یک جای‌نما دیده می‌شود."
+        description="هر تصویر را می‌توان به یک رنگ اختصاص داد؛ با انتخاب آن رنگ در صفحه‌ی محصول فقط تصاویر همان رنگ نمایش داده می‌شود. تصاویر «همه‌ی رنگ‌ها» فقط برای رنگ‌هایی دیده می‌شوند که تصویر اختصاصی ندارند. اگر تصویری نباشد، یک جای‌نما دیده می‌شود."
         actions={
           !isAddingImage && (
             <button type="button" onClick={() => setIsAddingImage(true)} className={adminButton("secondary", "sm")}>
@@ -176,7 +182,7 @@ export function ProductVariantsAndImages({
         }
       >
         <div className="flex flex-col gap-5">
-          {isAddingImage && <ImageAddForm productId={productId} variants={variants} onClose={() => setIsAddingImage(false)} />}
+          {isAddingImage && <ImageAddForm productId={productId} colors={colors} onClose={() => setIsAddingImage(false)} />}
 
           {images.length === 0 ? (
             !isAddingImage && (
@@ -194,6 +200,16 @@ export function ProductVariantsAndImages({
                     {image.isPrimary && (
                       <span className="absolute start-2 top-2 rounded-full bg-ink px-2.5 py-1 text-[0.7rem] font-semibold text-white">اصلی</span>
                     )}
+                    <span className="absolute start-2 bottom-2 inline-flex items-center gap-1.5 rounded-full bg-white/90 px-2.5 py-1 text-[0.7rem] font-medium text-ink">
+                      {image.color && colors.find((entry) => entry.color === image.color)?.colorHex && (
+                        <span
+                          aria-hidden="true"
+                          style={{ backgroundColor: colors.find((entry) => entry.color === image.color)?.colorHex ?? undefined }}
+                          className="h-3 w-3 rounded-full border border-ink/15"
+                        />
+                      )}
+                      {image.color ?? "همه‌ی رنگ‌ها"}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between gap-2 p-2.5">
                     <span className="truncate text-[0.76rem] text-text-secondary" title={image.altText}>
@@ -262,7 +278,15 @@ function AddVariantsPanel({
 
 const imageInitialState: ActionResult = { ok: true };
 
-function ImageAddForm({ productId, variants, onClose }: { productId: string; variants: ProductVariant[]; onClose: () => void }) {
+function ImageAddForm({
+  productId,
+  colors,
+  onClose,
+}: {
+  productId: string;
+  colors: Array<{ color: string; colorHex: string | null }>;
+  onClose: () => void;
+}) {
   // Bumping the key remounts the form, which clears the file picker and
   // fields after a successful add so the next image starts blank.
   const [formKey, setFormKey] = useState(0);
@@ -285,11 +309,11 @@ function ImageAddForm({ productId, variants, onClose }: { productId: string; var
         <div className="flex flex-col gap-4">
           <TextField label="متن جایگزین (alt)" name="altText" required hint="توضیح کوتاه تصویر برای نابینایان و موتورهای جستجو؛ مثلاً «پیراهن آبی از روبه‌رو»." />
           <FieldGrid>
-            <SelectField label="مخصوص کدام نوع؟" name="variantId" defaultValue="" optional hint="اگر خالی بماند، برای همه انواع نمایش داده می‌شود.">
-              <option value="">همه انواع</option>
-              {variants.map((variant) => (
-                <option key={variant.id} value={variant.id}>
-                  {variant.size} / {variant.color}
+            <SelectField label="مخصوص کدام رنگ؟" name="color" defaultValue="" optional hint="با انتخاب این رنگ در فروشگاه، همین تصویر نمایش داده می‌شود. «همه‌ی رنگ‌ها» فقط برای رنگ‌های بدون تصویر اختصاصی دیده می‌شود.">
+              <option value="">همه‌ی رنگ‌ها</option>
+              {colors.map(({ color }) => (
+                <option key={color} value={color}>
+                  {color}
                 </option>
               ))}
             </SelectField>

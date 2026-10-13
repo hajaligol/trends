@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { CartIcon } from "@/components/ui/icons";
 import { AddedToCartModal } from "@/components/catalog/AddedToCartModal";
 import { useCart } from "@/components/cart/CartProvider";
+import { useProductColor } from "@/components/catalog/ProductColorContext";
 
 /**
  * Size/color picker plus a real "add to cart" control, for a product's
@@ -46,7 +47,8 @@ export function VariantSelector({
   // Start on a purchasable variant when there is one.
   const firstVariant = variants.find(isInStock) ?? variants[0];
   const [selectedSize, setSelectedSize] = useState(firstVariant?.size ?? "");
-  const [selectedColor, setSelectedColor] = useState(firstVariant?.color ?? "");
+  // The colour is shared with the gallery, which shows that colour's photos.
+  const { selectedColor, setSelectedColor } = useProductColor();
   const [quantity, setQuantity] = useState(1);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 

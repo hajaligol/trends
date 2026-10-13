@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Container } from "@/components/ui/Container";
 import { Breadcrumbs } from "@/components/catalog/Breadcrumbs";
 import { ProductGallery } from "@/components/catalog/ProductGallery";
+import { ProductColorProvider } from "@/components/catalog/ProductColorContext";
 import { VariantSelector } from "@/components/catalog/VariantSelector";
 import { WishlistToggleButton } from "@/components/ui/WishlistButton";
 import { ScrollToTopOnMount } from "@/components/utility/ScrollToTopOnMount";
@@ -120,51 +121,53 @@ export default async function ProductPage({ params }: ProductPageProps) {
           ]}
         />
 
-        <div className="grid gap-8 lg:grid-cols-2 lg:gap-14">
-          <ProductGallery title={product.title} images={product.images} />
+        <ProductColorProvider variants={product.variants}>
+          <div className="grid gap-8 lg:grid-cols-2 lg:gap-14">
+            <ProductGallery title={product.title} images={product.galleryImages} />
 
-          <div className="flex flex-col gap-6 lg:py-2">
-            <div className="flex flex-col gap-2">
-              {product.brand && <p className="text-[0.88rem] text-text-secondary">{product.brand}</p>}
-              <h1 className="m-0 text-[clamp(1.5rem,3vw,2.1rem)] leading-snug font-bold">{product.title}</h1>
-              <p className="m-0 text-[0.82rem] text-text-secondary">کد کالا: {toPersianDigits(product.productCode)}</p>
-              {reviewSummary.averageRating !== null && (
-                <a
-                  href="#reviews"
-                  className="inline-flex w-fit items-center gap-2 rounded-full text-[0.85rem] text-text-secondary hover:text-ink"
-                >
-                  <StarRating rating={reviewSummary.averageRating} />
-                  <span>
-                    {toPersianDigits(reviewSummary.averageRating).replace(".", "٫")} (
-                    {toPersianDigits(reviewSummary.approvedCount)} دیدگاه)
-                  </span>
-                </a>
+            <div className="flex flex-col gap-6 lg:py-2">
+              <div className="flex flex-col gap-2">
+                {product.brand && <p className="text-[0.88rem] text-text-secondary">{product.brand}</p>}
+                <h1 className="m-0 text-[clamp(1.5rem,3vw,2.1rem)] leading-snug font-bold">{product.title}</h1>
+                <p className="m-0 text-[0.82rem] text-text-secondary">کد کالا: {toPersianDigits(product.productCode)}</p>
+                {reviewSummary.averageRating !== null && (
+                  <a
+                    href="#reviews"
+                    className="inline-flex w-fit items-center gap-2 rounded-full text-[0.85rem] text-text-secondary hover:text-ink"
+                  >
+                    <StarRating rating={reviewSummary.averageRating} />
+                    <span>
+                      {toPersianDigits(reviewSummary.averageRating).replace(".", "٫")} (
+                      {toPersianDigits(reviewSummary.approvedCount)} دیدگاه)
+                    </span>
+                  </a>
+                )}
+              </div>
+
+              {product.shortDescription && (
+                <p className="text-[0.95rem] leading-8 text-text-secondary">{product.shortDescription}</p>
               )}
+
+              <div className="border-t border-line pt-6">
+                <VariantSelector
+                  variants={product.variants}
+                  secondaryAction={
+                    <WishlistToggleButton productId={product.id} productName={product.title} />
+                  }
+                />
+              </div>
+
+              <p className="flex flex-wrap gap-x-5 gap-y-1 border-t border-line pt-5 text-[0.85rem] text-text-secondary">
+                <Link href="/shipping-policy" className="underline-offset-4 hover:text-ink hover:underline">
+                  راهنمای ارسال
+                </Link>
+                <Link href="/returns-policy" className="underline-offset-4 hover:text-ink hover:underline">
+                  شرایط بازگشت کالا
+                </Link>
+              </p>
             </div>
-
-            {product.shortDescription && (
-              <p className="text-[0.95rem] leading-8 text-text-secondary">{product.shortDescription}</p>
-            )}
-
-            <div className="border-t border-line pt-6">
-              <VariantSelector
-                variants={product.variants}
-                secondaryAction={
-                  <WishlistToggleButton productId={product.id} productName={product.title} />
-                }
-              />
-            </div>
-
-            <p className="flex flex-wrap gap-x-5 gap-y-1 border-t border-line pt-5 text-[0.85rem] text-text-secondary">
-              <Link href="/shipping-policy" className="underline-offset-4 hover:text-ink hover:underline">
-                راهنمای ارسال
-              </Link>
-              <Link href="/returns-policy" className="underline-offset-4 hover:text-ink hover:underline">
-                شرایط بازگشت کالا
-              </Link>
-            </p>
           </div>
-        </div>
+        </ProductColorProvider>
 
         <div className="mt-14 border-t border-line pt-10 lg:mt-20">
           <ProductTabs

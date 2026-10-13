@@ -3,6 +3,8 @@
 import { useState } from "react";
 import Image from "next/image";
 import { AssetSlot } from "@/components/ui/AssetSlot";
+import { useProductColor } from "@/components/catalog/ProductColorContext";
+import { selectGalleryImages, type ColoredImage } from "@/domains/catalog/gallery";
 
 /**
  * No real product photography exists yet (see catalog `seed.ts`), so in
@@ -10,13 +12,15 @@ import { AssetSlot } from "@/components/ui/AssetSlot";
  * branch today. The real-image path is still implemented so Phase 11's
  * admin media upload has a working gallery to plug into.
  */
-export function ProductGallery({
-  title,
-  images,
-}: {
-  title: string;
-  images: Array<{ url: string; altText: string }>;
-}) {
+export function ProductGallery({ title, images }: { title: string; images: ColoredImage[] }) {
+  const { selectedColor } = useProductColor();
+  const colorImages = selectGalleryImages(images, selectedColor);
+  // Keyed by colour so switching colour starts again on that colour's first
+  // photo instead of carrying over the previous colour's active index.
+  return <GalleryView key={selectedColor} title={title} images={colorImages} />;
+}
+
+function GalleryView({ title, images }: { title: string; images: ColoredImage[] }) {
   const [activeIndex, setActiveIndex] = useState(0);
 
   // Caps the image's rendered width (height then follows from the 4/5

@@ -166,8 +166,12 @@ export function parseBulkVariantsField(
 export const productImageSchema = z.object({
   url: z.string().trim().min(1, "آدرس تصویر را وارد کنید").max(2000),
   altText: z.string().trim().min(1, "متن جایگزین (alt) را وارد کنید").max(300),
-  variantId: z
-    .union([z.string().uuid(), z.literal("")])
+  // Colour name this photo belongs to (one of the product's variant colours,
+  // checked against the DB in `createImageAction`); empty = shared image.
+  color: z
+    .string()
+    .trim()
+    .max(60)
     .optional()
     .transform((value) => (value ? value : null)),
   displayOrder: z.coerce.number().int().default(0),

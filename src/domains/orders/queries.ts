@@ -13,6 +13,7 @@ import {
   type OrderItem,
   type OrderStatusHistoryRow,
 } from "@/lib/db/schema";
+import { pickImageForColor } from "@/domains/catalog/gallery";
 import type { ShippingMethod } from "@/domains/shipping/methods";
 import { CouponInvalidError, recordCouponRedemption, validateCoupon } from "@/domains/promotions/queries";
 import { canAdminTransition, canCustomerCancel, type OrderStatus } from "@/domains/orders/lifecycle";
@@ -159,13 +160,20 @@ export async function createOrderFromCart(
     // `getCartSummary` — one query instead of N.
     const productIds = [...new Set(lines.map((line) => line.productId))];
     const imageRows = await tx
-      .select({ productId: productImages.productId, url: productImages.url })
+      .select({
+        productId: productImages.productId,
+        url: productImages.url,
+        altText: productImages.altText,
+        color: productImages.color,
+      })
       .from(productImages)
       .where(inArray(productImages.productId, productIds))
       .orderBy(productImages.displayOrder);
-    const firstImageByProduct = new Map<string, string>();
+    const imagesByProduct = new Map<string, typeof imageRows>();
     for (const image of imageRows) {
-      if (!firstImageByProduct.has(image.productId)) firstImageByProduct.set(image.productId, image.url);
+      const bucket = imagesByProduct.get(image.productId);
+      if (bucket) bucket.push(image);
+      else imagesByProduct.set(image.productId, [image]);
     }
 
     // Conditional, concurrency-safe decrement — see the function header
@@ -266,7 +274,7 @@ export async function createOrderFromCart(
       sku: line.sku,
       size: line.size,
       color: line.color,
-      imageUrl: firstImageByProduct.get(line.productId) ?? null,
+      imageUrl: pickImageForColor(imagesByProduct.get(line.productId) ?? [], line.color)?.url ?? null,
       unitPriceToman: line.priceToman,
       compareAtPriceToman: line.compareAtPriceToman,
       quantity: line.requestedQuantity,

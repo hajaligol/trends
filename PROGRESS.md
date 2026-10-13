@@ -1,5 +1,53 @@
 # Trends Progress Report
 
+## Latest change: colour-specific product images (out-of-phase, user-requested)
+
+Status: COMPLETE. `typecheck`, `lint`, `next build`, 137 unit and 62
+integration tests pass. Migration 0014 applied on a fresh Postgres; product
+page checked over HTTP against a production build (only the default colour's
+images are rendered in `<img>` tags).
+
+- **Behaviour**: picking a colour on the product page shows only that
+  colour's photos (and resets to its first photo). A colour with no photos of
+  its own falls back to the *shared* images (those saved as «همه‌ی رنگ‌ها»);
+  with neither, the placeholder shows. Rules live in
+  `src/domains/catalog/gallery.ts` (`selectGalleryImages`,
+  `pickImageForColor`; unit-tested in `tests/unit/product-gallery.test.ts`).
+- **Why colour, not variant**: variants are size×colour, so a per-variant
+  image would have to be uploaded once per size. New column
+  `product_images.color` (text, null = shared) holds the same text as
+  `product_variants.color`. Migration `0014_product_image_color` adds the
+  column + `(product_id, color)` index and backfills `color` from the legacy
+  `variant_id`. `variant_id` is kept but deprecated (no longer read/written).
+- **Product page**: new client provider `ProductColorContext`
+  (`ProductColorProvider` / `useProductColor`) shares the selected colour
+  between `ProductGallery` and `VariantSelector` (siblings in a Server
+  Component). `getProductDetailBySlug` now also returns `galleryImages`
+  (with `color`); `images` is unchanged for cards/JSON-LD/OG.
+- **Cart + orders**: a line's thumbnail is now the photo of the colour that
+  was added (cart summary, and the `order_items.imageUrl` snapshot at order
+  time) instead of the product's first image.
+- **Admin** (`ProductVariantsAndImages`): the image form's «مخصوص کدام نوع؟»
+  select became «مخصوص کدام رنگ؟» (the product's colours + «همه‌ی رنگ‌ها»);
+  each image card shows its colour. `createImageAction` rejects a colour the
+  product doesn't have. `updateVariantAction` carries a colour's photos over
+  when the last variant of that colour is renamed.
+
+Deploy: run `npm run db:migrate`, then restart/redeploy so cached product
+pages are rebuilt. Existing images stay shared until an admin assigns colours
+(except legacy per-variant images, which are backfilled).
+
+Known limitations:
+- Deleting every variant of a colour leaves its photos in the DB (hidden on
+  the storefront, still visible in admin with the colour label).
+- Product cards/listing still use the product's first image (not
+  colour-specific); swatch dots on cards don't switch images.
+- The selected colour is not in the URL (no `?color=` deep link).
+- The admin UI flow (Server Actions in a browser) was not exercised
+  end-to-end; the domain/DB path and storefront render were.
+
+---
+
 ## Latest change: Persian product slugs (out-of-phase, user-requested)
 
 Status: COMPLETE. `typecheck`, `lint`, `next build`, 129 unit and 62

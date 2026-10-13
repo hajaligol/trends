@@ -1,5 +1,6 @@
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db/client";
+import { pickImageForColor } from "@/domains/catalog/gallery";
 import { cartItems, carts, productImages, productVariants, products, type Cart } from "@/lib/db/schema";
 import type { StockState } from "@/domains/catalog/queries";
 
@@ -150,16 +151,23 @@ export async function getCartSummary(cartId: string | null): Promise<CartSummary
 
   const productIds = [...new Set(rows.map((row) => row.productId))];
   const imageRows = await db
-    .select({ productId: productImages.productId, url: productImages.url, altText: productImages.altText })
+    .select({
+      productId: productImages.productId,
+      url: productImages.url,
+      altText: productImages.altText,
+      color: productImages.color,
+    })
     .from(productImages)
     .where(inArray(productImages.productId, productIds))
     .orderBy(asc(productImages.displayOrder));
 
-  const firstImageByProduct = new Map<string, { url: string; altText: string }>();
+  // Per product, in display order, so each line can pick the photo of the
+  // colour that was actually added (`pickImageForColor`).
+  const imagesByProduct = new Map<string, typeof imageRows>();
   for (const image of imageRows) {
-    if (!firstImageByProduct.has(image.productId)) {
-      firstImageByProduct.set(image.productId, { url: image.url, altText: image.altText });
-    }
+    const bucket = imagesByProduct.get(image.productId);
+    if (bucket) bucket.push(image);
+    else imagesByProduct.set(image.productId, [image]);
   }
 
   let subtotalToman = 0;
@@ -169,7 +177,7 @@ export async function getCartSummary(cartId: string | null): Promise<CartSummary
     const isAvailable = row.variantActive && row.productActive && row.stock > 0;
     const effectiveQuantity = isAvailable ? Math.min(row.requestedQuantity, row.stock) : 0;
     const lineTotalToman = effectiveQuantity * row.priceToman;
-    const image = firstImageByProduct.get(row.productId) ?? null;
+    const image = pickImageForColor(imagesByProduct.get(row.productId) ?? [], row.color);
 
     subtotalToman += lineTotalToman;
     itemCount += effectiveQuantity;

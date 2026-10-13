@@ -99,6 +99,13 @@
       "when": 1791882238711,
       "tag": "0013_product_slug_redirects",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1791884998248,
+      "tag": "0014_product_image_color",
+      "breakpoints": true
     }
   ]
 }

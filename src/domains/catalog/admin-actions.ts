@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { auth } from "@/lib/auth/config";
 import { db } from "@/lib/db/client";
 import { productImages, productVariants, products } from "@/lib/db/schema";
@@ -273,10 +273,30 @@ export async function updateVariantAction(_prev: ActionResult, formData: FormDat
   void _colorCode;
 
   try {
-    await db
-      .update(productVariants)
-      .set({ ...fields, color, colorHex, updatedAt: new Date() })
-      .where(eq(productVariants.id, id));
+    await db.transaction(async (tx) => {
+      await tx
+        .update(productVariants)
+        .set({ ...fields, color, colorHex, updatedAt: new Date() })
+        .where(eq(productVariants.id, id));
+
+      // Photos are scoped by colour *name*. If this edit renamed the last
+      // variant of a colour, carry that colour's photos over to the new name
+      // so they don't silently become orphans. (If other sizes still use the
+      // old colour, the photos correctly stay with it.)
+      if (color !== existing.color) {
+        const [stillUsed] = await tx
+          .select({ id: productVariants.id })
+          .from(productVariants)
+          .where(and(eq(productVariants.productId, existing.productId), eq(productVariants.color, existing.color)))
+          .limit(1);
+        if (!stillUsed) {
+          await tx
+            .update(productImages)
+            .set({ color })
+            .where(and(eq(productImages.productId, existing.productId), eq(productImages.color, existing.color)));
+        }
+      }
+    });
   } catch {
     // The DB's `product_variants_product_size_color_idx` unique constraint
     // is the real invariant enforcer; this is just a friendly message.
@@ -333,8 +353,22 @@ export async function createImageAction(_prev: ActionResult, formData: FormData)
   const parsed = productImageSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { ok: false, error: fieldErrors(parsed.error) };
 
+  // A colour-scoped image must name a colour this product really has —
+  // otherwise it would be stored but never shown.
+  if (parsed.data.color !== null) {
+    const [match] = await db
+      .select({ id: productVariants.id })
+      .from(productVariants)
+      .where(and(eq(productVariants.productId, productId), eq(productVariants.color, parsed.data.color)))
+      .limit(1);
+    if (!match) return { ok: false, error: "رنگ انتخاب‌شده برای این محصول وجود ندارد" };
+  }
+
   await db.insert(productImages).values({ ...parsed.data, productId });
-  await recordAuditLog(session.user, "product_image.create", "product_image", null, { productId });
+  await recordAuditLog(session.user, "product_image.create", "product_image", null, {
+    productId,
+    color: parsed.data.color,
+  });
 
   const [product] = await db.select({ slug: products.slug }).from(products).where(eq(products.id, productId)).limit(1);
   revalidateStorefrontForProduct(product?.slug);
