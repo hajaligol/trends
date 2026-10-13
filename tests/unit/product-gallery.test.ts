@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { pickImageForColor, selectGalleryImages, type ColoredImage } from "@/domains/catalog/gallery";
+import { pickImageForColor, resolveRequestedColor, selectGalleryImages, type ColoredImage } from "@/domains/catalog/gallery";
 
 const img = (url: string, color: string | null): ColoredImage => ({ url, altText: url, color });
 
@@ -49,5 +49,21 @@ describe("pickImageForColor", () => {
   it("falls back to the first shared image, then null", () => {
     expect(pickImageForColor(images, "قرمز")?.url).toBe("shared-1");
     expect(pickImageForColor([img("blue-1", "آبی")], "مشکی")).toBeNull();
+  });
+});
+
+describe("resolveRequestedColor", () => {
+  const colors = ["مشکی", "آبی"];
+  it("accepts a colour the product has", () => {
+    expect(resolveRequestedColor(colors, "آبی")).toBe("آبی");
+  });
+  it("uses the first value when the param is repeated", () => {
+    expect(resolveRequestedColor(colors, ["مشکی", "آبی"])).toBe("مشکی");
+  });
+  it("ignores missing, empty, unknown or tampered values", () => {
+    expect(resolveRequestedColor(colors, undefined)).toBeNull();
+    expect(resolveRequestedColor(colors, "")).toBeNull();
+    expect(resolveRequestedColor(colors, "قرمز")).toBeNull();
+    expect(resolveRequestedColor(colors, "<script>")).toBeNull();
   });
 });

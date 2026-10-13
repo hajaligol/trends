@@ -26,12 +26,26 @@ export function initialColorFor(variants: CatalogProductVariant[]): string {
 
 export function ProductColorProvider({
   variants,
+  initialColor,
   children,
 }: {
   variants: CatalogProductVariant[];
+  /** Colour from the validated `?color=` param (e.g. a card swatch click), if any. */
+  initialColor?: string | null;
   children: ReactNode;
 }) {
-  const [selectedColor, setSelectedColor] = useState(() => initialColorFor(variants));
+  const [selectedColor, setSelected] = useState(() => initialColor ?? initialColorFor(variants));
+
+  // Keep `?color=` in the address bar in step with the choice so the URL can
+  // be shared or reloaded. `replaceState` (not a navigation): no server
+  // round-trip and no extra history entries. Display state only.
+  const setSelectedColor = (color: string) => {
+    setSelected(color);
+    const url = new URL(window.location.href);
+    url.searchParams.set("color", color);
+    window.history.replaceState(window.history.state, "", url);
+  };
+
   return <ProductColorContext.Provider value={{ selectedColor, setSelectedColor }}>{children}</ProductColorContext.Provider>;
 }
 

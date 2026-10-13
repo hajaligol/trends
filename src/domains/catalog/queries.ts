@@ -2,6 +2,7 @@ import { cache } from "react";
 import { toLatinDigits } from "@/lib/utils/digits";
 import { and, asc, desc, eq, ilike, inArray, ne, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/lib/db/client";
+import type { ColoredImage } from "@/domains/catalog/gallery";
 import { categories, orderItems, orders, productImages, productSlugRedirects, products, productVariants } from "@/lib/db/schema";
 import { discountPercent } from "@/lib/utils/money";
 import {
@@ -193,6 +194,20 @@ const IMAGE_COLUMNS = {
   color: productImages.color,
 } as const;
 
+export type CatalogColorOption = {
+  color: string;
+  colorHex: string | null;
+  image: { url: string; altText: string } | null;
+  /** In-stock sizes of this colour, in variant order. */
+  sizes: string[];
+};
+
+const toColoredImage = (image: { url: string; altText: string; color: string | null }): ColoredImage => ({
+  url: image.url,
+  altText: image.altText,
+  color: image.color,
+});
+
 export type CatalogProductSummary = {
   id: string;
   slug: string;
@@ -208,6 +223,12 @@ export type CatalogProductSummary = {
   /** Distinct variant colors, for swatch dots on cards. */
   colorHexes: string[];
   images: Array<{ url: string; altText: string }>;
+  /** One entry per colour, for the card's hover panel: the colour's own
+   * first photo (null = use the card's default image) and the sizes that
+   * are in stock in that colour. Display data only. */
+  colorOptions: CatalogColorOption[];
+  /** First colour-less image — what a colour without photos falls back to. */
+  sharedImage: { url: string; altText: string } | null;
   /** Aggregate across active variants — see `aggregateStockState`. */
   stockState: StockState;
 };
@@ -215,7 +236,7 @@ export type CatalogProductSummary = {
 function buildSummary(
   product: { id: string; slug: string; title: string; categorySlug: string },
   variants: CatalogProductVariant[],
-  images: Array<{ url: string; altText: string }>,
+  images: ColoredImage[],
 ): CatalogProductSummary {
   const fromPriceToman =
     variants.length > 0 ? Math.min(...variants.map((variant) => variant.priceToman)) : null;
@@ -232,15 +253,37 @@ function buildSummary(
   const stockState =
     variants.length > 0 ? aggregateStockState(variants.map((variant) => variant.stockState)) : "out-of-stock";
 
+  const colorOptions: CatalogColorOption[] = [];
+  for (const variant of variants) {
+    let option = colorOptions.find((entry) => entry.color === variant.color);
+    if (!option) {
+      // Only the colour's own photo; shared images are the card default.
+      const own = images.find((image) => image.color === variant.color);
+      option = {
+        color: variant.color,
+        colorHex: variant.colorHex,
+        image: own ? { url: own.url, altText: own.altText } : null,
+        sizes: [],
+      };
+      colorOptions.push(option);
+    }
+    if (variant.stockState !== "out-of-stock" && !option.sizes.includes(variant.size)) option.sizes.push(variant.size);
+  }
+
   return {
     id: product.id,
     slug: product.slug,
     title: product.title,
     categorySlug: product.categorySlug,
+    colorOptions,
+    sharedImage: (() => {
+      const shared = images.find((image) => image.color === null);
+      return shared ? { url: shared.url, altText: shared.altText } : null;
+    })(),
     fromPriceToman,
     discountPercent: cheapest ? discountPercent(cheapest.compareAtPriceToman, cheapest.priceToman) : 0,
     colorHexes,
-    images,
+    images: images.map((image) => ({ url: image.url, altText: image.altText })),
     stockState,
   };
 }
@@ -300,7 +343,7 @@ async function loadProductSummaries(
     buildSummary(
       row,
       (variantsByProduct.get(row.id) ?? []).map(toVariant),
-      (imagesByProduct.get(row.id) ?? []).map((image) => ({ url: image.url, altText: image.altText })),
+      (imagesByProduct.get(row.id) ?? []).map(toColoredImage),
     ),
   );
 }
@@ -450,9 +493,8 @@ export async function getProductDetailBySlug(rawSlug: string): Promise<CatalogPr
   ]);
 
   const variants = variantRows.map(toVariant);
-  const images = imageRows.map((image) => ({ url: image.url, altText: image.altText }));
-  const galleryImages = imageRows.map((image) => ({ url: image.url, altText: image.altText, color: image.color }));
-  const summary = buildSummary(row, variants, images);
+  const galleryImages = imageRows.map(toColoredImage);
+  const summary = buildSummary(row, variants, galleryImages);
 
   return {
     ...summary,
@@ -532,7 +574,7 @@ export async function getRelatedProducts(
     buildSummary(
       row,
       (variantsByProduct.get(row.id) ?? []).map(toVariant),
-      (imagesByProduct.get(row.id) ?? []).map((image) => ({ url: image.url, altText: image.altText })),
+      (imagesByProduct.get(row.id) ?? []).map(toColoredImage),
     ),
   );
 }
@@ -624,7 +666,7 @@ export async function searchProducts(params: {
     buildSummary(
       row,
       (variantsByProduct.get(row.id) ?? []).map(toVariant),
-      (imagesByProduct.get(row.id) ?? []).map((image) => ({ url: image.url, altText: image.altText })),
+      (imagesByProduct.get(row.id) ?? []).map(toColoredImage),
     ),
   );
 
@@ -789,7 +831,7 @@ export async function getProductsByCategorySlug(params: {
     buildSummary(
       row,
       rawVariants.map(toVariant),
-      (imagesByProduct.get(row.id) ?? []).map((image) => ({ url: image.url, altText: image.altText })),
+      (imagesByProduct.get(row.id) ?? []).map(toColoredImage),
     ),
   );
 

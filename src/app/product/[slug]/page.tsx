@@ -12,6 +12,7 @@ import { ScrollToTopOnMount } from "@/components/utility/ScrollToTopOnMount";
 import { ProductGrid } from "@/components/catalog/ProductGrid";
 import { getCurrentSlugForFormerSlug, getProductDetailBySlug, getRelatedProducts } from "@/domains/catalog/queries";
 import { productHref } from "@/domains/catalog/slug";
+import { resolveRequestedColor } from "@/domains/catalog/gallery";
 import { getApprovedReviewsForProduct } from "@/domains/reviews/queries";
 import { ReviewsSection } from "@/components/catalog/ReviewsSection";
 import { ProductSpecs } from "@/components/catalog/ProductSpecs";
@@ -23,6 +24,7 @@ import { safeJsonLd } from "@/lib/utils/safe-json-ld";
 
 type ProductPageProps = {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ color?: string | string[] }>;
 };
 
 /** `cache()`'d so `generateMetadata` and the page body share one fetch
@@ -53,8 +55,9 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
   };
 }
 
-export default async function ProductPage({ params }: ProductPageProps) {
+export default async function ProductPage({ params, searchParams }: ProductPageProps) {
   const { slug } = await params;
+  const { color: requestedColor } = await searchParams;
   const product = await loadProduct(slug);
   if (!product) {
     // A former slug (the product was renamed or moved to a Persian slug)
@@ -121,7 +124,13 @@ export default async function ProductPage({ params }: ProductPageProps) {
           ]}
         />
 
-        <ProductColorProvider variants={product.variants}>
+        <ProductColorProvider
+          variants={product.variants}
+          initialColor={resolveRequestedColor(
+            product.variants.map((variant) => variant.color),
+            requestedColor,
+          )}
+        >
           <div className="grid gap-8 lg:grid-cols-2 lg:gap-14">
             <ProductGallery title={product.title} images={product.galleryImages} />
 

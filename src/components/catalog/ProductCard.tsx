@@ -1,6 +1,5 @@
-import Image from "next/image";
 import Link from "next/link";
-import { AssetSlot } from "@/components/ui/AssetSlot";
+import { ProductCardMedia } from "@/components/catalog/ProductCardMedia";
 import { WishlistButton } from "@/components/ui/WishlistButton";
 import { DiscountBadge } from "@/components/catalog/DiscountBadge";
 import { StockBadge } from "@/components/catalog/StockBadge";
@@ -20,30 +19,21 @@ import { productHref } from "@/domains/catalog/slug";
  * wired up and ready for when Phase 11's admin media upload lands.
  */
 export function ProductCard({ product }: { product: CatalogProductSummary }) {
-  const primaryImage = product.images[0];
   const colorSwatches = product.colorHexes.slice(0, 4);
 
   return (
     <article className="flex flex-col gap-2.5">
-      <div className="group relative aspect-[4/5] overflow-hidden rounded-[14px] bg-card-image">
-        <Link href={productHref(product.slug)} className="absolute inset-0 block">
-          {primaryImage ? (
-            <Image
-              src={primaryImage.url}
-              alt={primaryImage.altText}
-              fill
-              sizes="(min-width: 1024px) 20vw, (min-width: 640px) 33vw, 50vw"
-              className="object-cover"
-            />
-          ) : (
-            <AssetSlot label={product.title} rounded="none" className="h-full w-full" />
-          )}
-        </Link>
+      <ProductCardMedia
+        title={product.title}
+        href={productHref(product.slug)}
+        colorOptions={product.colorOptions}
+        sharedImage={product.sharedImage}
+      >
         <DiscountBadge percent={product.discountPercent} />
         {/* Sibling of the image link, not nested inside it — a <button>
          * inside an <a> is invalid HTML and breaks keyboard/AT navigation. */}
         <WishlistButton productId={product.id} productName={product.title} />
-      </div>
+      </ProductCardMedia>
       <div>
         <Link href={productHref(product.slug)} className="mb-1 block text-[0.95rem] font-semibold">
           {product.title}

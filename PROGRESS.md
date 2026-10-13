@@ -1,5 +1,72 @@
 # Trends Progress Report
 
+## Latest change: `?color=` deep link from card swatches (user-requested)
+
+Status: COMPLETE. `typecheck`, `lint`, `next build`, 140 unit tests pass;
+verified over HTTP on a production build (no param → default colour; valid
+`?color=` → that colour's images in the initial HTML; unknown value → default).
+No schema/migration change.
+
+- Card swatches (`ProductCardMedia`) are now `<Link>`s to
+  `/product/<slug>?color=<name>` (they were buttons that only kept a local
+  choice). Hover/focus still previews that colour's photo on the card.
+- Product page reads `searchParams.color`, validates it against the product's
+  real variant colours (`resolveRequestedColor` in `gallery.ts`; unknown,
+  empty, repeated → default) and passes it as `initialColor` to
+  `ProductColorProvider`, so the correct gallery/selection is server-rendered
+  (no flash). The route was already dynamic, so this adds no caching cost.
+- Changing colour on the product page now keeps `?color=` in the address bar
+  via `history.replaceState` (shareable/reloadable, no extra history entries).
+- Canonical URL and OG/JSON-LD are unchanged (no `?color=`), so colour URLs
+  are not indexed as duplicates.
+
+Known limitations:
+- A colour that is fully out of stock still opens selected (the user chose it);
+  the page shows its stock state as usual.
+- Not exercised in a real browser (hover/click/replaceState) — server render
+  and URL handling only.
+- Earlier items still apply: card hover panel is hover-capable devices only;
+  sizes in the panel are display-only.
+
+---
+
+## Earlier change: product-card hover panel (out-of-phase, user-requested)
+
+Status: COMPLETE. `typecheck`, `lint`, `next build`, 137 unit tests pass; the
+homepage was rendered over HTTP from a production build (colour buttons +
+sizes present in the markup; only the default colour's image mounted).
+No schema/migration change.
+
+- **Behaviour** (hover-capable devices only, `@media (hover: hover)`):
+  hovering or keyboard-focusing a card slides up a panel over the bottom of the
+  image with the product's colour swatches and the sizes *in stock* for the
+  colour being looked at. Hovering/focusing a swatch previews that colour's
+  photo (fade); clicking opens the product page on that colour (see above). A colour
+  with no photo of its own shows the shared image, else the placeholder
+  (same rule as the product page). Touch devices keep the plain card.
+- **Code**: `ProductCardMedia` (client island, `src/components/catalog/`)
+  holds the image link + panel; `ProductCard` stays a Server Component and
+  passes the discount badge / wishlist button as children. `NewArrivals`
+  had its own copy of the card markup and now uses the same island.
+  `CatalogProductSummary` gained `colorOptions` (per colour: hex, own first
+  image, in-stock sizes) and `sharedImage`, built in `buildSummary`
+  (`queries.ts`); `images` is unchanged.
+- **Performance**: only the shown image is mounted initially; the other
+  colours' images mount on first pointer-enter/focus of that card (no
+  up-front download for the whole grid).
+- **Accessibility**: swatches are real buttons (`aria-pressed`,
+  `aria-label`), panel reveals on `group-focus-within`, sizes announced via a
+  live region, `motion-reduce` disables transitions.
+
+Known limitations:
+- Hover/focus/click behaviour was not exercised in a real browser (no browser
+  automation in the sandbox); only the server render was checked.
+- Sizes in the panel are display-only; add-to-cart still happens on the
+  product page.
+- The below-card swatch dots remain (they are the only colour cue on touch).
+
+---
+
 ## Latest change: colour-specific product images (out-of-phase, user-requested)
 
 Status: COMPLETE. `typecheck`, `lint`, `next build`, 137 unit and 62
@@ -42,7 +109,7 @@ Known limitations:
   the storefront, still visible in admin with the colour label).
 - Product cards/listing still use the product's first image (not
   colour-specific); swatch dots on cards don't switch images.
-- The selected colour is not in the URL (no `?color=` deep link).
+- (Resolved later: `?color=` deep link now exists.)
 - The admin UI flow (Server Actions in a browser) was not exercised
   end-to-end; the domain/DB path and storefront render were.
 

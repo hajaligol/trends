@@ -34,3 +34,15 @@ export function selectGalleryImages<T extends ColoredImage>(images: T[], color: 
 export function pickImageForColor<T extends ColoredImage>(images: T[], color: string | null): T | null {
   return selectGalleryImages(images, color)[0] ?? null;
 }
+
+/**
+ * Resolves a `?color=` URL parameter against the colours the product really
+ * has. Anything else (missing, repeated, unknown, tampered) yields `null` and
+ * the page falls back to its default colour — the URL is only a hint, never
+ * trusted.
+ */
+export function resolveRequestedColor(colors: string[], requested: string | string[] | undefined): string | null {
+  const value = Array.isArray(requested) ? requested[0] : requested;
+  if (!value) return null;
+  return colors.includes(value) ? value : null;
+}

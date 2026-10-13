@@ -1,6 +1,5 @@
-import Image from "next/image";
 import Link from "next/link";
-import { AssetSlot } from "@/components/ui/AssetSlot";
+import { ProductCardMedia } from "@/components/catalog/ProductCardMedia";
 import { Container } from "@/components/ui/Container";
 import { SectionHead } from "@/components/home/SectionHead";
 import { SwipeRow } from "@/components/home/SwipeRow";
@@ -40,27 +39,19 @@ export function NewArrivals({ arrivals }: { arrivals: CatalogProductSummary[] })
           itemClassName="basis-[calc((100%_-_16px)/2)] sm:basis-[calc((100%_-_32px)/3)] lg:basis-[calc((100%_-_80px)/6)]"
         >
           {visible.map((arrival) => {
-            const primaryImage = arrival.images[0];
             return (
               <article key={arrival.id} className="flex w-full flex-col gap-2">
-                <div className="group relative aspect-[4/5] overflow-hidden rounded-[14px] bg-card-image">
-                  <Link href={productHref(arrival.slug)} className="absolute inset-0 block">
-                    {primaryImage ? (
-                      <Image
-                        src={primaryImage.url}
-                        alt={primaryImage.altText}
-                        fill
-                        sizes="(min-width: 1024px) 16vw, (min-width: 640px) 33vw, 50vw"
-                        className="object-cover"
-                      />
-                    ) : (
-                      <AssetSlot label={arrival.title} rounded="none" className="h-full w-full" />
-                    )}
-                  </Link>
+                <ProductCardMedia
+                  title={arrival.title}
+                  href={productHref(arrival.slug)}
+                  colorOptions={arrival.colorOptions}
+                  sharedImage={arrival.sharedImage}
+                  sizes="(min-width: 1024px) 16vw, (min-width: 640px) 33vw, 50vw"
+                >
                   {/* Sibling of the image link, not nested inside it — a <button>
                    * inside an <a> is invalid HTML and breaks keyboard/AT navigation. */}
                   <WishlistButton productId={arrival.id} productName={arrival.title} />
-                </div>
+                </ProductCardMedia>
                 <Link href={productHref(arrival.slug)} className="text-[0.87rem] font-semibold">
                   {arrival.title}
                 </Link>
