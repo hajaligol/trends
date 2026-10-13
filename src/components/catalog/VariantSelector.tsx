@@ -8,6 +8,7 @@ import { StockBadge } from "@/components/catalog/StockBadge";
 import { Button } from "@/components/ui/Button";
 import { CartIcon } from "@/components/ui/icons";
 import { AddedToCartModal } from "@/components/catalog/AddedToCartModal";
+import { SizePickerModal } from "@/components/catalog/SizePickerModal";
 import { useCart } from "@/components/cart/CartProvider";
 import { useProductColor } from "@/components/catalog/ProductColorContext";
 
@@ -44,9 +45,14 @@ export function VariantSelector({
   }
   const colors = [...colorMap.entries()].map(([color, colorHex]) => ({ color, colorHex }));
 
-  // Start on a purchasable variant when there is one.
+  // Start on a purchasable variant's colour when there is one. No size is
+  // pre-selected when there is a real choice: the customer picks one (on the
+  // page, or in the modal opened by "add to cart").
   const firstVariant = variants.find(isInStock) ?? variants[0];
-  const [selectedSize, setSelectedSize] = useState(firstVariant?.size ?? "");
+  const [pickedSize, setPickedSize] = useState("");
+  // A product with a single size has nothing to choose, so that size counts as selected.
+  const selectedSize = pickedSize || (sizes.length === 1 ? (sizes[0] ?? "") : "");
+  const [sizeModalOpen, setSizeModalOpen] = useState(false);
   // The colour is shared with the gallery, which shows that colour's photos.
   const { selectedColor, setSelectedColor } = useProductColor();
   const [quantity, setQuantity] = useState(1);
@@ -55,10 +61,19 @@ export function VariantSelector({
   const { addItem, isMutating } = useCart();
   const [addedInfo, setAddedInfo] = useState<{ size: string; color: string; colorHex: string | null; quantity: number } | null>(null);
 
+  // The variant for the chosen size + colour; null until a size is chosen.
+  const chosenVariant = selectedSize
+    ? (variants.find((variant) => variant.size === selectedSize && variant.color === selectedColor) ?? null)
+    : null;
+  // What the price/stock area shows: the chosen variant, else the selected
+  // colour's first purchasable variant (display only).
   const selectedVariant =
-    variants.find((variant) => variant.size === selectedSize && variant.color === selectedColor) ??
+    chosenVariant ??
+    variants.find((variant) => variant.color === selectedColor && isInStock(variant)) ??
+    variants.find((variant) => variant.color === selectedColor) ??
     firstVariant ??
     null;
+  const colorSoldOut = !variants.some((variant) => variant.color === selectedColor && isInStock(variant));
 
   /** A size can be chosen only if the selected colour has it in stock. */
   function isSizeAvailable(size: string) {
@@ -67,8 +82,10 @@ export function VariantSelector({
 
   function selectSize(size: string) {
     if (!isSizeAvailable(size)) return;
-    setSelectedSize(size);
-    setQuantity(1);
+    setPickedSize(size);
+    // Keep the chosen quantity, but never above what this size has in stock.
+    const stock = variants.find((variant) => variant.size === size && variant.color === selectedColor)?.stock ?? 1;
+    setQuantity((value) => Math.max(1, Math.min(value, stock)));
     setErrorMessage(null);
   }
 
@@ -76,16 +93,10 @@ export function VariantSelector({
     setSelectedColor(color);
     setQuantity(1);
     setErrorMessage(null);
-    // Keep the current size if this colour has it in stock; otherwise move to
-    // the first size of this colour that is in stock (or any size, so an
-    // entirely sold-out colour still shows its «ناموجود» state).
+    // Keep the current size if this colour has it in stock; otherwise clear it
+    // so the customer chooses again (never silently swap their size).
     const keep = variants.some((variant) => variant.size === selectedSize && variant.color === color && isInStock(variant));
-    if (!keep) {
-      const fallback =
-        variants.find((variant) => variant.color === color && isInStock(variant)) ??
-        variants.find((variant) => variant.color === color);
-      if (fallback) setSelectedSize(fallback.size);
-    }
+    if (!keep) setPickedSize("");
   }
 
   if (!selectedVariant) {
@@ -93,19 +104,30 @@ export function VariantSelector({
   }
 
   const percent = discountPercent(selectedVariant.compareAtPriceToman, selectedVariant.priceToman);
-  const isOutOfStock = selectedVariant.stockState === "out-of-stock";
-  const isLowStock = selectedVariant.stockState === "low-stock";
-  const maxQuantity = Math.max(selectedVariant.stock, 0);
+  // Sold out = the chosen variant is, or (before a size is chosen) the whole colour is.
+  const isOutOfStock = chosenVariant ? chosenVariant.stockState === "out-of-stock" : colorSoldOut;
+  const isLowStock = chosenVariant?.stockState === "low-stock";
+  // Before a size is chosen the stepper is bounded by the colour's best stock.
+  const maxQuantity = chosenVariant
+    ? Math.max(chosenVariant.stock, 0)
+    : Math.max(
+        ...variants.filter((variant) => variant.color === selectedColor && isInStock(variant)).map((variant) => variant.stock),
+        1,
+      );
 
   async function handleAddToCart() {
-    if (!selectedVariant) return;
+    // No size yet: ask for one in a modal instead of adding anything.
+    if (!chosenVariant) {
+      setSizeModalOpen(true);
+      return;
+    }
     setErrorMessage(null);
-    const ok = await addItem(selectedVariant.id, quantity);
+    const ok = await addItem(chosenVariant.id, quantity);
     if (ok) {
       setAddedInfo({
-        size: selectedVariant.size,
-        color: selectedVariant.color,
-        colorHex: selectedVariant.colorHex,
+        size: chosenVariant.size,
+        color: chosenVariant.color,
+        colorHex: chosenVariant.colorHex,
         quantity,
       });
     } else {
@@ -122,6 +144,19 @@ export function VariantSelector({
         color={addedInfo?.color ?? ""}
         colorHex={addedInfo?.colorHex ?? null}
         quantity={addedInfo?.quantity ?? 1}
+      />
+      <SizePickerModal
+        open={sizeModalOpen}
+        onClose={() => setSizeModalOpen(false)}
+        sizes={sizes}
+        selectedSize={selectedSize}
+        isSizeAvailable={isSizeAvailable}
+        onSelectSize={selectSize}
+        busy={isMutating}
+        onConfirm={() => {
+          setSizeModalOpen(false);
+          void handleAddToCart();
+        }}
       />
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
         <span className="text-[1.65rem] leading-tight font-bold">{formatToman(selectedVariant.priceToman)}</span>
@@ -140,7 +175,8 @@ export function VariantSelector({
       {sizes.length > 1 && (
         <fieldset className="m-0 flex min-w-0 flex-col gap-2.5 border-0 p-0">
           <legend className="mb-2.5 p-0 text-[0.88rem] text-text-secondary">
-            سایز: <span className="font-semibold text-ink">{toPersianDigits(selectedSize)}</span>
+            سایز:{" "}
+            <span className="font-semibold text-ink">{selectedSize ? toPersianDigits(selectedSize) : "انتخاب نشده"}</span>
           </legend>
           <div className="flex flex-wrap gap-2">
             {sizes.map((size) => {
