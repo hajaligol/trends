@@ -618,6 +618,40 @@ export type SearchResult = {
   totalPages: number;
 };
 
+export type BrandSuggestion = { name: string; nameEn: string | null; productCount: number };
+
+/**
+ * Header-search brand suggestions: **active** brands whose Persian or Latin
+ * name contains `q`, that have at least one active product (a brand with
+ * nothing to show would lead to an empty results page). Names that start
+ * with the query come first. `%`/`_`/`\\` in the query are escaped so they
+ * match literally.
+ */
+export async function searchBrands(q: string, limit = 4): Promise<BrandSuggestion[]> {
+  const term = q.trim();
+  if (term.length === 0) return [];
+  const escaped = term.replace(/[\\%_]/g, (ch) => `\\${ch}`);
+  const contains = `%${escaped}%`;
+  const prefix = `${escaped}%`;
+  const rows = await db
+    .select({
+      name: brands.name,
+      nameEn: brands.nameEn,
+      productCount: sql<number>`count(${products.id})`,
+    })
+    .from(brands)
+    .innerJoin(products, and(eq(products.brandId, brands.id), eq(products.isActive, true)))
+    .where(and(eq(brands.isActive, true), or(ilike(brands.name, contains), ilike(brands.nameEn, contains))))
+    .groupBy(brands.id)
+    .orderBy(
+      sql`(${brands.name} ilike ${prefix} or ${brands.nameEn} ilike ${prefix}) desc`,
+      asc(brands.displayOrder),
+      asc(brands.name),
+    )
+    .limit(limit);
+  return rows.map((row) => ({ ...row, productCount: Number(row.productCount) }));
+}
+
 /**
  * Real product search (Phase 5). Plain PostgreSQL `ILIKE` over
  * title/short description/brand (active brands only) — the "sensible PostgreSQL search first"

@@ -1,5 +1,20 @@
 # Trends Progress Report
 
+## Latest change: brands in the header search panel (user-requested)
+Status: COMPLETE. `tsc --noEmit` and eslint clean. Verified on Postgres 16
+(fresh migrate + `db:seed`): `searchBrands` and `/api/search/suggest` return the
+matching brand for Persian ("تر") and Latin ("Toranj") queries.
+
+- `searchBrands(q)` in `src/domains/catalog/queries.ts`: active brands with at
+  least one active product whose `name`/`nameEn` contains the query (LIKE
+  wildcards escaped), prefix matches first, max 4.
+- `/api/search/suggest` now also returns `brands`.
+- `HeaderSearch.tsx` shows a «برندها» section (above categories); a brand links
+  to `/search?q=<brand name>` (no brand page exists), which already matches by
+  brand. Placeholders updated. No DB changes.
+
+---
+
 ## Latest change: demo reviews for all products (user-requested)
 Status: COMPLETE. `typecheck` and `eslint` clean. Verified on Postgres 16
 (fresh migrate + `db:seed`, then `db:seed-reviews`): 176 products, every one

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCategoryTree, searchProducts } from "@/domains/catalog/queries";
+import { getCategoryTree, searchBrands, searchProducts } from "@/domains/catalog/queries";
 import { findCategoryPath, flattenCategoryTree } from "@/domains/categories/tree";
 
 /**
@@ -7,6 +7,8 @@ import { findCategoryPath, flattenCategoryTree } from "@/domains/categories/tree
  *  - `categories`: active categories / sub-categories whose name matches,
  *    each with its ancestor names (e.g. "مردانه › لباس") so the visitor can
  *    tell same-named types apart.
+ *  - `brands`: active brands (with products) whose name matches; they link
+ *    to the search page for that brand name.
  *  - `items`: the first few matching products (same `searchProducts` query
  *    as the `/search` page, so the two always agree), each with its full
  *    category path.
@@ -22,11 +24,15 @@ export async function GET(request: Request) {
   const q = (new URL(request.url).searchParams.get("q") ?? "").trim().slice(0, MAX_QUERY_LENGTH);
 
   if (q.length < MIN_QUERY_LENGTH) {
-    return NextResponse.json({ query: q, total: 0, items: [], categories: [] });
+    return NextResponse.json({ query: q, total: 0, items: [], categories: [], brands: [] });
   }
 
   try {
-    const [result, tree] = await Promise.all([searchProducts({ q, page: 1 }), getCategoryTree()]);
+    const [result, tree, brands] = await Promise.all([
+      searchProducts({ q, page: 1 }),
+      getCategoryTree(),
+      searchBrands(q),
+    ]);
 
     const needle = q.toLowerCase();
     const categories = flattenCategoryTree(tree)
@@ -49,6 +55,7 @@ export async function GET(request: Request) {
         query: q,
         total: result.total,
         categories,
+        brands,
         items: result.products.slice(0, MAX_PRODUCTS).map((product) => ({
           slug: product.slug,
           title: product.title,

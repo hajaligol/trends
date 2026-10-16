@@ -57,7 +57,7 @@ export function SearchOverlay() {
             type="text"
             name="q"
             required
-            placeholder="نام محصول را جستجو کنید..."
+            placeholder="نام محصول یا برند را جستجو کنید..."
             className="w-full rounded-full border border-line bg-white px-[18px] py-3.5 text-[0.95rem] focus:outline-2 focus:outline-ink focus:outline-offset-2"
           />
         </form>

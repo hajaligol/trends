@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "reac
 import Form from "next/form";
 import Image from "next/image";
 import Link from "next/link";
-import { ClockIcon, FolderIcon, SearchIcon, TrendingUpIcon, XIcon } from "@/components/ui/icons";
+import { ClockIcon, FolderIcon, SearchIcon, TagIcon, TrendingUpIcon, XIcon } from "@/components/ui/icons";
 import { useDimPage } from "@/components/overlays/UIOverlayProvider";
 import { TRENDING_SEARCHES } from "@/lib/search/trending-searches";
 import { formatToman } from "@/lib/utils/money";
@@ -87,6 +87,8 @@ type Suggestion = {
 
 type CategorySuggestion = { slug: string; name: string; parents: string[] };
 
+type BrandSuggestion = { name: string; nameEn: string | null; productCount: number };
+
 /** Live results start once the visitor has typed this many characters. */
 const MIN_LIVE_LENGTH = 2;
 
@@ -114,6 +116,7 @@ export function HeaderSearch() {
     total: number;
     items: Suggestion[];
     categories: CategorySuggestion[];
+    brands: BrandSuggestion[];
   } | null>(null);
   // The query that last failed to load; "failed" is derived from it below so
   // it never needs resetting from inside an effect.
@@ -144,8 +147,9 @@ export function HeaderSearch() {
           total: number;
           items: Suggestion[];
           categories: CategorySuggestion[];
+          brands: BrandSuggestion[];
         };
-        setLive({ q: typed, total: data.total, items: data.items, categories: data.categories });
+        setLive({ q: typed, total: data.total, items: data.items, categories: data.categories, brands: data.brands ?? [] });
         setFailedQuery(null);
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") return;
@@ -230,7 +234,7 @@ export function HeaderSearch() {
           onChange={(event) => setQuery(event.target.value)}
           onFocus={() => setOpen(true)}
           onClick={() => setOpen(true)}
-          placeholder="نام محصول یا دسته را جستجو کنید..."
+          placeholder="نام محصول، دسته یا برند را جستجو کنید..."
           className="h-[48px] w-full rounded-full border border-[#d5d9dd] bg-[#e3e6e9] ps-6 pe-[78px] text-[0.95rem] text-ink outline-none! placeholder:text-text-secondary focus:outline-none! focus-visible:outline-none! [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-cancel-button]:appearance-none [&::-webkit-search-decoration]:hidden"
         />
         {/* Custom clear button (the browser's built-in one is hidden above). */}
@@ -291,12 +295,40 @@ export function HeaderSearch() {
                       </li>
                     ))}
                   </ul>
-                ) : live && live.items.length === 0 && live.categories.length === 0 ? (
+                ) : live && live.items.length === 0 && live.categories.length === 0 && live.brands.length === 0 ? (
                   <p className="m-0 px-1 py-4 text-[0.9rem] text-text-secondary">
                     نتیجه‌ای برای «{typed}» پیدا نشد.
                   </p>
                 ) : (
                   <>
+                    {live && live.brands.length > 0 && (
+                      <div className="mb-4">
+                        <h3 className="m-0 mb-2 text-[0.95rem] font-bold text-ink">برندها</h3>
+                        <ul className="m-0 list-none p-0">
+                          {live.brands.map((brand) => (
+                            <li key={brand.name}>
+                              <Link
+                                href={searchHref(brand.name)}
+                                onClick={() => pick(brand.name)}
+                                className="flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-[#f0f2f4]"
+                              >
+                                <TagIcon className="h-[18px] w-[18px] shrink-0 text-black" />
+                                <span className="min-w-0 flex-1 truncate text-[0.92rem] text-ink">
+                                  <span className="font-semibold">{brand.name}</span>
+                                  {brand.nameEn && brand.nameEn !== brand.name && (
+                                    <span className="text-[0.82rem] text-text-secondary"> · {brand.nameEn}</span>
+                                  )}
+                                </span>
+                                <span className="shrink-0 text-[0.78rem] text-text-secondary">
+                                  {toPersianDigits(brand.productCount)} محصول
+                                </span>
+                              </Link>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
                     {live && live.categories.length > 0 && (
                       <div className="mb-4">
                         <h3 className="m-0 mb-2 text-[0.95rem] font-bold text-ink">دسته‌بندی‌ها</h3>
