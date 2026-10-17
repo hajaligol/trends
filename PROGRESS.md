@@ -13,6 +13,7 @@ Status: COMPLETE WITH FOLLOW-UP. tsc, eslint, `next build` clean; 178 unit + 96 
   behaviour as before; brand tiles mount on first open so logos are not fetched on every page.
 - **Icons**: دسته‌بندی‌ها uses Lucide `list-sort-descending`, برندها `tag`, and the audience rail uses `mars` / `venus` / `baby`
   (new `ListSortDescendingIcon`, `MarsIcon`, `VenusIcon`, `BabyIcon` in `components/ui/icons.tsx`; keyed by the fixed slugs men/women/kids).
+- **Audience rail style**: white rounded card, larger bold items, solid brand-coloured active item; no transitions/shadows.
 - **Header (mobile)**: accordion is now دسته‌بندی‌ها (audience > group > type) + a برندها link.
 - **Naming**: briefly renamed the audiences to آقایان/بانوان/کودکان, then **reverted at the user's request** — the taxonomy
   names are مردانه / زنانه / بچگانه again. Databases that ran the interim `npm run db:sync-categories` must run it once

@@ -127,8 +127,10 @@ export function HeaderNav({ categories, brands }: { categories: NavCategory[]; b
 
           <div id="category-menu" aria-hidden={!categoriesOpen} className={panelClass(categoriesOpen)}>
             <Container className="grid max-h-[calc(100vh-150px)] grid-cols-[190px_1fr] gap-x-6 overflow-y-auto py-6">
-              {/* Audience rail. A thin rule on its end edge separates it from the content, like the column rules inside. */}
-              <ul aria-label="دسته‌های اصلی" className="flex flex-col gap-1 border-e border-[#c9ced2] pe-4">
+              {/* Audience rail: a white card on the header-coloured panel, with larger bold items and a
+                  solid brand-coloured active item, so it reads as the primary choice next to the plain
+                  columns. Static on purpose — no transitions, shadows or glows. */}
+              <ul aria-label="دسته‌های اصلی" className="flex flex-col gap-1.5 self-start rounded-[14px] border border-line bg-white p-2">
                 {categories.map((root) => {
                   const isActive = root.slug === audience.slug;
                   const Icon = AUDIENCE_ICONS[root.slug];
@@ -140,11 +142,11 @@ export function HeaderNav({ categories, brands }: { categories: NavCategory[]; b
                         onMouseEnter={() => setActiveAudience(root.slug)}
                         onFocus={() => setActiveAudience(root.slug)}
                         aria-current={isActive ? "true" : undefined}
-                        className={`flex items-center gap-2.5 rounded-[8px] px-3 py-2.5 text-[1rem] font-semibold transition-colors duration-150 ${
-                          isActive ? "bg-ink/6 text-brand" : "text-ink hover:bg-ink/5"
+                        className={`flex items-center gap-3 rounded-[10px] px-4 py-3 text-[1.08rem] font-bold ${
+                          isActive ? "bg-brand text-white" : "text-ink hover:bg-ink/5"
                         }`}
                       >
-                        {Icon && <Icon aria-hidden="true" strokeWidth={2} className="h-[20px] w-[20px] shrink-0" />}
+                        {Icon && <Icon aria-hidden="true" strokeWidth={2} className="h-[22px] w-[22px] shrink-0" />}
                         {root.name}
                       </Link>
                     </li>
