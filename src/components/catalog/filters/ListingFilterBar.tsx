@@ -192,15 +192,15 @@ export function ListingFilterBar({
             role="switch"
             aria-checked={filters.availableOnly}
             onClick={() => navigate({ ...filters, availableOnly: !filters.availableOnly })}
-            className={`relative h-6 w-11 shrink-0 rounded-full border transition-colors ${
-              filters.availableOnly ? "border-ink bg-ink" : "border-line bg-card-image"
+            className={`relative h-6 w-11 shrink-0 cursor-pointer rounded-full transition-colors ${
+              filters.availableOnly ? "bg-brand" : "bg-ink/20"
             }`}
           >
             <span
               aria-hidden="true"
-              className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${
-                filters.availableOnly ? "end-0.5" : "start-0.5"
-              } border border-ink/10`}
+              className={`absolute start-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
+                filters.availableOnly ? "ltr:translate-x-5 rtl:-translate-x-5" : ""
+              }`}
             />
             <span className="sr-only">فقط کالاهای موجود</span>
           </button>

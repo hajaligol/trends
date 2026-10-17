@@ -1,5 +1,14 @@
 # Trends Progress Report
 
+## Latest change: removed the admin page-level scrollbar (far right)
+`AdminShell` wrapper is now `lg:fixed lg:inset-0` (+ `.admin-shell`), and `globals.css` sets `html:has(.admin-shell){overflow:hidden}` from 1024px, so only the content column's left scrollbar remains. Below `lg` unchanged. `tsc`/`eslint` ✔; not verified in a browser.
+
+## Latest change: admin content scrollbar on the far left
+`AdminShell.tsx`: from `lg` the content column is its own scroll container (`lg:h-screen lg:overflow-y-auto`) and the page no longer scrolls, so its scrollbar follows RTL to the left like the sidebar's. Below `lg` the page scrolls as before. Not verified in a browser; check that navigating between admin pages still starts at the top.
+
+## Latest change: «فقط کالاهای موجود» filter switch restyled
+Same look as the admin `ToggleSwitch` (brand-purple track when on, `bg-ink/20` off, white thumb with `shadow-sm`, RTL-aware slide). Behaviour unchanged. `tsc` ✔ `eslint` ✔.
+
 ## Latest change: product image lightbox (user-requested)
 Status: COMPLETE. `tsc --noEmit` ✔, `eslint .` ✔, unit tests ✔ (incl. new `tests/unit/image-zoom.test.ts`). `next build` compiles; page-data
 collection needs `DATABASE_URL` (not run against a DB this session). **No DB changes.**

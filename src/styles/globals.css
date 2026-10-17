@@ -61,6 +61,14 @@ html {
   scroll-behavior: smooth;
 }
 
+/* Admin (desktop): the shell is fixed to the viewport and its content column scrolls
+   itself (scrollbar on the left, RTL), so the page-level scrollbar must not exist. */
+@media (min-width: 1024px) {
+  html:has(.admin-shell) {
+    overflow: hidden;
+  }
+}
+
 body {
   background: var(--color-bg);
   color: var(--color-ink);

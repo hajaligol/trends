@@ -108,7 +108,7 @@ export function AdminShell({ user, badges, children }: { user: AdminShellUser; b
   }, [drawerOpen]);
 
   return (
-    <div className="min-h-screen bg-bg text-ink lg:flex">
+    <div className="admin-shell min-h-screen bg-bg text-ink lg:fixed lg:inset-0 lg:flex lg:overflow-hidden">
       <a
         href="#admin-main"
         className="sr-only focus:not-sr-only focus:fixed focus:start-4 focus:top-4 focus:z-[200] focus:rounded-full focus:bg-ink focus:px-5 focus:py-2.5 focus:text-[0.85rem] focus:text-white"
@@ -121,7 +121,11 @@ export function AdminShell({ user, badges, children }: { user: AdminShellUser; b
         <SidebarBody user={user} badges={badges} />
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      {/* From `lg` the content column is its own scroll container (the page itself
+          doesn't scroll), because the browser always draws the *page* scrollbar on
+          the far right, while an element's scrollbar follows `dir="rtl"` to its left
+          edge — the far left of the screen, like the sidebar's. */}
+      <div className="flex min-w-0 flex-1 flex-col lg:h-screen lg:overflow-y-auto">
         {/* Mobile / tablet top bar */}
         <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-line bg-white/90 px-4 py-2.5 backdrop-blur lg:hidden">
           <button
