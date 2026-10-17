@@ -1,14 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { Container } from "@/components/ui/Container";
 import { Breadcrumbs } from "@/components/catalog/Breadcrumbs";
-import { ProductGrid } from "@/components/catalog/ProductGrid";
+import { ProductListing } from "@/components/catalog/ProductListing";
 import { CollectionPagination } from "@/components/catalog/CollectionPagination";
 import { CampaignCountdown } from "@/components/catalog/CampaignCountdown";
 import { buttonClasses } from "@/components/ui/Button";
 import { getCampaignLanding } from "@/domains/campaigns/landing";
 import { campaignHref } from "@/domains/campaigns/slug";
+import { listingProgress, listingWindowFor } from "@/domains/catalog/presentation";
 import { normalizeSlugParam } from "@/domains/catalog/slug";
 import { toPersianDigits } from "@/lib/utils/persian-digits";
 
@@ -16,6 +17,12 @@ type SalePageProps = {
   params: Promise<{ slug: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
+
+/** `getCampaignLanding(slug, ...)` arguments for the infinite-scroll window. */
+function landingArgs(requestedPage: number): [number, Date, number] {
+  const window = listingWindowFor(requestedPage);
+  return [window.fetchPage, new Date(), window.pageSpan];
+}
 
 async function resolve(props: SalePageProps) {
   const { slug: rawSlug } = await props.params;
@@ -28,7 +35,7 @@ async function resolve(props: SalePageProps) {
 
 export async function generateMetadata(props: SalePageProps): Promise<Metadata> {
   const { slug, requestedPage } = await resolve(props);
-  const landing = await getCampaignLanding(slug, requestedPage);
+  const landing = await getCampaignLanding(slug, ...landingArgs(requestedPage));
   if (!landing) return { title: "کمپین یافت نشد", robots: { index: false, follow: false } };
   if (landing.state === "ended") return { title: landing.name, robots: { index: false, follow: true } };
   const path = campaignHref(slug);
@@ -43,7 +50,8 @@ export async function generateMetadata(props: SalePageProps): Promise<Metadata> 
 
 export default async function SalePage(props: SalePageProps) {
   const { slug, requestedPage } = await resolve(props);
-  const landing = await getCampaignLanding(slug, requestedPage);
+  const window = listingWindowFor(requestedPage);
+  const landing = await getCampaignLanding(slug, ...landingArgs(requestedPage));
   if (!landing) notFound();
 
   if (landing.state === "ended") {
@@ -59,6 +67,9 @@ export default async function SalePage(props: SalePageProps) {
       </main>
     );
   }
+
+  const progress = listingProgress(window, requestedPage, landing.totalPages, landing.page);
+  if (progress.clampedIntoInfiniteZone) redirect(`${campaignHref(slug)}?page=${landing.page}`);
 
   return (
     <main className="py-[clamp(24px,4vw,40px)]">
@@ -92,8 +103,19 @@ export default async function SalePage(props: SalePageProps) {
           </div>
         </header>
 
-        <ProductGrid products={landing.products} emptyMessage="در حال حاضر محصولی مشمول این کمپین نیست." />
-        <CollectionPagination basePath={campaignHref(slug)} page={landing.page} totalPages={landing.totalPages} />
+        <ProductListing
+          products={landing.products}
+          emptyMessage="در حال حاضر محصولی مشمول این کمپین نیست."
+          total={landing.total}
+          totalPages={landing.totalPages}
+          infinite={window.infinite}
+          loadedThrough={progress.loadedThrough}
+          source={{ kind: "campaign", slug }}
+          baseHref={campaignHref(slug)}
+          pagination={(current) => (
+            <CollectionPagination basePath={campaignHref(slug)} page={current} totalPages={landing.totalPages} />
+          )}
+        />
       </Container>
     </main>
   );

@@ -1,5 +1,15 @@
 # Trends Progress Report
 
+## Latest change: infinite scroll on product list pages (pages 1–5), pagination from page 6
+
+- Scope: `/category/[slug]`, `/search`, `/collection/[slug]`, `/sale/[slug]` (campaign pages). `/accessories` is a preview page (no pagination) and `/brands` is not a product list — both untouched.
+- Rule: `INFINITE_SCROLL_MAX_PAGE = 5` (`src/domains/catalog/presentation.ts`). Pages 1..5 append on scroll; once page 5 is loaded the numbered pagination appears (only if the list has more than 5 pages). `?page=N` with N ≤ 5 means "pages 1..N loaded" (server renders 1..N, scrolling continues); `?page=N` with N ≥ 6 is a plain single page with pagination. A page past the end of a short list redirects to its last page.
+- New: `components/catalog/InfiniteProductGrid.tsx` (client; IntersectionObserver, `history.replaceState` keeps `?page=` in sync, retry on error, `<noscript>` pagination fallback), `components/catalog/ProductListing.tsx` (server wrapper used by all 4 pages), `domains/catalog/load-more.tsx` (Server Action `loadMoreProducts`: zod-validated source + page 2..5, IP rate-limited 120/min, returns server-rendered `ProductCard`s), `domains/catalog/load-more-schema.ts`, `domains/catalog/collection-listing.ts` (collection paging moved out of the page).
+- Changed: `getProductsByCategorySlug`, `searchProducts`, `getCampaignLanding` take an optional `pageSpan` (default 1 → old behaviour).
+- DB changes: none. Tests: `tests/unit/infinite-scroll-window.test.ts` (new). Checks run: `tsc --noEmit` ✔, `eslint .` ✔, `vitest run tests/unit` ✔ (187), `next build` compiles but could not finish static generation in the sandbox (no Postgres).
+- NOT verified in a browser: scroll loading, `replaceState` + back-button behaviour, RTL/mobile look, noscript fallback. Smoke-test these against a seeded DB (needs > 12 products in a category, ideally > 60 to see pagination take over).
+- Known limitation: queries still load the whole list and slice in memory (existing tradeoff), so each loaded page re-runs the full query.
+
 ## Latest change: promo banners are image-only (user-requested)
 Status: COMPLETE. `tsc --noEmit` and eslint clean. `next build`/tests not re-run (change is one presentational component).
 

@@ -1,26 +1,17 @@
-import { cache } from "react";
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { Container } from "@/components/ui/Container";
 import { Breadcrumbs } from "@/components/catalog/Breadcrumbs";
-import { ProductGrid } from "@/components/catalog/ProductGrid";
+import { ProductListing } from "@/components/catalog/ProductListing";
 import { CollectionPagination } from "@/components/catalog/CollectionPagination";
-import { COLLECTIONS, isCollectionSlug, type CollectionSlug } from "@/domains/catalog/presentation";
-import { getFeaturedProducts, getNewArrivals, getTopSellingProducts } from "@/domains/catalog/queries";
+import { getCollectionPage } from "@/domains/catalog/collection-listing";
+import { COLLECTIONS, isCollectionSlug, listingProgress, listingWindowFor } from "@/domains/catalog/presentation";
 import { toPersianDigits } from "@/lib/utils/persian-digits";
 
 type CollectionPageProps = {
   params: Promise<{ slug: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
-
-const COLLECTION_PAGE_SIZE = 12;
-
-const loadCollection = cache((slug: CollectionSlug) => {
-  if (slug === "featured") return getFeaturedProducts();
-  if (slug === "top-selling") return getTopSellingProducts();
-  return getNewArrivals();
-});
 
 async function resolve(props: CollectionPageProps) {
   const { slug } = await props.params;
@@ -48,15 +39,12 @@ export async function generateMetadata(props: CollectionPageProps): Promise<Meta
 export default async function CollectionPage(props: CollectionPageProps) {
   const { slug, requestedPage } = await resolve(props);
   const collection = COLLECTIONS[slug];
-  const all = await loadCollection(slug);
-
-  // Paginated in application code after one batched fetch — the same
-  // documented tradeoff as category/search pages (fine at this catalog size).
-  const total = all.length;
-  const totalPages = Math.max(1, Math.ceil(total / COLLECTION_PAGE_SIZE));
-  const page = Math.min(requestedPage, totalPages);
-  const start = (page - 1) * COLLECTION_PAGE_SIZE;
-  const pageItems = all.slice(start, start + COLLECTION_PAGE_SIZE);
+  const window = listingWindowFor(requestedPage);
+  const result = await getCollectionPage(slug, window.fetchPage, window.pageSpan);
+  const { products, total, totalPages } = result;
+  const baseHref = `/collection/${slug}`;
+  const progress = listingProgress(window, requestedPage, totalPages, result.page);
+  if (progress.clampedIntoInfiniteZone) redirect(`${baseHref}?page=${result.page}`);
 
   return (
     <main className="py-[clamp(24px,4vw,40px)]">
@@ -70,9 +58,17 @@ export default async function CollectionPage(props: CollectionPageProps) {
           )}
         </div>
 
-        <ProductGrid products={pageItems} emptyMessage="هنوز محصولی در این بخش وجود ندارد." />
-
-        <CollectionPagination basePath={`/collection/${slug}`} page={page} totalPages={totalPages} />
+        <ProductListing
+          products={products}
+          emptyMessage="هنوز محصولی در این بخش وجود ندارد."
+          total={total}
+          totalPages={totalPages}
+          infinite={window.infinite}
+          loadedThrough={progress.loadedThrough}
+          source={{ kind: "collection", slug }}
+          baseHref={baseHref}
+          pagination={(current) => <CollectionPagination basePath={baseHref} page={current} totalPages={totalPages} />}
+        />
       </Container>
     </main>
   );

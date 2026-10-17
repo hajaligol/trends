@@ -1,5 +1,6 @@
 import { ProductCard } from "@/components/catalog/ProductCard";
 import type { CatalogProductSummary } from "@/domains/catalog/queries";
+import { PRODUCT_GRID_CLASS } from "@/domains/catalog/presentation";
 
 export function ProductGrid({
   products,
@@ -17,7 +18,7 @@ export function ProductGrid({
   }
 
   return (
-    <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-4">
+    <div className={PRODUCT_GRID_CLASS}>
       {products.map((product) => (
         <ProductCard key={product.id} product={product} />
       ))}

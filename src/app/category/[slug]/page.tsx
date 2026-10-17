@@ -1,16 +1,22 @@
 import { cache } from "react";
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { Container } from "@/components/ui/Container";
 import { Breadcrumbs } from "@/components/catalog/Breadcrumbs";
-import { ProductGrid } from "@/components/catalog/ProductGrid";
+import { ProductListing } from "@/components/catalog/ProductListing";
 import { SortSelect } from "@/components/catalog/SortSelect";
 import { CategoryFilters } from "@/components/catalog/CategoryFilters";
 import { Pagination } from "@/components/catalog/Pagination";
 import { SubcategoryNav } from "@/components/catalog/SubcategoryNav";
 import { getProductsByCategorySlug } from "@/domains/catalog/queries";
-import { isProductSort, type CategoryQueryState, type ProductSort } from "@/domains/catalog/presentation";
-import { toPersianDigits } from "@/lib/utils/persian-digits";
+import {
+  buildCategoryHref,
+  isProductSort,
+  listingProgress,
+  listingWindowFor,
+  type CategoryQueryState,
+  type ProductSort,
+} from "@/domains/catalog/presentation";
 
 type CategoryPageProps = {
   params: Promise<{ slug: string }>;
@@ -28,8 +34,14 @@ function firstValue(value: string | string[] | undefined): string | undefined {
  * fetching it twice.
  */
 const loadCategoryProducts = cache(
-  (slug: string, sort: ProductSort | undefined, size: string | undefined, color: string | undefined, page: number) =>
-    getProductsByCategorySlug({ slug, sort, size, color, page }),
+  (
+    slug: string,
+    sort: ProductSort | undefined,
+    size: string | undefined,
+    color: string | undefined,
+    page: number,
+    pageSpan: number,
+  ) => getProductsByCategorySlug({ slug, sort, size, color, page, pageSpan }),
 );
 
 async function resolveQueryState(props: CategoryPageProps) {
@@ -45,12 +57,12 @@ async function resolveQueryState(props: CategoryPageProps) {
   const parsedPage = pageParam ? Number.parseInt(pageParam, 10) : 1;
   const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
 
-  return { slug, sort, size, color, page };
+  return { slug, sort, size, color, page, window: listingWindowFor(page) };
 }
 
 export async function generateMetadata(props: CategoryPageProps): Promise<Metadata> {
-  const { slug, sort, size, color, page } = await resolveQueryState(props);
-  const result = await loadCategoryProducts(slug, sort, size, color, page);
+  const { slug, sort, size, color, page, window } = await resolveQueryState(props);
+  const result = await loadCategoryProducts(slug, sort, size, color, window.fetchPage, window.pageSpan);
   if (!result) return { title: "دسته‌بندی پیدا نشد" };
 
   const hasFacets = Boolean(size || color) || page > 1;
@@ -72,12 +84,14 @@ export async function generateMetadata(props: CategoryPageProps): Promise<Metada
 }
 
 export default async function CategoryPage(props: CategoryPageProps) {
-  const { slug, sort, size, color, page } = await resolveQueryState(props);
-  const result = await loadCategoryProducts(slug, sort, size, color, page);
+  const { slug, sort, size, color, page, window } = await resolveQueryState(props);
+  const result = await loadCategoryProducts(slug, sort, size, color, window.fetchPage, window.pageSpan);
   if (!result) notFound();
 
   const { category, products, total, totalPages, availableSizes, availableColors } = result;
   const state: CategoryQueryState = { sort, size, color };
+  const progress = listingProgress(window, page, totalPages, result.page);
+  if (progress.clampedIntoInfiniteZone) redirect(buildCategoryHref(slug, { ...state, page: result.page }));
 
   return (
     <main className="py-[clamp(24px,4vw,40px)]">
@@ -111,15 +125,18 @@ export default async function CategoryPage(props: CategoryPageProps) {
           />
         </div>
 
-        <ProductGrid products={products} emptyMessage="محصولی با این مشخصات در این دسته پیدا نشد." />
-
-        <Pagination slug={slug} state={state} page={result.page} totalPages={totalPages} />
-
-        {total > 0 && (
-          <p className="mt-4 text-center text-[0.82rem] text-text-secondary">
-            نمایش {toPersianDigits(products.length)} محصول از {toPersianDigits(total)} محصول
-          </p>
-        )}
+        <ProductListing
+          products={products}
+          emptyMessage="محصولی با این مشخصات در این دسته پیدا نشد."
+          total={total}
+          totalPages={totalPages}
+          infinite={window.infinite}
+          loadedThrough={progress.loadedThrough}
+          source={{ kind: "category", slug, sort, size, color }}
+          baseHref={buildCategoryHref(slug, state)}
+          showCount
+          pagination={(current) => <Pagination slug={slug} state={state} page={current} totalPages={totalPages} />}
+        />
       </Container>
     </main>
   );

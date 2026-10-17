@@ -31,7 +31,7 @@ export type CampaignLanding =
  * covers, newest first, paginated in application code (the same documented
  * tradeoff as the category/collection pages at this catalog size).
  */
-export async function getCampaignLanding(slug: string, requestedPage: number, now: Date = new Date()): Promise<CampaignLanding | null> {
+export async function getCampaignLanding(slug: string, requestedPage: number, now: Date = new Date(), pageSpan = 1): Promise<CampaignLanding | null> {
   const [row] = await db.select().from(campaigns).where(eq(campaigns.slug, slug)).limit(1);
   if (!row) return null;
 
@@ -58,7 +58,7 @@ export async function getCampaignLanding(slug: string, requestedPage: number, no
   const total = coveredIds.length;
   const totalPages = Math.max(1, Math.ceil(total / CAMPAIGN_PAGE_SIZE));
   const page = Math.min(Math.max(1, requestedPage), totalPages);
-  const pageIds = coveredIds.slice((page - 1) * CAMPAIGN_PAGE_SIZE, page * CAMPAIGN_PAGE_SIZE);
+  const pageIds = coveredIds.slice((page - 1) * CAMPAIGN_PAGE_SIZE, (page - 1 + Math.max(1, pageSpan)) * CAMPAIGN_PAGE_SIZE);
 
   // `getProductSummariesByIds` doesn't promise an order; restore the newest-first one.
   const summaries = pageIds.length ? await getProductSummariesByIds(pageIds) : [];

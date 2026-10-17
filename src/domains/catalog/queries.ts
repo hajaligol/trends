@@ -694,6 +694,9 @@ export async function searchBrands(q: string, limit = 4): Promise<BrandSuggestio
 export async function searchProducts(params: {
   q: string;
   page?: number;
+  /** Return this many consecutive pages starting at `page` (default 1) —
+   * used to re-render pages 1..N for an infinite-scroll list. */
+  pageSpan?: number;
   sort?: ProductSort;
 }): Promise<SearchResult> {
   const q = params.q.trim();
@@ -782,7 +785,7 @@ export async function searchProducts(params: {
   const totalPages = Math.max(1, Math.ceil(total / SEARCH_PAGE_SIZE));
   const page = Math.min(Math.max(1, params.page ?? 1), totalPages);
   const start = (page - 1) * SEARCH_PAGE_SIZE;
-  const pageItems = sorted.slice(start, start + SEARCH_PAGE_SIZE);
+  const pageItems = sorted.slice(start, start + SEARCH_PAGE_SIZE * Math.max(1, params.pageSpan ?? 1));
 
   return { query: q, products: pageItems, total, page, pageSize: SEARCH_PAGE_SIZE, totalPages };
 }
@@ -847,6 +850,8 @@ export type CategoryProductsResult = {
 export async function getProductsByCategorySlug(params: {
   slug: string;
   page?: number;
+  /** Return this many consecutive pages starting at `page` (default 1). */
+  pageSpan?: number;
   sort?: ProductSort;
   size?: string;
   color?: string;
@@ -951,7 +956,7 @@ export async function getProductsByCategorySlug(params: {
   const totalPages = Math.max(1, Math.ceil(total / CATEGORY_PAGE_SIZE));
   const page = Math.min(Math.max(1, params.page ?? 1), totalPages);
   const start = (page - 1) * CATEGORY_PAGE_SIZE;
-  const pageItems = sorted.slice(start, start + CATEGORY_PAGE_SIZE);
+  const pageItems = sorted.slice(start, start + CATEGORY_PAGE_SIZE * Math.max(1, params.pageSpan ?? 1));
 
   return {
     category,

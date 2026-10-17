@@ -1,12 +1,20 @@
 import { cache } from "react";
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { Container } from "@/components/ui/Container";
 import { Breadcrumbs } from "@/components/catalog/Breadcrumbs";
-import { ProductGrid } from "@/components/catalog/ProductGrid";
+import { ProductListing } from "@/components/catalog/ProductListing";
 import { SearchSortSelect } from "@/components/catalog/SearchSortSelect";
 import { SearchPagination } from "@/components/catalog/SearchPagination";
 import { searchProducts } from "@/domains/catalog/queries";
-import { isProductSort, type ProductSort, type SearchQueryState } from "@/domains/catalog/presentation";
+import {
+  buildSearchHref,
+  isProductSort,
+  listingProgress,
+  listingWindowFor,
+  type ProductSort,
+  type SearchQueryState,
+} from "@/domains/catalog/presentation";
 import { toPersianDigits } from "@/lib/utils/persian-digits";
 
 type SearchPageProps = {
@@ -18,8 +26,8 @@ function firstValue(value: string | string[] | undefined): string | undefined {
 }
 
 /** `cache()`'d so `generateMetadata` and the page body share one fetch. */
-const loadSearchResults = cache((q: string, sort: ProductSort | undefined, page: number) =>
-  searchProducts({ q, sort, page }),
+const loadSearchResults = cache((q: string, sort: ProductSort | undefined, page: number, pageSpan: number) =>
+  searchProducts({ q, sort, page, pageSpan }),
 );
 
 async function resolveQueryState(props: SearchPageProps) {
@@ -50,8 +58,11 @@ export async function generateMetadata(props: SearchPageProps): Promise<Metadata
 
 export default async function SearchPage(props: SearchPageProps) {
   const { q, sort, page } = await resolveQueryState(props);
-  const result = q ? await loadSearchResults(q, sort, page) : null;
+  const window = listingWindowFor(page);
+  const result = q ? await loadSearchResults(q, sort, window.fetchPage, window.pageSpan) : null;
   const state: SearchQueryState = { q, sort };
+  const progress = result ? listingProgress(window, page, result.totalPages, result.page) : null;
+  if (result && progress?.clampedIntoInfiniteZone) redirect(buildSearchHref({ ...state, page: result.page }));
 
   return (
     <main className="py-[clamp(24px,4vw,40px)]">
@@ -78,13 +89,19 @@ export default async function SearchPage(props: SearchPageProps) {
           </p>
         ) : (
           <>
-            <ProductGrid
+            <ProductListing
               products={result?.products ?? []}
               emptyMessage={`محصولی برای «${q}» پیدا نشد.`}
+              total={result?.total ?? 0}
+              totalPages={result?.totalPages ?? 0}
+              infinite={window.infinite}
+              loadedThrough={progress?.loadedThrough ?? 1}
+              source={{ kind: "search", q, sort }}
+              baseHref={buildSearchHref(state)}
+              pagination={(current) => (
+                <SearchPagination state={state} page={current} totalPages={result?.totalPages ?? 0} />
+              )}
             />
-            {result && (
-              <SearchPagination state={state} page={result.page} totalPages={result.totalPages} />
-            )}
           </>
         )}
       </Container>

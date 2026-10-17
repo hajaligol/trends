@@ -18,6 +18,55 @@ export const PRODUCT_SORT_OPTIONS: Array<{ value: ProductSort; label: string }> 
   { value: "price-desc", label: "گران‌ترین" },
 ];
 
+/**
+ * Product list pages (category, search, collections, campaigns) load pages
+ * 1..`INFINITE_SCROLL_MAX_PAGE` by infinite scroll; from the next page on,
+ * classic numbered pagination takes over.
+ *
+ * `?page=N` with N <= the limit means "pages 1..N already loaded" (so a
+ * refresh / back navigation / no-JS link reproduces what the visitor was
+ * looking at); N above the limit is a plain single page.
+ */
+export const INFINITE_SCROLL_MAX_PAGE = 5;
+
+/** Shared by `ProductGrid` and the infinite-scroll grid so they match. */
+export const PRODUCT_GRID_CLASS = "grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-4";
+
+export type ListingWindow = {
+  /** First page the server query should return. */
+  fetchPage: number;
+  /** How many consecutive pages the server query should return. */
+  pageSpan: number;
+  /** true → infinite-scroll zone (pages 1..5); false → numbered-pagination zone. */
+  infinite: boolean;
+};
+
+export function listingWindowFor(requestedPage: number): ListingWindow {
+  const page = Number.isFinite(requestedPage) && requestedPage >= 1 ? Math.floor(requestedPage) : 1;
+  if (page <= INFINITE_SCROLL_MAX_PAGE) return { fetchPage: 1, pageSpan: page, infinite: true };
+  return { fetchPage: page, pageSpan: 1, infinite: false };
+}
+
+/**
+ * Given what the server query returned, how far the list has been loaded
+ * and how far infinite scroll may still go.
+ */
+export function listingProgress(window: ListingWindow, requestedPage: number, totalPages: number, resultPage: number) {
+  const lastInfinitePage = Math.max(1, Math.min(INFINITE_SCROLL_MAX_PAGE, totalPages));
+  const loadedThrough = window.infinite ? Math.min(Math.max(1, requestedPage), lastInfinitePage) : resultPage;
+  return {
+    loadedThrough,
+    lastInfinitePage,
+    /** Infinite scroll can still append pages after the initial render. */
+    hasMore: window.infinite && loadedThrough < lastInfinitePage,
+    /** Numbered pagination is needed once infinite scroll has run its course. */
+    needsPagination: totalPages > INFINITE_SCROLL_MAX_PAGE,
+    /** A page number > 5 that the query clamped back into the infinite zone
+     * (e.g. `?page=99` on a 3-page list) should be redirected there. */
+    clampedIntoInfiniteZone: !window.infinite && resultPage <= INFINITE_SCROLL_MAX_PAGE,
+  };
+}
+
 export function isProductSort(value: string): value is ProductSort {
   return value === "newest" || value === "price-asc" || value === "price-desc";
 }
