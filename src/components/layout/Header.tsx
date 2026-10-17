@@ -17,9 +17,10 @@ import {
 import { useUIOverlay } from "@/components/overlays/UIOverlayProvider";
 import { useCart } from "@/components/cart/CartProvider";
 import { HeaderSearch } from "@/components/layout/HeaderSearch";
-import { CategoryMegaMenu } from "@/components/layout/CategoryMegaMenu";
+import { HeaderNav } from "@/components/layout/HeaderNav";
 import { MobileCategoryMenu } from "@/components/layout/MobileCategoryMenu";
 import type { NavCategory } from "@/domains/categories/tree";
+import type { NavBrand } from "@/domains/brands/queries";
 import { toPersianDigits } from "@/lib/utils/persian-digits";
 
 /**
@@ -27,9 +28,10 @@ import { toPersianDigits } from "@/lib/utils/persian-digits";
  *
  * **Desktop (lg and up) — three columns**, laid out by physical side:
  *   - left:   the brand logo, and nothing else;
- *   - centre: two rows — a wide search box, and beneath it the category
- *             menu (مردانه / زنانه / بچگانه, each opening its menu of
- *             groups and types);
+ *   - centre: two rows — a wide search box, and beneath it the nav
+ *             (دسته‌بندی‌ها — مردانه / زنانه / بچگانه with their groups
+ *             and types — and برندها, a dropdown of top brands; see
+ *             `HeaderNav`);
  *   - right:  the cart and account buttons.
  * The columns use equal side tracks so the centre column is truly
  * centred. The page is RTL, where grid column 1 is the right-hand one, so
@@ -50,7 +52,7 @@ const ICON_BUTTON =
   "relative flex h-[46px] w-[46px] items-center justify-center rounded-full bg-transparent transition-colors duration-200 hover:bg-ink/6 lg:h-[56px] lg:w-[56px]";
 const ICON = "h-[28px] w-[28px] text-ink lg:h-[36px] lg:w-[36px]";
 
-export function Header({ categories }: { categories: NavCategory[] }) {
+export function Header({ categories, brands }: { categories: NavCategory[]; brands: NavBrand[] }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const { openSearch, isHeaderDimmed } = useUIOverlay();
@@ -68,7 +70,7 @@ export function Header({ categories }: { categories: NavCategory[] }) {
   const closeMenu = () => setMenuOpen(false);
 
   // `relative` on the <header> is required, not cosmetic: the category menu
-  // panel (CategoryMegaMenu) is `absolute inset-x-0 top-full` and anchors to
+  // panels (HeaderNav) is `absolute inset-x-0 top-full` and anchors to
   // the nearest positioned ancestor, which is this header. With no
   // positioning at all it anchors to the page instead and never appears
   // under the header. To keep the header on screen while scrolling, use
@@ -117,7 +119,7 @@ export function Header({ categories }: { categories: NavCategory[] }) {
               panel (positioned at the header's bottom) is reachable by
               the pointer with no dead gap in between. */}
           <nav aria-label="ناوبری اصلی" className="flex h-[48px] items-stretch justify-center gap-7">
-            <CategoryMegaMenu categories={categories} />
+            <HeaderNav categories={categories} brands={brands} />
           </nav>
         </div>
 

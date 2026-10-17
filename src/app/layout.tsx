@@ -13,6 +13,7 @@ import { ToastProvider } from "@/components/feedback/ToastProvider";
 import { WishlistProvider } from "@/components/wishlist/WishlistProvider";
 import { getCategoryTree } from "@/domains/catalog/queries";
 import { toNavTree } from "@/domains/categories/tree";
+import { getHeaderBrands } from "@/domains/brands/queries";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -37,7 +38,8 @@ export default async function RootLayout({
   // is deliberately not swallowed: rendering (or, worse, statically
   // baking in) a site with an empty menu would be a quieter and much
   // harder-to-notice failure than an error.
-  const navCategories = toNavTree(await getCategoryTree());
+  const [categoryTree, navBrands] = await Promise.all([getCategoryTree(), getHeaderBrands()]);
+  const navCategories = toNavTree(categoryTree);
 
   return (
     <html lang="fa" dir="rtl">
@@ -48,7 +50,7 @@ export default async function RootLayout({
               <ToastProvider>
                 <UIOverlayProvider>
                   <StoreChrome>
-                    <Header categories={navCategories} />
+                    <Header categories={navCategories} brands={navBrands} />
                   </StoreChrome>
                   {children}
                   <StoreChrome>

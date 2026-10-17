@@ -1,5 +1,35 @@
 # Trends Progress Report
 
+## Latest change: header nav — دسته‌بندی‌ها / برندها + `/brands` page (user-requested)
+Status: COMPLETE WITH FOLLOW-UP. tsc, eslint, `next build` clean; 178 unit + 96 integration tests pass
+(Postgres 16, fresh migrate + `db:seed`). Smoke-tested on a production build: `/` and `/brands` → 200,
+`/brands` in `sitemap.xml`.
+
+- **Header (desktop)**: the centre nav row is now two items. `src/components/layout/HeaderNav.tsx` replaces
+  `CategoryMegaMenu.tsx`. **دسته‌بندی‌ها** opens the same full-width panel as before, with a rail of
+  مردانه / زنانه / بچگانه; hovering/focusing one shows its groups and types (the old 5-column layout,
+  unchanged). First audience is shown on open. **برندها** (link to `/brands`) opens a panel of up to 12
+  best-selling brands (logo + name + Latin name; initial-letter tile when no logo). Same hover/focus/Escape/dim
+  behaviour as before; brand tiles mount on first open so logos are not fetched on every page.
+- **Header (mobile)**: accordion is now دسته‌بندی‌ها (audience > group > type) + a برندها link.
+- **Naming**: briefly renamed the audiences to آقایان/بانوان/کودکان, then **reverted at the user's request** — the taxonomy
+  names are مردانه / زنانه / بچگانه again. Databases that ran the interim `npm run db:sync-categories` must run it once
+  more to restore the names. No migration.
+- **Brands data**: `listStorefrontBrands()` / `getHeaderBrands()` in `domains/brands/queries.ts`. Ranking = units sold in
+  paid/processing/shipped/delivered orders (via `order_items.product_id`), then admin `displayOrder`, then name.
+  Header lists only brands with ≥1 active product; `/brands` lists every active brand. Root layout fetches them
+  (`app/layout.tsx`); brand admin actions now also `revalidatePath("/brands")` and `("/", "layout")`.
+- **New page** `src/app/brands/page.tsx` (`revalidate = 300`): logo, name, Latin name, country, description,
+  product count. Added to sitemap.
+- **Tests**: updated names in `tests/unit/category-taxonomy.test.ts`, `tests/integration/category-tree.test.ts`;
+  new brand-list tests in `tests/integration/brands.test.ts`.
+- **Assumptions to confirm**: (1) brand tiles link to `/search?q=<brand name>` — there is no per-brand product page;
+  (2) "trending" = best-selling only;
+- **Not verified**: hover behaviour in a real browser (no browser automation in the sandbox); the sales-based ranking with
+  real orders (tests cover visibility, tie-break and limit only).
+
+---
+
 ## Latest change: campaign → homepage hero slide / promo banner (user-requested)
 Status: COMPLETE WITH FOLLOW-UP. tsc, eslint, `next build` clean; 178 unit + 94 integration tests pass.
 Smoke-tested on a production build: a hero campaign and a banner campaign rendered on `/` linking to

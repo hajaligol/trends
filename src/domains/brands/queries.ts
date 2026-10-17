@@ -1,6 +1,7 @@
+import { cache } from "react";
 import { and, asc, count, eq, ne, sql } from "drizzle-orm";
 import { db } from "@/lib/db/client";
-import { brands, products } from "@/lib/db/schema";
+import { brands, orderItems, orders, products } from "@/lib/db/schema";
 
 /**
  * Brand reads. Admin-facing functions see inactive brands too; the
@@ -107,3 +108,75 @@ export async function getProductBrandError(
   }
   return null;
 }
+
+/** What the header dropdown and the `/brands` page need. */
+export type StorefrontBrand = {
+  slug: string;
+  name: string;
+  nameEn: string | null;
+  description: string | null;
+  logoUrl: string | null;
+  countryOfOrigin: string | null;
+  /** Active products only. */
+  productCount: number;
+  /** Units sold in orders that were actually paid (0 for a new brand). */
+  unitsSold: number;
+};
+
+/** Order statuses that count as a real sale for the "best-selling" ranking. */
+const SOLD_STATUSES = sql`('paid','processing','shipped','delivered')`;
+
+/**
+ * Active brands for the storefront, best-selling first.
+ *
+ * Ranking: units sold in paid-or-later orders (descending), then the admin's
+ * `displayOrder`, then name — so a store with no sales yet shows brands in
+ * the order the admin arranged them. Only brands with at least one **active**
+ * product appear when `withProductsOnly` is set (the header: a tile that
+ * leads to nothing is worse than no tile); the `/brands` page lists every
+ * active brand.
+ *
+ * One grouped query: the order join is a left join, and `count(distinct)`
+ * keeps the product count right despite the extra rows it produces.
+ */
+export async function listStorefrontBrands(
+  options: { limit?: number; withProductsOnly?: boolean } = {},
+): Promise<StorefrontBrand[]> {
+  const { limit, withProductsOnly = false } = options;
+  const unitsSold = sql<number>`coalesce(sum(${orderItems.quantity}) filter (where ${orders.status} in ${SOLD_STATUSES}), 0)`;
+
+  const query = db
+    .select({
+      slug: brands.slug,
+      name: brands.name,
+      nameEn: brands.nameEn,
+      description: brands.description,
+      logoUrl: brands.logoUrl,
+      countryOfOrigin: brands.countryOfOrigin,
+      productCount: sql<number>`count(distinct ${products.id})`,
+      unitsSold,
+    })
+    .from(brands)
+    .leftJoin(products, and(eq(products.brandId, brands.id), eq(products.isActive, true)))
+    .leftJoin(orderItems, eq(orderItems.productId, products.id))
+    .leftJoin(orders, eq(orders.id, orderItems.orderId))
+    .where(eq(brands.isActive, true))
+    .groupBy(brands.id)
+    .having(withProductsOnly ? sql`count(distinct ${products.id}) > 0` : undefined)
+    .orderBy(sql`${unitsSold} desc`, asc(brands.displayOrder), asc(brands.name));
+
+  const rows = await (limit ? query.limit(limit) : query);
+  return rows.map((row) => ({ ...row, productCount: Number(row.productCount), unitsSold: Number(row.unitsSold) }));
+}
+
+/** Lean, serializable brand for the header menu (passed as props to a Client Component on every page). */
+export type NavBrand = { slug: string; name: string; nameEn: string | null; logoUrl: string | null };
+
+/** How many brands the header dropdown shows (two rows of six). */
+export const HEADER_BRAND_LIMIT = 12;
+
+/** Trending / best-selling brands for the header dropdown. Deduplicated per request. */
+export const getHeaderBrands = cache(async (): Promise<NavBrand[]> => {
+  const rows = await listStorefrontBrands({ limit: HEADER_BRAND_LIMIT, withProductsOnly: true });
+  return rows.map(({ slug, name, nameEn, logoUrl }) => ({ slug, name, nameEn, logoUrl }));
+});

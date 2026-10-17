@@ -27,8 +27,8 @@ const SUMMARY_CLASS =
   "flex cursor-pointer list-none items-center justify-between rounded-md px-2 text-ink hover:bg-ink/5 [&::-webkit-details-marker]:hidden";
 
 /**
- * Mobile/tablet category navigation: nested native `<details>` disclosures
- * (audience > group > types). No JS state to manage — the browser handles
+ * Mobile/tablet navigation: nested native `<details>` disclosures
+ * (دسته‌بندی‌ها > audience > group > types) plus a plain برندها link. No JS state to manage — the browser handles
  * open/close, keyboard (Enter/Space on the summary) and screen-reader
  * expanded state for free. Every level also offers an explicit "all …"
  * link, since the summary row itself only toggles.
@@ -42,6 +42,12 @@ export function MobileCategoryMenu({
 }) {
   return (
     <div className="flex flex-col">
+      <details className="group/cats border-b border-line/60">
+        <summary className={`${SUMMARY_CLASS} py-2.5 text-[0.95rem] font-semibold`}>
+          دسته‌بندی‌ها
+          <Chevron className="transition-transform group-open/cats:rotate-180" />
+        </summary>
+        <div className="flex flex-col pb-2 ps-3">
       {categories.map((root) => (
         <details key={root.slug} className="group border-b border-line/60">
           <summary className={`${SUMMARY_CLASS} py-2.5 text-[0.95rem] font-semibold`}>
@@ -91,6 +97,16 @@ export function MobileCategoryMenu({
           </div>
         </details>
       ))}
+        </div>
+      </details>
+
+      <Link
+        href="/brands"
+        onClick={onNavigate}
+        className="rounded-md px-2 py-2.5 text-[0.95rem] font-semibold text-ink hover:bg-ink/5"
+      >
+        برندها
+      </Link>
     </div>
   );
 }

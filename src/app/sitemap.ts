@@ -8,6 +8,7 @@ import { campaignHref } from "@/domains/campaigns/slug";
 
 const STATIC_PAGES = [
   "/accessories",
+  "/brands",
   "/about",
   "/contact",
   "/faq",

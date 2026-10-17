@@ -9,6 +9,7 @@ import {
   isBrandNameTaken,
   listBrandOptions,
   listBrandsForAdmin,
+  listStorefrontBrands,
 } from "@/domains/brands/queries";
 import { generateBrandSlug } from "@/domains/brands/slug";
 import { createTestCategory, createTestProductWithVariant } from "./helpers";
@@ -145,5 +146,32 @@ describe("storefront visibility", () => {
     await db.update(brands).set({ isActive: false }).where(eq(brands.id, brand.id));
     const afterOff = await searchProducts({ q: brand.name });
     expect(afterOff.products.some((item) => item.slug === product.slug)).toBe(false);
+  });
+});
+
+describe("storefront brand list (header dropdown and /brands)", () => {
+  it("hides inactive brands, and brands without an active product when asked", async () => {
+    const { brand: withProduct } = await makeBrand({ displayOrder: -2 });
+    const { brand: empty } = await makeBrand({ displayOrder: -1 });
+    const { brand: inactive } = await makeBrand({ isActive: false });
+    await makeProduct(withProduct.id);
+    await makeProduct(inactive.id);
+
+    const all = await listStorefrontBrands();
+    expect(all.map((b) => b.slug)).toContain(empty.slug);
+    expect(all.map((b) => b.slug)).not.toContain(inactive.slug);
+    expect(all.find((b) => b.slug === withProduct.slug)?.productCount).toBe(1);
+
+    const forHeader = await listStorefrontBrands({ withProductsOnly: true });
+    expect(forHeader.map((b) => b.slug)).toContain(withProduct.slug);
+    expect(forHeader.map((b) => b.slug)).not.toContain(empty.slug);
+  });
+
+  it("breaks ties between unsold brands by the admin's display order, and honours the limit", async () => {
+    const { brand: first } = await makeBrand({ displayOrder: -20 });
+    const { brand: second } = await makeBrand({ displayOrder: -10 });
+    const slugs = (await listStorefrontBrands()).map((b) => b.slug);
+    expect(slugs.indexOf(first.slug)).toBeLessThan(slugs.indexOf(second.slug));
+    expect(await listStorefrontBrands({ limit: 3 })).toHaveLength(3);
   });
 });

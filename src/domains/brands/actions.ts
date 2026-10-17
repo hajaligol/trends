@@ -39,6 +39,9 @@ function revalidateBrandSurfaces() {
   revalidatePath("/admin/products");
   revalidatePath("/product/[slug]", "page");
   revalidatePath("/search");
+  // The header's brand dropdown lives in the root layout, and `/brands` lists them.
+  revalidatePath("/brands");
+  revalidatePath("/", "layout");
 }
 
 export async function createBrandAction(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
