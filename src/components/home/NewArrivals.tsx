@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ProductCardMedia } from "@/components/catalog/ProductCardMedia";
 import { Container } from "@/components/ui/Container";
-import { SectionHead } from "@/components/home/SectionHead";
+import { SectionTitleBand } from "@/components/home/SectionTitleBand";
 import { SwipeRow } from "@/components/home/SwipeRow";
 import { ShowAllTile } from "@/components/home/ShowAllTile";
 import { StarIcon } from "@/components/ui/icons";
@@ -26,12 +26,11 @@ export function NewArrivals({ arrivals }: { arrivals: CatalogProductSummary[] })
 
   return (
     <section id="new-arrivals" className="py-[clamp(30px,5vw,54px)]">
-      <Container>
-        <SectionHead
-          eyebrow="تازه‌ترین‌ها"
-          title="جدیدترین محصولات"
-          icon={<StarIcon className="h-[1.1em] w-[1.1em] text-brand" />}
-        />
+      <SectionTitleBand
+        title="جدیدترین محصولات"
+        icon={<StarIcon className="h-[1.1em] w-[1.1em]" />}
+      />
+      <Container className="mt-[clamp(20px,3vw,34px)]">
         <SwipeRow
           label={COLLECTIONS["new-arrivals"].title}
           showArrows

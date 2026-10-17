@@ -10,20 +10,15 @@ import {
 import type { CatalogProductSummary } from "@/domains/catalog/queries";
 
 /**
- * A swipeable row (5 cards visible on desktop, 3 from ~640px, ~2 below
- * that). Real catalog data since Phase 4 — see `getFeaturedProducts` in
- * `@/domains/catalog/queries`. The page passes up to
- * `HOME_ROW_MAX_PRODUCTS + 1` products: if there are more than
- * `HOME_ROW_MAX_PRODUCTS`, the row shows the first ones, keeps its arrows
- * and ends with a "show all" tile linking to `/collection/featured`.
+ * Homepage "hero" product section (شگفت‌انگیزها). The title sits in a
+ * solid deep-purple rounded band spanning the container (lavender flame disc, white title, a
+ * short yellow rule); the products sit below on a full-width pastel
+ * lavender band, each on a white rounded tile. Flat on purpose: no
+ * gradient, glow or shadow, and no animation beyond the row's normal
+ * sliding arrows (see `SwipeRow`).
  *
- * Styled as the homepage's "hero" product section on purpose: a light-purple
- * panel with a full-width purple head band (white flame icon + title), and
- * each product on its own white tile. The arrows scroll the row with a
- * smooth eased animation (see `SwipeRow`); there is no hover lift or flame
- * pulse. `ProductCard` itself is
- * untouched (it is shared with category listings) — the tile is a wrapper
- * around it here.
+ * More than `HOME_ROW_MAX_PRODUCTS` products → the row keeps its arrows
+ * and ends with a "show all" tile linking to `/collection/featured`.
  */
 export function FeaturedProducts({
   products,
@@ -37,48 +32,50 @@ export function FeaturedProducts({
   return (
     <section id="featured" className="py-[clamp(30px,5vw,54px)]">
       <Container>
-        <div className="relative overflow-hidden rounded-[clamp(20px,3vw,32px)] border border-brand/15 bg-[#f3ebfa] shadow-[0_30px_70px_-32px_rgba(91,15,165,0.5)]">
-          {/* Full-width purple head band: spans the whole top of the panel. */}
-          <div className="flex items-center gap-3.5 bg-brand px-[clamp(14px,3vw,40px)] py-3 sm:gap-4 sm:py-4">
+        <div className="rounded-[clamp(18px,2.8vw,30px)] bg-brand-dark px-[clamp(16px,3vw,40px)] py-[clamp(16px,2.6vw,28px)]">
+          <div className="flex items-center gap-4">
             <span
               aria-hidden="true"
-              className="flex h-12 w-12 shrink-0 items-center justify-center sm:h-14 sm:w-14"
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-lavender text-brand-dark sm:h-14 sm:w-14"
             >
-              <FlameIcon
-                className="h-9 w-9 text-white sm:h-10 sm:w-10"
-                strokeWidth={2}
-              />
+              <FlameIcon className="h-6 w-6 sm:h-7 sm:w-7" strokeWidth={2} />
             </span>
-            <h2 className="m-0 text-[clamp(1.7rem,3.4vw,2.5rem)] font-extrabold leading-[1.3] text-white">
-              شگفت‌انگیزها
-            </h2>
+            <div>
+              <h2 className="m-0 text-[clamp(1.7rem,3.6vw,2.7rem)] font-extrabold leading-[1.25] text-white">
+                شگفت‌انگیزها
+              </h2>
+              <span
+                aria-hidden="true"
+                className="mt-2 block h-[3px] w-12 rounded-full bg-yellow"
+              />
+            </div>
           </div>
+        </div>
 
-          <div className="px-[clamp(14px,3vw,40px)] pb-[clamp(18px,3vw,40px)] pt-[clamp(20px,3vw,34px)]">
-            <SwipeRow
-              label={COLLECTIONS.featured.title}
-              showArrows
-              gapClassName="gap-3.5 sm:gap-5"
-              itemClassName="basis-[calc((100%_-_14px)/2)] sm:basis-[calc((100%_-_40px)/3)] lg:basis-[calc((100%_-_80px)/5)]"
-            >
-              {visible.map((product) => (
-                <div
-                  key={product.id}
-                  className="w-full rounded-[24px] bg-white/85 p-2.5 shadow-[0_2px_14px_-6px_rgba(24,38,48,0.18)] ring-1 ring-white"
-                >
-                  <ProductCard product={product} showOptions={false} />
-                </div>
-              ))}
-              {hasMore && (
-                <ShowAllTile
-                  key="show-all"
-                  href="/collection/featured"
-                  label="مشاهده همه"
-                  productsLabel={COLLECTIONS.featured.title}
-                />
-              )}
-            </SwipeRow>
-          </div>
+        <div className="mt-3 rounded-[clamp(18px,2.8vw,30px)] bg-lavender/60 px-[clamp(14px,3vw,40px)] py-[clamp(18px,3vw,36px)]">
+          <SwipeRow
+            label={COLLECTIONS.featured.title}
+            showArrows
+            gapClassName="gap-3.5 sm:gap-5"
+            itemClassName="basis-[calc((100%_-_14px)/2)] sm:basis-[calc((100%_-_40px)/3)] lg:basis-[calc((100%_-_80px)/5)]"
+          >
+            {visible.map((product) => (
+              <div
+                key={product.id}
+                className="w-full rounded-[22px] bg-white p-2.5"
+              >
+                <ProductCard product={product} showOptions={false} />
+              </div>
+            ))}
+            {hasMore && (
+              <ShowAllTile
+                key="show-all"
+                href="/collection/featured"
+                label="مشاهده همه"
+                productsLabel={COLLECTIONS.featured.title}
+              />
+            )}
+          </SwipeRow>
         </div>
       </Container>
     </section>
