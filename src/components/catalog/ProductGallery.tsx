@@ -2,9 +2,16 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import dynamic from "next/dynamic";
+import { ZoomInIcon } from "@/components/ui/icons";
 import { AssetSlot } from "@/components/ui/AssetSlot";
 import { useProductColor } from "@/components/catalog/ProductColorContext";
 import { selectGalleryImages, type ColoredImage } from "@/domains/catalog/gallery";
+
+// Code-split: the viewer (zoom/pan/gesture logic) is only fetched on first open.
+const ImageLightbox = dynamic(() => import("@/components/catalog/ImageLightbox").then((m) => m.ImageLightbox), {
+  ssr: false,
+});
 
 /**
  * No real product photography exists yet (see catalog `seed.ts`), so in
@@ -22,6 +29,7 @@ export function ProductGallery({ title, images }: { title: string; images: Color
 
 function GalleryView({ title, images }: { title: string; images: ColoredImage[] }) {
   const [activeIndex, setActiveIndex] = useState(0);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
 
   // Caps the image's rendered width (height then follows from the 4/5
   // ratio) so it can never grow taller than the viewport allows, while
@@ -61,6 +69,20 @@ function GalleryView({ title, images }: { title: string; images: ColoredImage[] 
           className="object-cover"
           priority
         />
+        <button
+          type="button"
+          onClick={() => setLightboxOpen(true)}
+          aria-label="مشاهده تصویر در اندازه بزرگ"
+          aria-haspopup="dialog"
+          className="group absolute inset-0 cursor-zoom-in border-0 bg-transparent p-0"
+        >
+          <span
+            aria-hidden="true"
+            className="absolute bottom-3 end-3 flex h-10 w-10 items-center justify-center rounded-full bg-bg/90 text-ink shadow-sm transition-transform duration-200 group-hover:scale-105"
+          >
+            <ZoomInIcon className="h-5 w-5" />
+          </span>
+        </button>
       </div>
       {images.length > 1 && (
         <div style={maxWidthWithThumbnailsStyle} className="mx-auto flex w-full gap-2.5 overflow-x-auto p-0.5">
@@ -79,6 +101,14 @@ function GalleryView({ title, images }: { title: string; images: ColoredImage[] 
             </button>
           ))}
         </div>
+      )}
+      {lightboxOpen && (
+        <ImageLightbox
+          images={images}
+          index={activeIndex}
+          onIndexChange={setActiveIndex}
+          onClose={() => setLightboxOpen(false)}
+        />
       )}
     </div>
   );

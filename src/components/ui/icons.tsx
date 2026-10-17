@@ -275,3 +275,17 @@ export function ChevronDownIcon(props: SVGProps<SVGSVGElement>) {
     <svg {...strokeProps} {...props}><path d="m6 9 6 6 6-6" /></svg>
   );
 }
+
+/** Lucide "zoom-in" — product image lightbox. */
+export function ZoomInIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...strokeProps} {...props}><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /><path d="M11 8v6" /><path d="M8 11h6" /></svg>
+  );
+}
+
+/** Lucide "zoom-out" — product image lightbox. */
+export function ZoomOutIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...strokeProps} {...props}><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /><path d="M8 11h6" /></svg>
+  );
+}

@@ -1,5 +1,21 @@
 # Trends Progress Report
 
+## Latest change: product image lightbox (user-requested)
+Status: COMPLETE. `tsc --noEmit` ✔, `eslint .` ✔, unit tests ✔ (incl. new `tests/unit/image-zoom.test.ts`). `next build` compiles; page-data
+collection needs `DATABASE_URL` (not run against a DB this session). **No DB changes.**
+
+- Clicking the main image on `/product/[slug]` opens `components/catalog/ImageLightbox.tsx` (full-screen dialog, code-split via
+  `next/dynamic`, mounted only while open). Shows the selected colour's images only (same list as the gallery).
+- **Zoom** 100–400 %: buttons, `+`/`-`/`0` keys, wheel/trackpad (around cursor), pinch, tap/click toggles 2.5×/reset. **Pan** by dragging when zoomed.
+- **Navigate**: prev/next buttons, thumbnails, ←/→ keys, swipe (at 100 %); loops. RTL: next = visual left, ArrowLeft = next, rightward swipe = next.
+- Gallery stays in sync: closing the lightbox leaves the page gallery on the last viewed image.
+- A11y: `useDialogA11y` (focus trap, Escape, focus restore), body scroll lock, labelled controls, counter in `aria-live`, reduced-motion respected.
+- Pure math in `lib/utils/image-zoom.ts`. New icons `ZoomInIcon`/`ZoomOutIcon`. `ProductGallery.tsx` now has a zoom button overlay.
+- Products without real photos (AssetSlot placeholder) show no zoom affordance.
+- **Cleanup**: deleted six dead components that the previous entry already listed as removed but were still in the zip and broke `tsc`
+  (`CategoryFilters`, `Pagination`, `SearchPagination`, `SearchSortSelect`, `SortSelect`, `CollectionPagination` in `components/catalog/`).
+- Not verified in a real browser (no browser automation in the sandbox): gesture feel (pinch/swipe) should be checked on a phone.
+
 ## Latest change: unified filters on all product list pages (user-requested)
 Status: COMPLETE WITH FOLLOW-UP. `tsc --noEmit` ✔, `eslint .` ✔, `next build` ✔, 223 unit + 107 integration tests pass
 (Postgres 16, fresh migrate + `db:seed`). Smoke-tested on a production build: `/category/men` (+ filtered, + `?page=2`),
