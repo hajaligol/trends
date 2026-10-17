@@ -18,6 +18,7 @@ import {
   StarIcon,
   TagIcon,
   TicketIcon,
+  PercentIcon,
   UsersIcon,
   PackageIcon,
 } from "@/components/admin/ui/icons";
@@ -34,6 +35,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/admin/orders", label: "سفارش‌ها", icon: PackageIcon, badge: "orders" },
       { href: "/admin/customers", label: "مشتریان", icon: UsersIcon },
+      { href: "/admin/campaigns", label: "کمپین‌های فروش", icon: PercentIcon },
       { href: "/admin/coupons", label: "کدهای تخفیف", icon: TicketIcon },
     ],
   },

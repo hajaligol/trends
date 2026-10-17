@@ -18,7 +18,16 @@ import {
 } from "@/domains/cart/actions";
 import type { CartSummary } from "@/domains/cart/queries";
 
-const EMPTY_CART: CartSummary = { cartId: null, items: [], itemCount: 0, subtotalToman: 0 };
+const EMPTY_CART: CartSummary = {
+  cartId: null,
+  items: [],
+  itemCount: 0,
+  subtotalToman: 0,
+  grossToman: 0,
+  campaignDiscountToman: 0,
+  appliedCampaigns: [],
+  freeShipping: null,
+};
 
 type CartContextValue = {
   cart: CartSummary;

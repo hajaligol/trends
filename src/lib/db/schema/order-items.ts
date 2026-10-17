@@ -38,9 +38,17 @@ export const orderItems = pgTable(
     size: text("size").notNull(),
     color: text("color").notNull(),
     imageUrl: text("image_url"),
+    /** The REGULAR unit price at purchase time (before any sale campaign). */
     unitPriceToman: integer("unit_price_toman").notNull(),
     compareAtPriceToman: integer("compare_at_price_toman"),
     quantity: integer("quantity").notNull(),
+    /** Total sale-campaign discount on this line (all campaigns, all kinds).
+     * `lineTotalToman = unitPriceToman * quantity - campaignDiscountToman`
+     * (DB-checked). */
+    campaignDiscountToman: integer("campaign_discount_toman").notNull().default(0),
+    /** Snapshot of the campaign name(s) that discounted this line. */
+    campaignLabel: text("campaign_label"),
+    /** What the customer actually pays for this line. */
     lineTotalToman: integer("line_total_toman").notNull(),
 
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -50,6 +58,11 @@ export const orderItems = pgTable(
     check("order_items_quantity_positive", sql`${table.quantity} > 0`),
     check("order_items_unit_price_non_negative", sql`${table.unitPriceToman} >= 0`),
     check("order_items_line_total_non_negative", sql`${table.lineTotalToman} >= 0`),
+    check("order_items_campaign_discount_non_negative", sql`${table.campaignDiscountToman} >= 0`),
+    check(
+      "order_items_line_total_matches",
+      sql`${table.lineTotalToman}::bigint = ${table.unitPriceToman}::bigint * ${table.quantity} - ${table.campaignDiscountToman}`,
+    ),
   ],
 );
 

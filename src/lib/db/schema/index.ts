@@ -16,6 +16,7 @@ export * from "./order-status";
 export * from "./orders";
 export * from "./coupons";
 export * from "./coupon-redemptions";
+export * from "./campaigns";
 export * from "./payments";
 export * from "./payment-events";
 export * from "./order-status-history";

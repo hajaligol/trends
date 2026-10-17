@@ -1,5 +1,42 @@
 # Trends Progress Report
 
+## Latest change: sale campaigns (user-requested)
+Status: COMPLETE WITH FOLLOW-UP. `tsc --noEmit`, eslint, `next build` clean; 174 unit +
+85 integration tests pass (Postgres 16, fresh migrate + `db:seed`). Full design/rules:
+`docs/SALE_CAMPAIGNS.md`.
+
+- **Feature**: admin-managed automatic campaigns at `/admin/campaigns` — 9 kinds (percent / amount /
+  fixed price, buy X get Y free / at N%, bundle price, tiered, basket discount, free shipping),
+  scoped to the whole store or any union of brands, categories (with sub-categories) and products,
+  minus excluded products; scheduled (Tehran time), pausable, duplicable, with live coverage preview.
+- **DB (migration `0017_sale_campaigns`)**: `campaigns`, `campaign_targets` (3 real FKs, exactly one set),
+  `order_campaign_applications`; new columns `order_items.campaign_discount_toman/campaign_label`,
+  `orders.campaign_discount_toman/shipping_discount_toman`; check
+  `order_items_line_total_matches` (added NOT VALID: new rows enforced, legacy untouched).
+- **Semantic change to know**: `order_items.unit_price_toman` is now the REGULAR price; the paid amount is
+  `line_total_toman` (= unit × qty − campaign discount). `orders.subtotal_toman` is post-campaign.
+  `CartSummary.subtotalToman` is post-campaign; `grossToman`/`campaignDiscountToman`/`appliedCampaigns`/`freeShipping` added.
+- **Authority**: `getCartSummary` and `createOrderFromCart` both run `evaluateCart` (pure engine,
+  `src/domains/campaigns/engine.ts`); order creation recomputes inside its transaction and now re-resolves
+  the shipping fee itself (the passed `shippingMethod` is trusted only for its `code`).
+- **Storefront**: price campaigns lower prices in all catalog queries (strike-through = regular price),
+  `CatalogProductSummary.campaigns` drives a card tag + product-page notice (+ optional countdown);
+  checkout/order pages show campaign discount rows. Homepage now `revalidate = 60` (it was static).
+- **Files**: `src/domains/campaigns/*`, `src/lib/db/schema/campaigns.ts`, `src/components/admin/campaign/*`,
+  `src/app/admin/campaigns/**`, `src/app/api/admin/campaign-products/route.ts`, `src/lib/utils/tehran-time.ts`,
+  catalog/cart/orders/shipping/checkout edits, tests `tests/unit/campaign-*.test.ts`, `tests/integration/sale-campaigns.test.ts`.
+- **Assumptions (business decisions to confirm)**: coupons apply to the post-campaign subtotal and are
+  not blocked on sale items; non-stackable campaigns exclude already-discounted units from other offers;
+  "cheapest units are free/discounted" in buy-X-get-Y; free shipping waives `standard` (express only if opted in);
+  strike-through price on a campaign item is the regular price (an existing `compare_at` is not shown while a campaign applies);
+  Iran time is fixed UTC+03:30 (no DST).
+- **Not verified**: admin screens were NOT exercised in a real browser (needs login/automation) — covered by
+  typecheck, lint, build, schema/engine/DB tests and a rendered product-page smoke test only.
+  First thing next session: click through `/admin/campaigns/new` (all 9 kinds, pickers, preview, save, edit, duplicate, delete)
+  and the cart → checkout → order flow with a campaign live.
+- **Not included**: gift-with-purchase, per-campaign unit caps, audience targeting, coupon exclusion on sale items.
+
+---
 ## Latest change: brands in the header search panel (user-requested)
 Status: COMPLETE. `tsc --noEmit` and eslint clean. Verified on Postgres 16
 (fresh migrate + `db:seed`): `searchBrands` and `/api/search/suggest` return the

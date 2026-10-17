@@ -8,6 +8,7 @@ import { Breadcrumbs } from "@/components/catalog/Breadcrumbs";
 import { ProductGallery } from "@/components/catalog/ProductGallery";
 import { ProductColorProvider } from "@/components/catalog/ProductColorContext";
 import { VariantSelector } from "@/components/catalog/VariantSelector";
+import { CampaignNotice } from "@/components/catalog/CampaignNotice";
 import { WishlistToggleButton } from "@/components/ui/WishlistButton";
 import { ScrollToTopOnMount } from "@/components/utility/ScrollToTopOnMount";
 import { ProductGrid } from "@/components/catalog/ProductGrid";
@@ -178,6 +179,8 @@ export default async function ProductPage({ params, searchParams }: ProductPageP
               {product.shortDescription && (
                 <p className="text-[0.95rem] leading-8 text-text-secondary">{product.shortDescription}</p>
               )}
+
+              <CampaignNotice campaigns={product.campaigns} />
 
               <div className="border-t border-line pt-6">
                 <VariantSelector

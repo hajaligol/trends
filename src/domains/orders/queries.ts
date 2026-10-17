@@ -2,6 +2,7 @@ import { and, asc, count, desc, eq, ilike, inArray, or, sql } from "drizzle-orm"
 import { db, type DbTransaction } from "@/lib/db/client";
 import {
   cartItems,
+  orderCampaignApplications,
   orderItems,
   orderStatusHistory,
   orders,
@@ -14,7 +15,9 @@ import {
   type OrderStatusHistoryRow,
 } from "@/lib/db/schema";
 import { pickImageForColor } from "@/domains/catalog/gallery";
-import type { ShippingMethod } from "@/domains/shipping/methods";
+import { getShippingMethod, type ShippingMethod } from "@/domains/shipping/methods";
+import { loadActiveCampaigns } from "@/domains/campaigns/queries";
+import { evaluateCart } from "@/domains/campaigns/engine";
 import { CouponInvalidError, recordCouponRedemption, validateCoupon } from "@/domains/promotions/queries";
 import { canAdminTransition, canCustomerCancel, type OrderStatus } from "@/domains/orders/lifecycle";
 import { notifyEvent } from "@/domains/notifications/provider";
@@ -138,6 +141,8 @@ export async function createOrderFromCart(
         stock: productVariants.stock,
         variantActive: productVariants.isActive,
         productActive: products.isActive,
+        brandId: products.brandId,
+        categoryId: products.categoryId,
         requestedQuantity: cartItems.quantity,
       })
       .from(cartItems)
@@ -198,7 +203,33 @@ export async function createOrderFromCart(
       }
     }
 
-    const subtotalToman = lines.reduce((sum, line) => sum + line.priceToman * line.requestedQuantity, 0);
+    // Sale campaigns, recomputed from the database INSIDE this transaction
+    // (never from what the customer saw in the cart): the same engine the
+    // cart uses, so the numbers agree unless a campaign changed in between —
+    // and then the order simply gets the current, correct price.
+    const pricing = evaluateCart(
+      lines.map((line) => ({
+        lineId: line.variantId,
+        productId: line.productId,
+        brandId: line.brandId,
+        categoryId: line.categoryId,
+        unitPriceToman: line.priceToman,
+        quantity: line.requestedQuantity,
+      })),
+      await loadActiveCampaigns(tx, new Date()),
+    );
+    const pricedByVariant = new Map(pricing.lines.map((line) => [line.lineId, line]));
+    // Items total the customer pays: regular prices minus campaigns.
+    const subtotalToman = pricing.subtotalToman;
+
+    // The shipping fee is re-resolved here too (the passed-in method is only
+    // trusted for its `code`): once with and once without a free-shipping
+    // campaign, so the waived amount is recorded exactly.
+    const resolvedMethod = await getShippingMethod(shippingMethod.code, subtotalToman, pricing.freeShipping);
+    const regularMethod = await getShippingMethod(shippingMethod.code, subtotalToman, null);
+    if (!resolvedMethod || !regularMethod) throw new Error("Unknown shipping method at order creation");
+    const shippingFeeToman = resolvedMethod.feeToman;
+    const shippingDiscountToman = Math.max(0, regularMethod.feeToman - resolvedMethod.feeToman);
 
     // Coupon validation happens *inside* this transaction, against the
     // real subtotal computed above, and with `coupons` locked
@@ -207,7 +238,7 @@ export async function createOrderFromCart(
     // with another checkout is caught here, not just at preview time.
     // Any thrown `CouponInvalidError` rolls back the stock decrement
     // above along with everything else (§4.3 — an invalid coupon must
-    // not partially apply).
+    // not partially apply). Coupons apply to the post-campaign subtotal.
     let discountToman = 0;
     let appliedCouponId: string | null = null;
     if (couponCode) {
@@ -216,7 +247,7 @@ export async function createOrderFromCart(
       appliedCouponId = coupon.id;
     }
 
-    const totalToman = Math.max(0, subtotalToman + shippingMethod.feeToman - discountToman);
+    const totalToman = Math.max(0, subtotalToman + shippingFeeToman - discountToman);
 
     let order: Order | undefined;
     // Retry once on the astronomically unlikely order-number collision
@@ -238,12 +269,14 @@ export async function createOrderFromCart(
             postalCode: shipping.postalCode,
             plaqueUnitDetails: shipping.plaqueUnitDetails,
             deliveryNotes: shipping.deliveryNotes,
-            shippingMethodCode: shippingMethod.code,
-            shippingMethodLabel: shippingMethod.label,
-            shippingEstimateLabel: shippingMethod.estimateLabel,
+            shippingMethodCode: resolvedMethod.code,
+            shippingMethodLabel: resolvedMethod.label,
+            shippingEstimateLabel: resolvedMethod.estimateLabel,
             subtotalToman,
-            shippingFeeToman: shippingMethod.feeToman,
+            shippingFeeToman,
             discountToman,
+            campaignDiscountToman: pricing.campaignDiscountToman,
+            shippingDiscountToman,
             totalToman,
             couponId: appliedCouponId,
             couponCode: appliedCouponId ? couponCode!.trim().toUpperCase() : null,
@@ -265,7 +298,9 @@ export async function createOrderFromCart(
       await recordCouponRedemption(tx, appliedCouponId, userId, order.id);
     }
 
-    const newItems: NewOrderItem[] = lines.map((line) => ({
+    const newItems: NewOrderItem[] = lines.map((line) => {
+      const priced = pricedByVariant.get(line.variantId)!;
+      return {
       orderId: order!.id,
       productId: line.productId,
       variantId: line.variantId,
@@ -278,9 +313,33 @@ export async function createOrderFromCart(
       unitPriceToman: line.priceToman,
       compareAtPriceToman: line.compareAtPriceToman,
       quantity: line.requestedQuantity,
-      lineTotalToman: line.priceToman * line.requestedQuantity,
-    }));
+      campaignDiscountToman: priced.discountToman,
+      campaignLabel: priced.campaignNames.length > 0 ? priced.campaignNames.join(" + ") : null,
+      lineTotalToman: priced.payableToman,
+      };
+    });
     await tx.insert(orderItems).values(newItems);
+
+    // Immutable record of which campaigns discounted this order.
+    const applications = pricing.applied.map((entry) => ({
+      orderId: order!.id,
+      campaignId: entry.campaignId,
+      campaignName: entry.name,
+      kind: entry.kind as string,
+      discountToman: entry.discountToman,
+      shippingDiscountToman: 0,
+    }));
+    if (pricing.freeShipping && shippingDiscountToman > 0) {
+      applications.push({
+        orderId: order.id,
+        campaignId: pricing.freeShipping.campaignId,
+        campaignName: pricing.freeShipping.name,
+        kind: "free_shipping",
+        discountToman: 0,
+        shippingDiscountToman,
+      });
+    }
+    if (applications.length > 0) await tx.insert(orderCampaignApplications).values(applications);
 
     await tx.delete(cartItems).where(eq(cartItems.cartId, cartId));
 

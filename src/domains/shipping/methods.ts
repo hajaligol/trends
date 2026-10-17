@@ -50,7 +50,12 @@ const BASE_METHODS: BaseMethod[] = [
  * Iran for now; a future phase can filter this list by the selected
  * address's province if that becomes a real requirement.
  */
-export async function listShippingMethods(subtotalToman: number): Promise<ShippingMethod[]> {
+export async function listShippingMethods(
+  subtotalToman: number,
+  // A live free-shipping sale campaign covering this cart (from the pricing
+  // engine). `standard` is waived; `express` only when the campaign says so.
+  campaignFreeShipping: { name: string; includeExpress: boolean } | null = null,
+): Promise<ShippingMethod[]> {
   const settings = await getSiteSettings();
   const feeByCode: Record<string, number> = {
     standard: settings.standardShippingFeeToman,
@@ -63,11 +68,18 @@ export async function listShippingMethods(subtotalToman: number): Promise<Shippi
     if (method.code === "standard" && qualifiesForFreeStandard) {
       return { ...method, feeToman: 0, label: `${method.label} (رایگان)` };
     }
+    if (campaignFreeShipping && (method.code === "standard" || campaignFreeShipping.includeExpress)) {
+      return { ...method, feeToman: 0, label: `${method.label} (رایگان — ${campaignFreeShipping.name})` };
+    }
     return { ...method, feeToman };
   });
 }
 
-export async function getShippingMethod(code: string, subtotalToman: number): Promise<ShippingMethod | null> {
-  const methods = await listShippingMethods(subtotalToman);
+export async function getShippingMethod(
+  code: string,
+  subtotalToman: number,
+  campaignFreeShipping: { name: string; includeExpress: boolean } | null = null,
+): Promise<ShippingMethod | null> {
+  const methods = await listShippingMethods(subtotalToman, campaignFreeShipping);
   return methods.find((method) => method.code === code) ?? null;
 }

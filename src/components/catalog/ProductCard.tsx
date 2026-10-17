@@ -27,6 +27,10 @@ export function ProductCard({
   showOptions?: boolean;
 }) {
   const colorSwatches = product.colorHexes.slice(0, 4);
+  // One short campaign tag: the campaign's name when it changed the price
+  // (the % badge already says how much), otherwise what the offer is.
+  const highlighted = product.campaigns.find((c) => c.kind !== "free_shipping");
+  const promo = highlighted ? (highlighted.changesPrice ? highlighted.name : highlighted.summary) : null;
 
   return (
     <article className="flex flex-col gap-2.5">
@@ -49,6 +53,9 @@ export function ProductCard({
         <p className="mb-1.5 text-[0.9rem] text-text-secondary">
           {product.fromPriceToman !== null ? formatToman(product.fromPriceToman) : "—"}
         </p>
+        {promo && (
+          <p className="mb-1.5 w-fit rounded-full bg-lavender/60 px-2.5 py-0.5 text-[0.72rem] font-semibold text-brand-dark">{promo}</p>
+        )}
         {colorSwatches.length > 0 && (
           <div className="mb-1.5 flex gap-1.5">
             {colorSwatches.map((hex, index) => (

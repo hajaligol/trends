@@ -79,6 +79,12 @@ export const orders = pgTable(
     subtotalToman: integer("subtotal_toman").notNull(),
     shippingFeeToman: integer("shipping_fee_toman").notNull(),
     discountToman: integer("discount_toman").notNull().default(0),
+    /** Sale-campaign discounts already inside `subtotalToman` (which is the
+     * payable items total AFTER campaigns). Reporting snapshot only. */
+    campaignDiscountToman: integer("campaign_discount_toman").notNull().default(0),
+    /** Shipping fee waived by a free-shipping campaign (`shippingFeeToman`
+     * is what was actually charged). */
+    shippingDiscountToman: integer("shipping_discount_toman").notNull().default(0),
     totalToman: integer("total_toman").notNull(),
 
     // --- Coupon snapshot (Phase 9). `couponId` is a nullable FK purely

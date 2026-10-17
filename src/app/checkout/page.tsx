@@ -30,7 +30,7 @@ export default async function CheckoutPage() {
   const cart = await getCartSummary(cartId);
 
   const addresses = user ? await getAddressesForUser(user.id) : [];
-  const shippingMethods = await listShippingMethods(cart.subtotalToman);
+  const shippingMethods = await listShippingMethods(cart.subtotalToman, cart.freeShipping);
 
   return (
     <main className="py-[clamp(28px,5vw,64px)]">

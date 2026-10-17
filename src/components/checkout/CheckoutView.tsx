@@ -598,8 +598,17 @@ export function CheckoutView({
             <div className={`flex flex-col gap-2.5 text-[0.9rem] ${step !== "cart" ? "border-t border-line pt-4" : ""}`}>
               <div className="flex justify-between">
                 <span className="text-text-secondary">جمع کالاها ({toPersianDigits(itemUnits)})</span>
-                <span>{formatToman(cart.subtotalToman)}</span>
+                <span>{formatToman(cart.grossToman)}</span>
               </div>
+              {cart.campaignDiscountToman > 0 && (
+                <div className="flex justify-between gap-3">
+                  <span className="text-text-secondary">
+                    تخفیف کمپین
+                    <span className="block text-[0.74rem]">{cart.appliedCampaigns.map((c) => c.name).join("، ")}</span>
+                  </span>
+                  <span className="shrink-0 font-semibold text-brand-dark">−{formatToman(cart.campaignDiscountToman)}</span>
+                </div>
+              )}
               {discountToman > 0 && (
                 <div className="flex justify-between">
                   <span className="text-text-secondary">تخفیف</span>
@@ -844,6 +853,16 @@ function CartLine({
                     <span className="ms-2 line-through">{formatToman(item.compareAtPriceToman)}</span>
                   )}
                 </span>
+                {item.campaignDiscountToman > 0 && (
+                  <span className="text-[0.74rem] font-semibold text-brand-dark">
+                    {item.campaignNames.join(" + ")}: −{formatToman(item.campaignDiscountToman)}
+                  </span>
+                )}
+                {item.campaignDiscountToman > 0 && (
+                  <span className="text-[0.78rem] text-text-secondary line-through">
+                    {formatToman(item.unitPriceToman * item.effectiveQuantity)}
+                  </span>
+                )}
                 <span className="text-[1.02rem] font-bold text-ink">{formatToman(item.lineTotalToman)}</span>
               </div>
             </div>

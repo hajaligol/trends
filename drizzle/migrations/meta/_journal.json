@@ -120,6 +120,13 @@
       "when": 1791915028105,
       "tag": "0016_drop_product_brand_text",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1792175488998,
+      "tag": "0017_sale_campaigns",
+      "breakpoints": true
     }
   ]
 }

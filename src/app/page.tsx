@@ -12,6 +12,16 @@ import { HOME_ROW_MAX_PRODUCTS } from "@/domains/catalog/presentation";
 import { getFeaturedProducts, getNewArrivals, getTopSellingProducts } from "@/domains/catalog/queries";
 import { getActiveHeroSlides, getActivePromoBanners, getHomeCategoryTiles } from "@/domains/content/queries";
 
+/**
+ * The homepage is statically generated, and its product rows now show sale
+ * campaign prices — which change with the clock (a campaign starting or
+ * ending). Re-generate at most once a minute so a prerendered page can never
+ * show a sale price long after the campaign ended. (Saving a campaign in the
+ * admin also revalidates immediately; the cart and checkout never read this
+ * page — they always price from the database.)
+ */
+export const revalidate = 60;
+
 export const metadata: Metadata = {
   alternates: { canonical: "/" },
   openGraph: { url: "/" },

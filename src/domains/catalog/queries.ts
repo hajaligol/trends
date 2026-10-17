@@ -16,6 +16,14 @@ import {
 } from "@/domains/categories/tree";
 import type { ProductSort } from "./presentation";
 import { normalizeSlugParam } from "./slug";
+import {
+  campaignInfosFor,
+  getCatalogPricing,
+  priceVariantForCatalog,
+  type CatalogCampaignInfo,
+  type CatalogPricing,
+} from "@/domains/campaigns/pricing";
+import type { ProductRef } from "@/domains/campaigns/engine";
 import { listProductSpecifications, type SpecificationRow } from "@/domains/catalog/specifications";
 
 /**
@@ -159,15 +167,19 @@ type RawVariantRow = {
   lowStockThreshold: number;
 };
 
-function toVariant(row: RawVariantRow): CatalogProductVariant {
+/** `ref` identifies the owning product so a sale campaign covering its
+ * brand/category/id lowers the displayed price (display only: the cart and
+ * order recompute from the database). */
+function toVariant(row: RawVariantRow, pricing: CatalogPricing, ref: ProductRef): CatalogProductVariant {
+  const price = priceVariantForCatalog(pricing, ref, row);
   return {
     id: row.id,
     size: row.size,
     color: row.color,
     colorHex: row.colorHex,
     material: row.material,
-    priceToman: row.priceToman,
-    compareAtPriceToman: row.compareAtPriceToman,
+    priceToman: price.priceToman,
+    compareAtPriceToman: price.compareAtPriceToman,
     stock: row.stock,
     stockState: stockStateFor(row.stock, row.lowStockThreshold),
   };
@@ -231,12 +243,18 @@ export type CatalogProductSummary = {
   sharedImage: { url: string; altText: string } | null;
   /** Aggregate across active variants — see `aggregateStockState`. */
   stockState: StockState;
+  /** Live sale campaigns covering this product (price-level first). */
+  campaigns: CatalogCampaignInfo[];
 };
+
+type ProductRow = { id: string; slug: string; title: string; categorySlug: string; brandId: string | null; categoryId: string };
+const refOf = (row: ProductRow): ProductRef => ({ productId: row.id, brandId: row.brandId, categoryId: row.categoryId });
 
 function buildSummary(
   product: { id: string; slug: string; title: string; categorySlug: string },
   variants: CatalogProductVariant[],
   images: ColoredImage[],
+  campaigns: CatalogCampaignInfo[] = [],
 ): CatalogProductSummary {
   const fromPriceToman =
     variants.length > 0 ? Math.min(...variants.map((variant) => variant.priceToman)) : null;
@@ -285,6 +303,7 @@ function buildSummary(
     colorHexes,
     images: images.map((image) => ({ url: image.url, altText: image.altText })),
     stockState,
+    campaigns,
   };
 }
 
@@ -314,6 +333,8 @@ async function loadProductSummaries(
       slug: products.slug,
       title: products.title,
       categorySlug: categories.slug,
+      brandId: products.brandId,
+      categoryId: products.categoryId,
     })
     .from(products)
     .innerJoin(categories, eq(categories.id, products.categoryId))
@@ -338,12 +359,14 @@ async function loadProductSummaries(
 
   const variantsByProduct = groupByProductId(variantRows);
   const imagesByProduct = groupByProductId(imageRows);
+  const pricing = await getCatalogPricing();
 
   return rows.map((row) =>
     buildSummary(
       row,
-      (variantsByProduct.get(row.id) ?? []).map(toVariant),
+      (variantsByProduct.get(row.id) ?? []).map((variant) => toVariant(variant, pricing, refOf(row))),
       (imagesByProduct.get(row.id) ?? []).map(toColoredImage),
+      campaignInfosFor(pricing, refOf(row)),
     ),
   );
 }
@@ -481,6 +504,7 @@ export async function getProductDetailBySlug(rawSlug: string): Promise<CatalogPr
       seoTitle: products.seoTitle,
       seoDescription: products.seoDescription,
       categoryId: products.categoryId,
+      brandId: products.brandId,
       categorySlug: categories.slug,
       categoryName: categories.name,
     })
@@ -510,9 +534,10 @@ export async function getProductDetailBySlug(rawSlug: string): Promise<CatalogPr
     listProductSpecifications(row.id),
   ]);
 
-  const variants = variantRows.map(toVariant);
+  const pricing = await getCatalogPricing();
+  const variants = variantRows.map((variant) => toVariant(variant, pricing, refOf(row)));
   const galleryImages = imageRows.map(toColoredImage);
-  const summary = buildSummary(row, variants, galleryImages);
+  const summary = buildSummary(row, variants, galleryImages, campaignInfosFor(pricing, refOf(row)));
 
   return {
     ...summary,
@@ -570,6 +595,8 @@ export async function getRelatedProducts(
       slug: products.slug,
       title: products.title,
       categorySlug: categories.slug,
+      brandId: products.brandId,
+      categoryId: products.categoryId,
     })
     .from(products)
     .innerJoin(categories, eq(categories.id, products.categoryId))
@@ -597,12 +624,14 @@ export async function getRelatedProducts(
 
   const variantsByProduct = groupByProductId(variantRows);
   const imagesByProduct = groupByProductId(imageRows);
+  const pricing = await getCatalogPricing();
 
   return rows.map((row) =>
     buildSummary(
       row,
-      (variantsByProduct.get(row.id) ?? []).map(toVariant),
+      (variantsByProduct.get(row.id) ?? []).map((variant) => toVariant(variant, pricing, refOf(row))),
       (imagesByProduct.get(row.id) ?? []).map(toColoredImage),
+      campaignInfosFor(pricing, refOf(row)),
     ),
   );
 }
@@ -686,6 +715,8 @@ export async function searchProducts(params: {
       title: products.title,
       categorySlug: categories.slug,
       createdAt: products.createdAt,
+      brandId: products.brandId,
+      categoryId: products.categoryId,
     })
     .from(products)
     .innerJoin(categories, eq(categories.id, products.categoryId))
@@ -728,11 +759,13 @@ export async function searchProducts(params: {
   const variantsByProduct = groupByProductId(variantRows);
   const imagesByProduct = groupByProductId(imageRows);
 
+  const pricing = await getCatalogPricing();
   const summaries = productRows.map((row) =>
     buildSummary(
       row,
-      (variantsByProduct.get(row.id) ?? []).map(toVariant),
+      (variantsByProduct.get(row.id) ?? []).map((variant) => toVariant(variant, pricing, refOf(row))),
       (imagesByProduct.get(row.id) ?? []).map(toColoredImage),
+      campaignInfosFor(pricing, refOf(row)),
     ),
   );
 
@@ -831,6 +864,8 @@ export async function getProductsByCategorySlug(params: {
       title: products.title,
       categorySlug: categories.slug,
       createdAt: products.createdAt,
+      brandId: products.brandId,
+      categoryId: products.categoryId,
     })
     .from(products)
     .innerJoin(categories, eq(categories.id, products.categoryId))
@@ -893,11 +928,13 @@ export async function getProductsByCategorySlug(params: {
     return true;
   });
 
+  const pricing = await getCatalogPricing();
   const summaries = filtered.map(({ row, rawVariants }) =>
     buildSummary(
       row,
-      rawVariants.map(toVariant),
+      rawVariants.map((variant) => toVariant(variant, pricing, refOf(row))),
       (imagesByProduct.get(row.id) ?? []).map(toColoredImage),
+      campaignInfosFor(pricing, refOf(row)),
     ),
   );
 

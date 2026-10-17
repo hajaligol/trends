@@ -71,6 +71,11 @@ export default async function AdminOrderDetailPage({
                     <span className="text-[0.8rem] text-text-secondary">
                       {toPersianDigits(item.quantity)} × {formatToman(item.unitPriceToman)}
                     </span>
+                    {item.campaignDiscountToman > 0 && (
+                      <span className="text-[0.78rem] text-brand-dark">
+                        {item.campaignLabel}: −{formatToman(item.campaignDiscountToman)}
+                      </span>
+                    )}
                   </div>
                   <span className="shrink-0 text-[0.92rem] font-bold text-ink">{formatToman(item.lineTotalToman)}</span>
                 </li>
@@ -78,7 +83,8 @@ export default async function AdminOrderDetailPage({
             </ul>
 
             <dl className="m-0 mt-5 flex flex-col gap-2.5 border-t border-line pt-4">
-              <DetailRow label="جمع اقلام">{formatToman(order.subtotalToman)}</DetailRow>
+              <DetailRow label="جمع اقلام">{formatToman(order.subtotalToman + order.campaignDiscountToman)}</DetailRow>
+              {order.campaignDiscountToman > 0 && <DetailRow label="تخفیف کمپین">−{formatToman(order.campaignDiscountToman)}</DetailRow>}
               <DetailRow label={`هزینه ارسال (${order.shippingMethodLabel})`}>
                 {order.shippingFeeToman === 0 ? "رایگان" : formatToman(order.shippingFeeToman)}
               </DetailRow>

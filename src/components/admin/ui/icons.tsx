@@ -269,3 +269,11 @@ export const ShoppingBagIcon = (p: SVGProps<SVGSVGElement>) => (
     <path d="M3.4 5.467a2 2 0 0 0-.4 1.2V20a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6.667a2 2 0 0 0-.4-1.2l-2-2.667A2 2 0 0 0 17 2H7a2 2 0 0 0-1.6.8z" />
   </Svg>
 );
+
+export const PercentIcon = (p: SVGProps<SVGSVGElement>) => (
+  <Svg {...p}>
+    <line x1="19" y1="5" x2="5" y2="19" />
+    <circle cx="6.5" cy="6.5" r="2.5" />
+    <circle cx="17.5" cy="17.5" r="2.5" />
+  </Svg>
+);

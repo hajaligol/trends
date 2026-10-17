@@ -68,7 +68,7 @@ export async function placeOrderAction(
     };
   }
 
-  const shippingMethod = await getShippingMethod(shippingMethodCode, cart.subtotalToman);
+  const shippingMethod = await getShippingMethod(shippingMethodCode, cart.subtotalToman, cart.freeShipping);
   if (!shippingMethod) {
     return { ok: false, error: "روش ارسال انتخاب‌شده معتبر نیست" };
   }

@@ -67,6 +67,11 @@ function OrderItemRow({ item }: { item: OrderPageItem }) {
         <p className="text-text-secondary">
           {item.size} / {item.color} × {toPersianDigits(item.quantity)}
         </p>
+        {item.campaignDiscountToman > 0 && (
+          <p className="text-[0.76rem] text-brand-dark">
+            {item.campaignLabel}: −{formatToman(item.campaignDiscountToman)}
+          </p>
+        )}
       </div>
       <span className="shrink-0 font-semibold text-ink">{formatToman(item.lineTotalToman)}</span>
       {linked && (
@@ -208,11 +213,22 @@ export default async function OrderConfirmationPage({
             <div className="flex flex-col gap-1 border-t border-line pt-3">
               <div className="flex justify-between">
                 <span className="text-text-secondary">جمع کالاها</span>
-                <span>{formatToman(order.subtotalToman)}</span>
+                <span>{formatToman(order.subtotalToman + order.campaignDiscountToman)}</span>
               </div>
+              {order.campaignDiscountToman > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-text-secondary">تخفیف کمپین</span>
+                  <span>−{formatToman(order.campaignDiscountToman)}</span>
+                </div>
+              )}
               <div className="flex justify-between">
                 <span className="text-text-secondary">هزینه ارسال</span>
-                <span>{order.shippingFeeToman === 0 ? "رایگان" : formatToman(order.shippingFeeToman)}</span>
+                <span>
+                  {order.shippingFeeToman === 0 ? "رایگان" : formatToman(order.shippingFeeToman)}
+                  {order.shippingDiscountToman > 0 && (
+                    <span className="ms-2 text-[0.76rem] text-text-secondary line-through">{formatToman(order.shippingDiscountToman)}</span>
+                  )}
+                </span>
               </div>
               {order.discountToman > 0 && (
                 <div className="flex justify-between">

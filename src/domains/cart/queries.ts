@@ -3,6 +3,8 @@ import { db } from "@/lib/db/client";
 import { pickImageForColor } from "@/domains/catalog/gallery";
 import { cartItems, carts, productImages, productVariants, products, type Cart } from "@/lib/db/schema";
 import type { StockState } from "@/domains/catalog/queries";
+import { loadActiveCampaigns } from "@/domains/campaigns/queries";
+import { evaluateCart, type AppliedCampaign, type FreeShippingResult } from "@/domains/campaigns/engine";
 
 /**
  * The one error `addItemToCart` throws for an expected, user-facing
@@ -77,6 +79,7 @@ export type CartLineItem = {
   colorHex: string | null;
   imageUrl: string | null;
   imageAlt: string | null;
+  /** The REGULAR unit price; sale campaigns are reported separately below. */
   unitPriceToman: number;
   compareAtPriceToman: number | null;
   requestedQuantity: number;
@@ -85,7 +88,12 @@ export type CartLineItem = {
    * See `cart-items.ts`'s header comment: price/stock are never
    * snapshotted onto the cart row, so this is recomputed on every read. */
   effectiveQuantity: number;
+  /** What the customer pays for this line, after sale campaigns. */
   lineTotalToman: number;
+  /** Sale-campaign discount inside this line (0 when none). */
+  campaignDiscountToman: number;
+  /** Names of the campaigns that discounted this line. */
+  campaignNames: string[];
   stock: number;
   stockState: StockState;
   /** `false` if the variant or its product has been deactivated since
@@ -102,10 +110,27 @@ export type CartSummary = {
   cartId: string | null;
   items: CartLineItem[];
   itemCount: number;
+  /** Items total AFTER sale campaigns (before coupon and shipping). */
   subtotalToman: number;
+  /** Items total at regular prices, before sale campaigns. */
+  grossToman: number;
+  campaignDiscountToman: number;
+  appliedCampaigns: AppliedCampaign[];
+  /** Set when a free-shipping campaign applies to this cart. */
+  freeShipping: FreeShippingResult | null;
 };
 
-const EMPTY_SUMMARY: CartSummary = { cartId: null, items: [], itemCount: 0, subtotalToman: 0 };
+export const EMPTY_CART_SUMMARY: CartSummary = {
+  cartId: null,
+  items: [],
+  itemCount: 0,
+  subtotalToman: 0,
+  grossToman: 0,
+  campaignDiscountToman: 0,
+  appliedCampaigns: [],
+  freeShipping: null,
+};
+const EMPTY_SUMMARY = EMPTY_CART_SUMMARY;
 
 function stockStateFor(stock: number, lowStockThreshold: number): StockState {
   if (stock <= 0) return "out-of-stock";
@@ -140,6 +165,8 @@ export async function getCartSummary(cartId: string | null): Promise<CartSummary
       productSlug: products.slug,
       productTitle: products.title,
       productActive: products.isActive,
+      brandId: products.brandId,
+      categoryId: products.categoryId,
     })
     .from(cartItems)
     .innerJoin(productVariants, eq(productVariants.id, cartItems.variantId))
@@ -170,16 +197,38 @@ export async function getCartSummary(cartId: string | null): Promise<CartSummary
     else imagesByProduct.set(image.productId, [image]);
   }
 
-  let subtotalToman = 0;
+  // Sale campaigns: the engine prices every available line from live
+  // database state; nothing here comes from the client.
+  const campaigns = await loadActiveCampaigns(db);
+  const pricing = evaluateCart(
+    rows.flatMap((row) => {
+      const isAvailable = row.variantActive && row.productActive && row.stock > 0;
+      const quantity = isAvailable ? Math.min(row.requestedQuantity, row.stock) : 0;
+      return quantity > 0
+        ? [
+            {
+              lineId: row.itemId,
+              productId: row.productId,
+              brandId: row.brandId,
+              categoryId: row.categoryId,
+              unitPriceToman: row.priceToman,
+              quantity,
+            },
+          ]
+        : [];
+    }),
+    campaigns,
+  );
+  const priced = new Map(pricing.lines.map((line) => [line.lineId, line]));
+
   let itemCount = 0;
 
   const items: CartLineItem[] = rows.map((row) => {
     const isAvailable = row.variantActive && row.productActive && row.stock > 0;
     const effectiveQuantity = isAvailable ? Math.min(row.requestedQuantity, row.stock) : 0;
-    const lineTotalToman = effectiveQuantity * row.priceToman;
+    const line = priced.get(row.itemId);
     const image = pickImageForColor(imagesByProduct.get(row.productId) ?? [], row.color);
 
-    subtotalToman += lineTotalToman;
     itemCount += effectiveQuantity;
 
     return {
@@ -197,7 +246,9 @@ export async function getCartSummary(cartId: string | null): Promise<CartSummary
       compareAtPriceToman: row.compareAtPriceToman,
       requestedQuantity: row.requestedQuantity,
       effectiveQuantity,
-      lineTotalToman,
+      lineTotalToman: line?.payableToman ?? 0,
+      campaignDiscountToman: line?.discountToman ?? 0,
+      campaignNames: line?.campaignNames ?? [],
       stock: row.stock,
       stockState: stockStateFor(row.stock, row.lowStockThreshold),
       isAvailable,
@@ -205,7 +256,16 @@ export async function getCartSummary(cartId: string | null): Promise<CartSummary
     };
   });
 
-  return { cartId, items, itemCount, subtotalToman };
+  return {
+    cartId,
+    items,
+    itemCount,
+    subtotalToman: pricing.subtotalToman,
+    grossToman: pricing.grossToman,
+    campaignDiscountToman: pricing.campaignDiscountToman,
+    appliedCampaigns: pricing.applied,
+    freeShipping: pricing.freeShipping,
+  };
 }
 
 /** Live variant lookup used before trusting any client-submitted
