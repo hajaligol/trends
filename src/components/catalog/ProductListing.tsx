@@ -54,6 +54,8 @@ export function ProductListing({
   const lastInfinitePage = Math.max(1, Math.min(INFINITE_SCROLL_MAX_PAGE, totalPages));
   return (
     <InfiniteProductGrid
+      // A different filter/sort/query is a different list: start its scroll state afresh.
+      key={baseHref}
       source={source}
       initialCards={products.map((product) => (
         <ProductCard key={product.id} product={product} />

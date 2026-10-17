@@ -1,24 +1,43 @@
 import { z } from "zod";
-import { INFINITE_SCROLL_MAX_PAGE } from "@/domains/catalog/presentation";
+import { LISTING_LIMITS } from "@/domains/catalog/listing-filters";
+import { INFINITE_SCROLL_MAX_PAGE, PRODUCT_SORT_OPTIONS, type ProductSort } from "@/domains/catalog/presentation";
+
+const facetValues = z
+  .array(z.string().trim().min(1).max(LISTING_LIMITS.maxValueLength))
+  .max(LISTING_LIMITS.maxValuesPerFacet)
+  .default([]);
+
+const price = z.number().int().min(0).max(LISTING_LIMITS.maxPriceToman).optional();
+
+/**
+ * The filters of the list being continued. Arrives from the browser, so it is
+ * validated here with the same bounds the URL parser applies.
+ */
+export const listingFiltersSchema = z.object({
+  sort: z.enum(PRODUCT_SORT_OPTIONS.map((option) => option.value) as [ProductSort, ...ProductSort[]]).optional(),
+  brands: facetValues,
+  categories: facetValues,
+  sizes: facetValues,
+  colors: facetValues,
+  priceMin: price,
+  priceMax: price,
+  availableOnly: z.boolean().default(false),
+});
 
 /**
  * Which list an infinite-scroll grid is continuing. Validated on the server
  * (it arrives from the browser); a client-safe module so the client
  * component can import the type without touching the DB.
  */
-const sort = z.enum(["newest", "price-asc", "price-desc"]).optional();
-
 export const loadMoreSourceSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("category"), slug: z.string().min(1).max(200), filters: listingFiltersSchema }),
+  z.object({ kind: z.literal("search"), q: z.string().trim().min(1).max(200), filters: listingFiltersSchema }),
   z.object({
-    kind: z.literal("category"),
-    slug: z.string().min(1).max(200),
-    sort,
-    size: z.string().max(100).optional(),
-    color: z.string().max(100).optional(),
+    kind: z.literal("collection"),
+    slug: z.enum(["featured", "top-selling", "new-arrivals"]),
+    filters: listingFiltersSchema,
   }),
-  z.object({ kind: z.literal("search"), q: z.string().trim().min(1).max(200), sort }),
-  z.object({ kind: z.literal("collection"), slug: z.enum(["featured", "top-selling", "new-arrivals"]) }),
-  z.object({ kind: z.literal("campaign"), slug: z.string().min(1).max(200) }),
+  z.object({ kind: z.literal("campaign"), slug: z.string().min(1).max(200), filters: listingFiltersSchema }),
 ]);
 
 export type LoadMoreSource = z.infer<typeof loadMoreSourceSchema>;

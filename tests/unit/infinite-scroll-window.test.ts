@@ -40,7 +40,7 @@ describe("listingProgress", () => {
 });
 
 describe("loadMoreInputSchema", () => {
-  const source = { kind: "category", slug: "men" } as const;
+  const source = { kind: "category", slug: "men", filters: {} } as const;
   it("accepts pages 2..5 only", () => {
     expect(loadMoreInputSchema.safeParse({ source, page: 2 }).success).toBe(true);
     expect(loadMoreInputSchema.safeParse({ source, page: 5 }).success).toBe(true);
@@ -50,7 +50,25 @@ describe("loadMoreInputSchema", () => {
   });
   it("rejects unknown kinds, bad sorts and unknown collections", () => {
     expect(loadMoreInputSchema.safeParse({ source: { kind: "admin" }, page: 2 }).success).toBe(false);
-    expect(loadMoreInputSchema.safeParse({ source: { ...source, sort: "random" }, page: 2 }).success).toBe(false);
-    expect(loadMoreInputSchema.safeParse({ source: { kind: "collection", slug: "nope" }, page: 2 }).success).toBe(false);
+    expect(loadMoreInputSchema.safeParse({ source: { ...source, filters: { sort: "random" } }, page: 2 }).success).toBe(false);
+    expect(
+      loadMoreInputSchema.safeParse({ source: { kind: "collection", slug: "nope", filters: {} }, page: 2 }).success,
+    ).toBe(false);
+  });
+  it("fills in empty filters and rejects oversized / invalid ones", () => {
+    const parsed = loadMoreInputSchema.parse({ source, page: 2 });
+    expect(parsed.source.filters).toEqual({
+      brands: [],
+      categories: [],
+      sizes: [],
+      colors: [],
+      availableOnly: false,
+    });
+    const withFilters = (filters: object) => loadMoreInputSchema.safeParse({ source: { ...source, filters }, page: 2 });
+    expect(withFilters({ brands: ["a", "b"], priceMin: 1000, priceMax: 5000, sort: "discount", availableOnly: true }).success).toBe(true);
+    expect(withFilters({ brands: Array.from({ length: 31 }, (_, i) => `b${i}`) }).success).toBe(false);
+    expect(withFilters({ sizes: ["x".repeat(101)] }).success).toBe(false);
+    expect(withFilters({ priceMin: -1 }).success).toBe(false);
+    expect(withFilters({ priceMax: 1.5 }).success).toBe(false);
   });
 });

@@ -16,21 +16,21 @@ export type LoadMoreResult =
 async function fetchPage(source: LoadMoreSource, page: number): Promise<CatalogProductSummary[] | null> {
   switch (source.kind) {
     case "category": {
-      const result = await getProductsByCategorySlug({ slug: source.slug, sort: source.sort, size: source.size, color: source.color, page });
+      const result = await getProductsByCategorySlug({ slug: source.slug, filters: source.filters, page });
       // The query clamps out-of-range pages to the last one; that would repeat
       // products already on screen, so an out-of-range page is just "no more".
       return result && result.page === page ? result.products : [];
     }
     case "search": {
-      const result = await searchProducts({ q: source.q, sort: source.sort, page });
+      const result = await searchProducts({ q: source.q, filters: source.filters, page });
       return result.page === page ? result.products : [];
     }
     case "collection": {
-      const result = await getCollectionPage(source.slug, page);
+      const result = await getCollectionPage(source.slug, page, 1, source.filters);
       return result.page === page ? result.products : [];
     }
     case "campaign": {
-      const landing = await getCampaignLanding(normalizeSlugParam(source.slug), page);
+      const landing = await getCampaignLanding(normalizeSlugParam(source.slug), page, new Date(), 1, source.filters);
       if (!landing || landing.state !== "live") return null;
       return landing.page === page ? landing.products : [];
     }

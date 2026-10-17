@@ -1,13 +1,15 @@
-import { asc, desc, eq } from "drizzle-orm";
+import { asc, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { campaignTargets, campaigns, categories, products } from "@/lib/db/schema";
-import { getProductSummariesByIds, type CatalogProductSummary } from "@/domains/catalog/queries";
+import { EMPTY_LISTING_FILTERS, type ListingFilters } from "@/domains/catalog/listing-filters";
+import { LISTING_PAGE_SIZE, type ListingFacets } from "@/domains/catalog/listing-engine";
+import { finishListing, loadListingCandidates, type CatalogProductSummary } from "@/domains/catalog/queries";
 import { campaignCoversProduct } from "./engine";
 import { describeDefinition } from "./labels";
 import { toEngineCampaign } from "./queries";
 import { campaignStatus } from "./status";
 
-export const CAMPAIGN_PAGE_SIZE = 12;
+export const CAMPAIGN_PAGE_SIZE = LISTING_PAGE_SIZE;
 
 export type CampaignLanding =
   | {
@@ -21,6 +23,8 @@ export type CampaignLanding =
       total: number;
       page: number;
       totalPages: number;
+      /** Options for the filter dropdowns, from every product the campaign covers. */
+      facets: ListingFacets;
     }
   | { state: "ended"; name: string };
 
@@ -28,10 +32,17 @@ export type CampaignLanding =
  * Data for `/sale/<slug>`. Returns `null` (→ 404) unless the campaign is live
  * or has simply ended: a paused or not-yet-started campaign must not leak its
  * name or products. Products are every ACTIVE product the campaign's scope
- * covers, newest first, paginated in application code (the same documented
- * tradeoff as the category/collection pages at this catalog size).
+ * covers, filtered/sorted like every other list page (newest first by
+ * default) and paginated in application code (the same documented tradeoff as
+ * the category/collection pages at this catalog size).
  */
-export async function getCampaignLanding(slug: string, requestedPage: number, now: Date = new Date(), pageSpan = 1): Promise<CampaignLanding | null> {
+export async function getCampaignLanding(
+  slug: string,
+  requestedPage: number,
+  now: Date = new Date(),
+  pageSpan = 1,
+  filters: ListingFilters = EMPTY_LISTING_FILTERS,
+): Promise<CampaignLanding | null> {
   const [row] = await db.select().from(campaigns).where(eq(campaigns.slug, slug)).limit(1);
   if (!row) return null;
 
@@ -55,15 +66,12 @@ export async function getCampaignLanding(slug: string, requestedPage: number, no
     .filter((p) => campaignCoversProduct(campaign.scope, { productId: p.id, brandId: p.brandId, categoryId: p.categoryId }))
     .map((p) => p.id);
 
-  const total = coveredIds.length;
-  const totalPages = Math.max(1, Math.ceil(total / CAMPAIGN_PAGE_SIZE));
-  const page = Math.min(Math.max(1, requestedPage), totalPages);
-  const pageIds = coveredIds.slice((page - 1) * CAMPAIGN_PAGE_SIZE, (page - 1 + Math.max(1, pageSpan)) * CAMPAIGN_PAGE_SIZE);
-
-  // `getProductSummariesByIds` doesn't promise an order; restore the newest-first one.
-  const summaries = pageIds.length ? await getProductSummariesByIds(pageIds) : [];
-  const byId = new Map(summaries.map((summary) => [summary.id, summary]));
-  const ordered = pageIds.map((id) => byId.get(id)).filter((s): s is CatalogProductSummary => Boolean(s));
+  const result = await finishListing({
+    candidates: coveredIds.length ? await loadListingCandidates(inArray(products.id, coveredIds)) : [],
+    filters,
+    page: requestedPage,
+    pageSpan,
+  });
 
   return {
     state: "live",
@@ -72,10 +80,12 @@ export async function getCampaignLanding(slug: string, requestedPage: number, no
     description: row.description,
     summary: describeDefinition(campaign),
     countdownEndsAt: row.showCountdown && row.endsAt ? row.endsAt.toISOString() : null,
-    products: ordered,
-    total,
-    page,
-    totalPages,
+    products: result.products,
+    total: result.total,
+    page: result.page,
+    // A campaign that covers nothing still has one (empty) page, as before.
+    totalPages: Math.max(1, result.totalPages),
+    facets: result.facets,
   };
 }
 

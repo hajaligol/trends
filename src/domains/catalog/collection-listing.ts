@@ -1,37 +1,43 @@
 import { cache } from "react";
-import type { CollectionSlug } from "@/domains/catalog/presentation";
-import { getFeaturedProducts, getNewArrivals, getTopSellingProducts, type CatalogProductSummary } from "@/domains/catalog/queries";
+import { eq } from "drizzle-orm";
+import { products } from "@/lib/db/schema";
+import { EMPTY_LISTING_FILTERS, type ListingFilters } from "@/domains/catalog/listing-filters";
+import type { ListingCandidate, ListingPage } from "@/domains/catalog/listing-engine";
+import { DEFAULT_PRODUCT_SORT, type CollectionSlug, type ProductSort } from "@/domains/catalog/presentation";
+import { finishListing, getTopSellingCandidates, loadListingCandidates } from "@/domains/catalog/queries";
 
-export const COLLECTION_PAGE_SIZE = 12;
+export { LISTING_PAGE_SIZE as COLLECTION_PAGE_SIZE } from "@/domains/catalog/listing-engine";
 
-const loadCollection = cache((slug: CollectionSlug) => {
-  if (slug === "featured") return getFeaturedProducts();
-  if (slug === "top-selling") return getTopSellingProducts();
-  return getNewArrivals();
+/** The order a collection shows when the URL has no `sort`. */
+export function collectionDefaultSort(slug: CollectionSlug): ProductSort {
+  return slug === "top-selling" ? "best-selling" : DEFAULT_PRODUCT_SORT;
+}
+
+const loadCollection = cache((slug: CollectionSlug): Promise<ListingCandidate[]> => {
+  if (slug === "featured") return loadListingCandidates(eq(products.isFeatured, true));
+  if (slug === "top-selling") return getTopSellingCandidates();
+  return loadListingCandidates(eq(products.isNewArrival, true));
 });
 
-export type CollectionPageResult = {
-  products: CatalogProductSummary[];
-  total: number;
-  page: number;
-  totalPages: number;
-};
+export type CollectionPageResult = ListingPage;
 
 /**
- * One page (or `pageSpan` consecutive pages) of a homepage collection.
- * Paginated in application code after one batched fetch — the same
- * documented tradeoff as the category/search pages.
+ * One page (or `pageSpan` consecutive pages) of a homepage collection, with
+ * the same filters/sorts as every other list page. Paginated in application
+ * code after one batched fetch — the same documented tradeoff as the
+ * category/search pages.
  */
-export async function getCollectionPage(slug: CollectionSlug, requestedPage: number, pageSpan = 1): Promise<CollectionPageResult> {
-  const all = await loadCollection(slug);
-  const total = all.length;
-  const totalPages = Math.max(1, Math.ceil(total / COLLECTION_PAGE_SIZE));
-  const page = Math.min(Math.max(1, requestedPage), totalPages);
-  const start = (page - 1) * COLLECTION_PAGE_SIZE;
-  return {
-    products: all.slice(start, start + COLLECTION_PAGE_SIZE * Math.max(1, pageSpan)),
-    total,
-    page,
-    totalPages,
-  };
+export async function getCollectionPage(
+  slug: CollectionSlug,
+  requestedPage: number,
+  pageSpan = 1,
+  filters: ListingFilters = EMPTY_LISTING_FILTERS,
+): Promise<CollectionPageResult> {
+  return finishListing({
+    candidates: await loadCollection(slug),
+    filters,
+    defaultSort: collectionDefaultSort(slug),
+    page: requestedPage,
+    pageSpan,
+  });
 }

@@ -4,12 +4,20 @@ import { notFound, redirect } from "next/navigation";
 import { Container } from "@/components/ui/Container";
 import { Breadcrumbs } from "@/components/catalog/Breadcrumbs";
 import { ProductListing } from "@/components/catalog/ProductListing";
-import { CollectionPagination } from "@/components/catalog/CollectionPagination";
+import { ListingFilterBar } from "@/components/catalog/filters/ListingFilterBar";
+import { ListingPagination } from "@/components/catalog/ListingPagination";
 import { CampaignCountdown } from "@/components/catalog/CampaignCountdown";
 import { buttonClasses } from "@/components/ui/Button";
 import { getCampaignLanding } from "@/domains/campaigns/landing";
 import { campaignHref } from "@/domains/campaigns/slug";
-import { listingProgress, listingWindowFor } from "@/domains/catalog/presentation";
+import {
+  buildListingHref,
+  countActiveFilters,
+  isDefaultListing,
+  parseListingFilters,
+  type ListingFilters,
+} from "@/domains/catalog/listing-filters";
+import { DEFAULT_PRODUCT_SORT, listingProgress, listingWindowFor } from "@/domains/catalog/presentation";
 import { normalizeSlugParam } from "@/domains/catalog/slug";
 import { toPersianDigits } from "@/lib/utils/persian-digits";
 
@@ -19,9 +27,9 @@ type SalePageProps = {
 };
 
 /** `getCampaignLanding(slug, ...)` arguments for the infinite-scroll window. */
-function landingArgs(requestedPage: number): [number, Date, number] {
+function landingArgs(requestedPage: number, filters: ListingFilters): [number, Date, number, ListingFilters] {
   const window = listingWindowFor(requestedPage);
-  return [window.fetchPage, new Date(), window.pageSpan];
+  return [window.fetchPage, new Date(), window.pageSpan, filters];
 }
 
 async function resolve(props: SalePageProps) {
@@ -30,12 +38,16 @@ async function resolve(props: SalePageProps) {
   const searchParams = await props.searchParams;
   const pageParam = Array.isArray(searchParams.page) ? searchParams.page[0] : searchParams.page;
   const parsed = pageParam ? Number.parseInt(pageParam, 10) : 1;
-  return { slug, requestedPage: Number.isFinite(parsed) && parsed > 0 ? parsed : 1 };
+  return {
+    slug,
+    requestedPage: Number.isFinite(parsed) && parsed > 0 ? parsed : 1,
+    filters: parseListingFilters(searchParams),
+  };
 }
 
 export async function generateMetadata(props: SalePageProps): Promise<Metadata> {
-  const { slug, requestedPage } = await resolve(props);
-  const landing = await getCampaignLanding(slug, ...landingArgs(requestedPage));
+  const { slug, requestedPage, filters } = await resolve(props);
+  const landing = await getCampaignLanding(slug, ...landingArgs(requestedPage, filters));
   if (!landing) return { title: "کمپین یافت نشد", robots: { index: false, follow: false } };
   if (landing.state === "ended") return { title: landing.name, robots: { index: false, follow: true } };
   const path = campaignHref(slug);
@@ -44,14 +56,14 @@ export async function generateMetadata(props: SalePageProps): Promise<Metadata> 
     description: landing.description ?? `${landing.name}: ${landing.summary}`,
     alternates: { canonical: path },
     openGraph: { url: path },
-    robots: requestedPage > 1 ? { index: false, follow: true } : undefined,
+    robots: requestedPage > 1 || !isDefaultListing(filters) ? { index: false, follow: true } : undefined,
   };
 }
 
 export default async function SalePage(props: SalePageProps) {
-  const { slug, requestedPage } = await resolve(props);
+  const { slug, requestedPage, filters } = await resolve(props);
   const window = listingWindowFor(requestedPage);
-  const landing = await getCampaignLanding(slug, ...landingArgs(requestedPage));
+  const landing = await getCampaignLanding(slug, ...landingArgs(requestedPage, filters));
   if (!landing) notFound();
 
   if (landing.state === "ended") {
@@ -69,7 +81,9 @@ export default async function SalePage(props: SalePageProps) {
   }
 
   const progress = listingProgress(window, requestedPage, landing.totalPages, landing.page);
-  if (progress.clampedIntoInfiniteZone) redirect(`${campaignHref(slug)}?page=${landing.page}`);
+  const basePath = campaignHref(slug);
+  if (progress.clampedIntoInfiniteZone) redirect(buildListingHref(basePath, filters, { page: landing.page }));
+  const showFilterBar = landing.total > 0 || countActiveFilters(filters) > 0;
 
   return (
     <main className="py-[clamp(24px,4vw,40px)]">
@@ -103,17 +117,31 @@ export default async function SalePage(props: SalePageProps) {
           </div>
         </header>
 
+        {showFilterBar && (
+          <ListingFilterBar basePath={basePath} filters={filters} defaultSort={DEFAULT_PRODUCT_SORT} facets={landing.facets} />
+        )}
+
         <ProductListing
           products={landing.products}
-          emptyMessage="در حال حاضر محصولی مشمول این کمپین نیست."
+          emptyMessage={
+            countActiveFilters(filters) > 0
+              ? "محصولی با این مشخصات پیدا نشد."
+              : "در حال حاضر محصولی مشمول این کمپین نیست."
+          }
           total={landing.total}
           totalPages={landing.totalPages}
           infinite={window.infinite}
           loadedThrough={progress.loadedThrough}
-          source={{ kind: "campaign", slug }}
-          baseHref={campaignHref(slug)}
+          source={{ kind: "campaign", slug, filters }}
+          baseHref={buildListingHref(basePath, filters)}
           pagination={(current) => (
-            <CollectionPagination basePath={campaignHref(slug)} page={current} totalPages={landing.totalPages} />
+            <ListingPagination
+              basePath={basePath}
+              filters={filters}
+              defaultSort={DEFAULT_PRODUCT_SORT}
+              page={current}
+              totalPages={landing.totalPages}
+            />
           )}
         />
       </Container>

@@ -10,13 +10,20 @@ import type { CategorySwatch } from "./demo-data";
  * component needs (sort-option labels, category swatch colors, ...)
  * belongs here instead.
  */
-export type ProductSort = "newest" | "price-asc" | "price-desc";
+export type ProductSort = "newest" | "price-asc" | "price-desc" | "discount" | "best-selling";
 
+/** Order of the sort dropdown on every product list page. */
 export const PRODUCT_SORT_OPTIONS: Array<{ value: ProductSort; label: string }> = [
-  { value: "newest", label: "جدیدترین" },
   { value: "price-asc", label: "ارزان‌ترین" },
   { value: "price-desc", label: "گران‌ترین" },
+  { value: "newest", label: "جدیدترین" },
+  { value: "discount", label: "بیشترین تخفیف" },
+  { value: "best-selling", label: "پرفروش‌ترین" },
 ];
+
+/** What a list page shows when the URL has no `sort` (the top-selling
+ * collection overrides it with "best-selling"). */
+export const DEFAULT_PRODUCT_SORT: ProductSort = "newest";
 
 /**
  * Product list pages (category, search, collections, campaigns) load pages
@@ -68,57 +75,7 @@ export function listingProgress(window: ListingWindow, requestedPage: number, to
 }
 
 export function isProductSort(value: string): value is ProductSort {
-  return value === "newest" || value === "price-asc" || value === "price-desc";
-}
-
-/**
- * Current filter/sort/page state for a category page, used to build
- * shareable URLs (TRENDS_PROJECT_CONTEXT.md §5 "Search result pagination"
- * / "URL-driven search/filter state" — applied here a phase early since
- * it's the same pattern the category listing needs anyway).
- */
-export type CategoryQueryState = {
-  sort?: ProductSort;
-  size?: string;
-  color?: string;
-  page?: number;
-};
-
-/**
- * Builds a `/category/[slug]` URL for a given filter/sort/page state,
- * omitting anything at its default value so the "no filters" URL stays
- * clean (`/category/men`, not `/category/men?sort=newest&page=1`).
- * Sort/filter controls each call this with one field overridden from the
- * current state to link to "what the page would look like if I changed
- * just this" — no client-side JS/routing needed for any of them.
- */
-export function buildCategoryHref(slug: string, state: CategoryQueryState): string {
-  const params = new URLSearchParams();
-  if (state.sort && state.sort !== "newest") params.set("sort", state.sort);
-  if (state.size) params.set("size", state.size);
-  if (state.color) params.set("color", state.color);
-  if (state.page && state.page > 1) params.set("page", String(state.page));
-  const query = params.toString();
-  return `/category/${slug}${query ? `?${query}` : ""}`;
-}
-
-/**
- * Search-page equivalent of `CategoryQueryState`/`buildCategoryHref` —
- * same "omit defaults, build a shareable URL" pattern, keyed on the
- * search query string instead of a category slug.
- */
-export type SearchQueryState = {
-  q: string;
-  sort?: ProductSort;
-  page?: number;
-};
-
-export function buildSearchHref(state: SearchQueryState): string {
-  const params = new URLSearchParams();
-  params.set("q", state.q);
-  if (state.sort && state.sort !== "newest") params.set("sort", state.sort);
-  if (state.page && state.page > 1) params.set("page", String(state.page));
-  return `/search?${params.toString()}`;
+  return PRODUCT_SORT_OPTIONS.some((option) => option.value === value);
 }
 
 /**

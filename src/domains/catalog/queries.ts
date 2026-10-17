@@ -14,6 +14,14 @@ import {
   type CategoryNode,
   type CategoryRow,
 } from "@/domains/categories/tree";
+import { EMPTY_LISTING_FILTERS, type ListingFilters } from "./listing-filters";
+import {
+  EMPTY_FACETS,
+  resolveSort,
+  runListing,
+  type ListingCandidate,
+  type ListingFacets,
+} from "./listing-engine";
 import type { ProductSort } from "./presentation";
 import { normalizeSlugParam } from "./slug";
 import {
@@ -371,6 +379,144 @@ async function loadProductSummaries(
   );
 }
 
+/** Order statuses whose units count as "sold". `pending_payment` (not yet
+ * paid), `cancelled` and `refunded` are deliberately excluded so an
+ * abandoned or reversed order can't push a product up the ranking. */
+const SALES_COUNTING_STATUSES = ["paid", "processing", "shipped", "delivered"] as const;
+
+/**
+ * Everything the list pages' filter/sort engine needs about a product, next
+ * to the card's `CatalogProductSummary`. Variant prices are the campaign-
+ * adjusted ones the card shows (display only — the cart re-prices from the DB).
+ */
+type CandidateRow = {
+  id: string;
+  slug: string;
+  title: string;
+  categorySlug: string;
+  categoryName: string;
+  createdAt: Date;
+  brandId: string | null;
+  brandSlug: string | null;
+  brandName: string | null;
+  brandNameEn: string | null;
+  categoryId: string;
+};
+
+const CANDIDATE_COLUMNS = {
+  id: products.id,
+  slug: products.slug,
+  title: products.title,
+  categorySlug: categories.slug,
+  categoryName: categories.name,
+  createdAt: products.createdAt,
+  brandId: products.brandId,
+  brandSlug: brands.slug,
+  brandName: brands.name,
+  brandNameEn: brands.nameEn,
+  categoryId: products.categoryId,
+} as const;
+
+/** Position of every category in the taxonomy (audience > group > type), for a stable facet order. */
+const getCategoryOrder = cache(async (): Promise<Map<string, number>> => {
+  const flat = flattenCategoryTree(buildCategoryTree(await loadAllCategoryRows()));
+  return new Map(flat.map((node, index) => [node.slug, index]));
+});
+
+/** Active products matching `where`, joined to their category and (active) brand. */
+async function selectCandidateRows(where: SQL | undefined): Promise<CandidateRow[]> {
+  return db
+    .select(CANDIDATE_COLUMNS)
+    .from(products)
+    .innerJoin(categories, eq(categories.id, products.categoryId))
+    // An inactive brand is hidden from the storefront entirely (as on the product page).
+    .leftJoin(brands, and(eq(brands.id, products.brandId), eq(brands.isActive, true)))
+    .where(and(eq(products.isActive, true), where));
+}
+
+/** Two batched queries for N products (no N+1), then one candidate per row, in row order. */
+async function assembleCandidates(rows: CandidateRow[]): Promise<ListingCandidate[]> {
+  if (rows.length === 0) return [];
+  const productIds = rows.map((row) => row.id);
+  const [variantRows, imageRows, pricing, categoryOrder] = await Promise.all([
+    db
+      .select(VARIANT_COLUMNS)
+      .from(productVariants)
+      .where(and(inArray(productVariants.productId, productIds), eq(productVariants.isActive, true))),
+    db
+      .select(IMAGE_COLUMNS)
+      .from(productImages)
+      .where(inArray(productImages.productId, productIds))
+      .orderBy(asc(productImages.displayOrder)),
+    getCatalogPricing(),
+    getCategoryOrder(),
+  ]);
+
+  const variantsByProduct = groupByProductId(variantRows);
+  const imagesByProduct = groupByProductId(imageRows);
+
+  return rows.map((row) => {
+    const variants = (variantsByProduct.get(row.id) ?? []).map((variant) => toVariant(variant, pricing, refOf(row)));
+    return {
+      summary: buildSummary(
+        row,
+        variants,
+        (imagesByProduct.get(row.id) ?? []).map(toColoredImage),
+        campaignInfosFor(pricing, refOf(row)),
+      ),
+      createdAt: row.createdAt,
+      brand: row.brandSlug && row.brandName ? { slug: row.brandSlug, name: row.brandName, nameEn: row.brandNameEn } : null,
+      category: { slug: row.categorySlug, name: row.categoryName, order: categoryOrder.get(row.categorySlug) ?? 0 },
+      variants: variants.map((variant) => ({
+        size: variant.size,
+        color: variant.color,
+        colorHex: variant.colorHex,
+        priceToman: variant.priceToman,
+        stock: variant.stock,
+      })),
+    };
+  });
+}
+
+/** Candidates for any `where` over active products (collections, campaigns). */
+export async function loadListingCandidates(where: SQL | undefined): Promise<ListingCandidate[]> {
+  return assembleCandidates(await selectCandidateRows(where));
+}
+
+/** Units sold per product (paid-or-later orders only), for the best-selling sort. */
+export async function getUnitsSoldByProduct(productIds: string[]): Promise<Map<string, number>> {
+  if (productIds.length === 0) return new Map();
+  const unitsSold = sql<number>`sum(${orderItems.quantity})::int`;
+  const rows = await db
+    .select({ productId: orderItems.productId, unitsSold })
+    .from(orderItems)
+    .innerJoin(orders, eq(orders.id, orderItems.orderId))
+    .where(and(inArray(orders.status, [...SALES_COUNTING_STATUSES]), inArray(orderItems.productId, productIds)))
+    .groupBy(orderItems.productId);
+  const map = new Map<string, number>();
+  for (const row of rows) if (row.productId) map.set(row.productId, Number(row.unitsSold));
+  return map;
+}
+
+/**
+ * Filter + sort + page a candidate list. The sales ranking is only fetched when
+ * the resolved sort needs it, so the common orderings cost no extra query.
+ */
+export async function finishListing(params: {
+  candidates: ListingCandidate[];
+  filters?: ListingFilters;
+  defaultSort?: ProductSort;
+  page?: number;
+  pageSpan?: number;
+}) {
+  const filters = params.filters ?? EMPTY_LISTING_FILTERS;
+  const unitsSold =
+    resolveSort(filters, params.defaultSort) === "best-selling"
+      ? await getUnitsSoldByProduct(params.candidates.map((candidate) => candidate.summary.id))
+      : undefined;
+  return runListing({ ...params, filters, unitsSold });
+}
+
 /** `limit` is optional: the homepage row asks for one more than it
  * shows (to know whether to render the "show all" tile), while the
  * `/collection/featured` page asks for everything. */
@@ -394,10 +540,6 @@ export async function getNewArrivals(limit?: number): Promise<CatalogProductSumm
   return loadProductSummaries(eq(products.isNewArrival, true), { limit, newestFirst: true });
 }
 
-/** Order statuses whose units count as "sold". `pending_payment` (not yet
- * paid), `cancelled` and `refunded` are deliberately excluded so an
- * abandoned or reversed order can't push a product up the ranking. */
-const SALES_COUNTING_STATUSES = ["paid", "processing", "shipped", "delivered"] as const;
 
 /**
  * Best sellers for the homepage: active products ranked by total units
@@ -409,7 +551,7 @@ const SALES_COUNTING_STATUSES = ["paid", "processing", "shipped", "delivered"] a
  * list with unsold products, so an empty array (no paid orders yet) is a
  * normal result and the homepage hides the section.
  */
-export async function getTopSellingProducts(limit?: number): Promise<CatalogProductSummary[]> {
+async function rankTopSellingIds(limit?: number): Promise<string[]> {
   const unitsSold = sql<number>`sum(${orderItems.quantity})::int`;
 
   const rankedQuery = db
@@ -421,14 +563,23 @@ export async function getTopSellingProducts(limit?: number): Promise<CatalogProd
     .groupBy(orderItems.productId)
     .orderBy(desc(unitsSold), asc(orderItems.productId));
   const ranked = await (limit !== undefined ? rankedQuery.limit(limit) : rankedQuery);
+  return ranked.map((row) => row.productId).filter((id): id is string => id !== null);
+}
 
-  const rankedIds = ranked.map((row) => row.productId).filter((id): id is string => id !== null);
+export async function getTopSellingProducts(limit?: number): Promise<CatalogProductSummary[]> {
+  const rankedIds = await rankTopSellingIds(limit);
   if (rankedIds.length === 0) return [];
 
   // `loadProductSummaries` orders by createdAt; restore the sales ranking.
   const summaries = await loadProductSummaries(inArray(products.id, rankedIds));
   const rankById = new Map(rankedIds.map((id, index) => [id, index]));
   return summaries.sort((a, b) => (rankById.get(a.id) ?? 0) - (rankById.get(b.id) ?? 0));
+}
+
+/** The products that have sold, as list-page candidates (the `/collection/top-selling` page). */
+export async function getTopSellingCandidates(): Promise<ListingCandidate[]> {
+  const rankedIds = await rankTopSellingIds();
+  return rankedIds.length === 0 ? [] : loadListingCandidates(inArray(products.id, rankedIds));
 }
 
 /** The brand shown on a product page. Only ever present for an **active**
@@ -645,6 +796,8 @@ export type SearchResult = {
   page: number;
   pageSize: number;
   totalPages: number;
+  /** Options for the filter dropdowns (from the whole, unfiltered result set). */
+  facets: ListingFacets;
 };
 
 export type BrandSuggestion = { name: string; nameEn: string | null; productCount: number };
@@ -697,13 +850,12 @@ export async function searchProducts(params: {
   /** Return this many consecutive pages starting at `page` (default 1) —
    * used to re-render pages 1..N for an infinite-scroll list. */
   pageSpan?: number;
-  sort?: ProductSort;
+  filters?: ListingFilters;
 }): Promise<SearchResult> {
   const q = params.q.trim();
-  const sort = params.sort ?? "newest";
 
   if (q.length === 0) {
-    return { query: q, products: [], total: 0, page: 1, pageSize: SEARCH_PAGE_SIZE, totalPages: 0 };
+    return { query: q, products: [], total: 0, page: 1, pageSize: SEARCH_PAGE_SIZE, totalPages: 0, facets: EMPTY_FACETS };
   }
 
   const pattern = `%${q}%`;
@@ -711,83 +863,28 @@ export async function searchProducts(params: {
   // (a prefix match would make "1000" return half the catalog).
   const codeQuery = toLatinDigits(q).replace(/[\s-]/g, "");
   const exactCode = /^\d{1,9}$/.test(codeQuery) ? Number(codeQuery) : null;
-  const productRows = await db
-    .select({
-      id: products.id,
-      slug: products.slug,
-      title: products.title,
-      categorySlug: categories.slug,
-      createdAt: products.createdAt,
-      brandId: products.brandId,
-      categoryId: products.categoryId,
-    })
-    .from(products)
-    .innerJoin(categories, eq(categories.id, products.categoryId))
-    .leftJoin(brands, and(eq(brands.id, products.brandId), eq(brands.isActive, true)))
-    .where(
-      and(
-        eq(products.isActive, true),
-        or(
-          exactCode === null ? undefined : eq(products.productCode, exactCode),
-          ilike(products.title, pattern),
-          ilike(products.shortDescription, pattern),
-          // Brand name (Persian or Latin) — an inactive brand is excluded by
-          // the join condition above, so it never matches.
-          ilike(brands.name, pattern),
-          ilike(brands.nameEn, pattern),
-          // Category name too, so "کفش" or "هودی زنانه" finds products
-          // whose own title doesn't repeat the word.
-          ilike(categories.name, pattern),
-        ),
-      ),
-    );
-
-  if (productRows.length === 0) {
-    return { query: q, products: [], total: 0, page: 1, pageSize: SEARCH_PAGE_SIZE, totalPages: 0 };
-  }
-
-  const productIds = productRows.map((row) => row.id);
-  const [variantRows, imageRows] = await Promise.all([
-    db
-      .select(VARIANT_COLUMNS)
-      .from(productVariants)
-      .where(and(inArray(productVariants.productId, productIds), eq(productVariants.isActive, true))),
-    db
-      .select(IMAGE_COLUMNS)
-      .from(productImages)
-      .where(inArray(productImages.productId, productIds))
-      .orderBy(asc(productImages.displayOrder)),
-  ]);
-
-  const variantsByProduct = groupByProductId(variantRows);
-  const imagesByProduct = groupByProductId(imageRows);
-
-  const pricing = await getCatalogPricing();
-  const summaries = productRows.map((row) =>
-    buildSummary(
-      row,
-      (variantsByProduct.get(row.id) ?? []).map((variant) => toVariant(variant, pricing, refOf(row))),
-      (imagesByProduct.get(row.id) ?? []).map(toColoredImage),
-      campaignInfosFor(pricing, refOf(row)),
+  const rows = await selectCandidateRows(
+    or(
+      exactCode === null ? undefined : eq(products.productCode, exactCode),
+      ilike(products.title, pattern),
+      ilike(products.shortDescription, pattern),
+      // Brand name (Persian or Latin) — an inactive brand is excluded by
+      // the join condition, so it never matches.
+      ilike(brands.name, pattern),
+      ilike(brands.nameEn, pattern),
+      // Category name too, so "کفش" or "هودی زنانه" finds products
+      // whose own title doesn't repeat the word.
+      ilike(categories.name, pattern),
     ),
   );
 
-  const createdAtBySlug = new Map(productRows.map((row) => [row.slug, row.createdAt]));
-  const sorted = [...summaries].sort((a, b) => {
-    if (sort === "price-asc") return (a.fromPriceToman ?? Infinity) - (b.fromPriceToman ?? Infinity);
-    if (sort === "price-desc") return (b.fromPriceToman ?? -Infinity) - (a.fromPriceToman ?? -Infinity);
-    const aCreatedAt = createdAtBySlug.get(a.slug);
-    const bCreatedAt = createdAtBySlug.get(b.slug);
-    return (bCreatedAt?.getTime() ?? 0) - (aCreatedAt?.getTime() ?? 0);
+  const result = await finishListing({
+    candidates: await assembleCandidates(rows),
+    filters: params.filters,
+    page: params.page,
+    pageSpan: params.pageSpan,
   });
-
-  const total = sorted.length;
-  const totalPages = Math.max(1, Math.ceil(total / SEARCH_PAGE_SIZE));
-  const page = Math.min(Math.max(1, params.page ?? 1), totalPages);
-  const start = (page - 1) * SEARCH_PAGE_SIZE;
-  const pageItems = sorted.slice(start, start + SEARCH_PAGE_SIZE * Math.max(1, params.pageSpan ?? 1));
-
-  return { query: q, products: pageItems, total, page, pageSize: SEARCH_PAGE_SIZE, totalPages };
+  return { query: q, pageSize: SEARCH_PAGE_SIZE, ...result };
 }
 
 /**
@@ -826,146 +923,44 @@ export type CategoryProductsResult = {
   page: number;
   pageSize: number;
   totalPages: number;
-  /** Distinct size/color values across *all* of the category's products
-   * (before the current size/color filter is applied), so filter controls
-   * don't disappear once a filter narrows the visible results. */
-  availableSizes: string[];
-  availableColors: Array<{ color: string; colorHex: string | null }>;
+  /** Options for the filter dropdowns: brands, sub-categories, sizes, colours
+   * and the price range across *all* of the category's products (before the
+   * current filters), so a dropdown never loses its choices once a selection
+   * narrows the results. */
+  facets: ListingFacets;
 };
 
 /**
- * Category listing: browsable, filterable (size/color), sortable
- * (newest/price), paginated product grid for one category.
+ * Category listing: browsable, filterable (brand / price / category / size /
+ * colour / availability), sortable and paginated product grid for one category.
  *
  * Filtering/sorting/pagination happen in application code after a single
- * batched fetch of the category's products, rather than pushed into SQL.
- * That's the right tradeoff at the catalog's current scale (a handful of
- * products per category) per rule F.1 ("prefer the simplest
- * production-safe solution") — it is *not* the right long-term approach
- * once a category can hold hundreds/thousands of products, at which point
- * this should move to `WHERE`/`ORDER BY`/`LIMIT ... OFFSET` in the query
- * itself (flagged in PROGRESS.md for whoever picks this up when catalog
- * size grows, likely around Phase 5's search work).
+ * batched fetch of the category's products (see `listing-engine.ts`), rather
+ * than pushed into SQL. That's the right tradeoff at the catalog's current
+ * scale (a handful of products per category) per rule F.1 ("prefer the simplest
+ * production-safe solution") — it is *not* the right long-term approach once a
+ * category can hold thousands of products, at which point this should move to
+ * `WHERE`/`ORDER BY`/`LIMIT ... OFFSET` in the query itself.
  */
 export async function getProductsByCategorySlug(params: {
   slug: string;
   page?: number;
   /** Return this many consecutive pages starting at `page` (default 1). */
   pageSpan?: number;
-  sort?: ProductSort;
-  size?: string;
-  color?: string;
+  filters?: ListingFilters;
 }): Promise<CategoryProductsResult | null> {
   const resolved = await resolveActiveCategory(params.slug);
   if (!resolved) return null;
   const { detail: category, subtreeIds } = resolved;
 
-  const sort = params.sort ?? "newest";
-
-  const productRows = await db
-    .select({
-      id: products.id,
-      slug: products.slug,
-      title: products.title,
-      categorySlug: categories.slug,
-      createdAt: products.createdAt,
-      brandId: products.brandId,
-      categoryId: products.categoryId,
-    })
-    .from(products)
-    .innerJoin(categories, eq(categories.id, products.categoryId))
-    // Audience/group pages list everything beneath them, not just products
-    // filed directly on that category (products live on the type level).
-    .where(and(inArray(products.categoryId, subtreeIds), eq(products.isActive, true)));
-
-  if (productRows.length === 0) {
-    return {
-      category,
-      products: [],
-      total: 0,
-      page: 1,
-      pageSize: CATEGORY_PAGE_SIZE,
-      totalPages: 0,
-      availableSizes: [],
-      availableColors: [],
-    };
-  }
-
-  const productIds = productRows.map((row) => row.id);
-  const [variantRows, imageRows] = await Promise.all([
-    db
-      .select(VARIANT_COLUMNS)
-      .from(productVariants)
-      .where(and(inArray(productVariants.productId, productIds), eq(productVariants.isActive, true))),
-    db
-      .select(IMAGE_COLUMNS)
-      .from(productImages)
-      .where(inArray(productImages.productId, productIds))
-      .orderBy(asc(productImages.displayOrder)),
-  ]);
-
-  const variantsByProduct = groupByProductId(variantRows);
-  const imagesByProduct = groupByProductId(imageRows);
-
-  const availableSizes = [...new Set(variantRows.map((variant) => variant.size))].sort((a, b) =>
-    a.localeCompare(b, "fa"),
-  );
-
-  const availableColorsMap = new Map<string, string | null>();
-  for (const variant of variantRows) {
-    if (!availableColorsMap.has(variant.color)) {
-      availableColorsMap.set(variant.color, variant.colorHex);
-    }
-  }
-  const availableColors = [...availableColorsMap.entries()].map(([color, colorHex]) => ({
-    color,
-    colorHex,
-  }));
-
-  const withVariants = productRows.map((row) => ({
-    row,
-    rawVariants: variantsByProduct.get(row.id) ?? [],
-  }));
-
-  const filtered = withVariants.filter(({ rawVariants }) => {
-    if (params.size && !rawVariants.some((variant) => variant.size === params.size)) return false;
-    if (params.color && !rawVariants.some((variant) => variant.color === params.color)) return false;
-    return true;
+  // Audience/group pages list everything beneath them, not just products
+  // filed directly on that category (products live on the type level).
+  const rows = await selectCandidateRows(inArray(products.categoryId, subtreeIds));
+  const result = await finishListing({
+    candidates: await assembleCandidates(rows),
+    filters: params.filters,
+    page: params.page,
+    pageSpan: params.pageSpan,
   });
-
-  const pricing = await getCatalogPricing();
-  const summaries = filtered.map(({ row, rawVariants }) =>
-    buildSummary(
-      row,
-      rawVariants.map((variant) => toVariant(variant, pricing, refOf(row))),
-      (imagesByProduct.get(row.id) ?? []).map(toColoredImage),
-      campaignInfosFor(pricing, refOf(row)),
-    ),
-  );
-
-  const createdAtBySlug = new Map(productRows.map((row) => [row.slug, row.createdAt]));
-  const sorted = [...summaries].sort((a, b) => {
-    if (sort === "price-asc") return (a.fromPriceToman ?? Infinity) - (b.fromPriceToman ?? Infinity);
-    if (sort === "price-desc") return (b.fromPriceToman ?? -Infinity) - (a.fromPriceToman ?? -Infinity);
-    const aCreatedAt = createdAtBySlug.get(a.slug);
-    const bCreatedAt = createdAtBySlug.get(b.slug);
-    return (bCreatedAt?.getTime() ?? 0) - (aCreatedAt?.getTime() ?? 0);
-  });
-
-  const total = sorted.length;
-  const totalPages = Math.max(1, Math.ceil(total / CATEGORY_PAGE_SIZE));
-  const page = Math.min(Math.max(1, params.page ?? 1), totalPages);
-  const start = (page - 1) * CATEGORY_PAGE_SIZE;
-  const pageItems = sorted.slice(start, start + CATEGORY_PAGE_SIZE * Math.max(1, params.pageSpan ?? 1));
-
-  return {
-    category,
-    products: pageItems,
-    total,
-    page,
-    pageSize: CATEGORY_PAGE_SIZE,
-    totalPages,
-    availableSizes,
-    availableColors,
-  };
+  return { category, pageSize: CATEGORY_PAGE_SIZE, ...result };
 }

@@ -4,17 +4,16 @@ import { redirect } from "next/navigation";
 import { Container } from "@/components/ui/Container";
 import { Breadcrumbs } from "@/components/catalog/Breadcrumbs";
 import { ProductListing } from "@/components/catalog/ProductListing";
-import { SearchSortSelect } from "@/components/catalog/SearchSortSelect";
-import { SearchPagination } from "@/components/catalog/SearchPagination";
+import { ListingFilterBar } from "@/components/catalog/filters/ListingFilterBar";
+import { ListingPagination } from "@/components/catalog/ListingPagination";
 import { searchProducts } from "@/domains/catalog/queries";
 import {
-  buildSearchHref,
-  isProductSort,
-  listingProgress,
-  listingWindowFor,
-  type ProductSort,
-  type SearchQueryState,
-} from "@/domains/catalog/presentation";
+  buildListingHref,
+  countActiveFilters,
+  parseListingFilters,
+  type ListingFilters,
+} from "@/domains/catalog/listing-filters";
+import { DEFAULT_PRODUCT_SORT, listingProgress, listingWindowFor } from "@/domains/catalog/presentation";
 import { toPersianDigits } from "@/lib/utils/persian-digits";
 
 type SearchPageProps = {
@@ -26,22 +25,21 @@ function firstValue(value: string | string[] | undefined): string | undefined {
 }
 
 /** `cache()`'d so `generateMetadata` and the page body share one fetch. */
-const loadSearchResults = cache((q: string, sort: ProductSort | undefined, page: number, pageSpan: number) =>
-  searchProducts({ q, sort, page, pageSpan }),
+const loadSearchResults = cache((q: string, filtersJson: string, page: number, pageSpan: number) =>
+  searchProducts({ q, filters: JSON.parse(filtersJson) as ListingFilters, page, pageSpan }),
 );
 
 async function resolveQueryState(props: SearchPageProps) {
   const searchParams = await props.searchParams;
   const q = firstValue(searchParams.q)?.trim() ?? "";
 
-  const sortParam = firstValue(searchParams.sort);
-  const sort = sortParam && isProductSort(sortParam) ? sortParam : undefined;
+  const filters = parseListingFilters(searchParams);
 
   const pageParam = firstValue(searchParams.page);
   const parsedPage = pageParam ? Number.parseInt(pageParam, 10) : 1;
   const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
 
-  return { q, sort, page };
+  return { q, filters, filtersJson: JSON.stringify(filters), page };
 }
 
 export async function generateMetadata(props: SearchPageProps): Promise<Metadata> {
@@ -57,12 +55,15 @@ export async function generateMetadata(props: SearchPageProps): Promise<Metadata
 }
 
 export default async function SearchPage(props: SearchPageProps) {
-  const { q, sort, page } = await resolveQueryState(props);
+  const { q, filters, filtersJson, page } = await resolveQueryState(props);
   const window = listingWindowFor(page);
-  const result = q ? await loadSearchResults(q, sort, window.fetchPage, window.pageSpan) : null;
-  const state: SearchQueryState = { q, sort };
+  const result = q ? await loadSearchResults(q, filtersJson, window.fetchPage, window.pageSpan) : null;
   const progress = result ? listingProgress(window, page, result.totalPages, result.page) : null;
-  if (result && progress?.clampedIntoInfiniteZone) redirect(buildSearchHref({ ...state, page: result.page }));
+  if (result && progress?.clampedIntoInfiniteZone) {
+    redirect(buildListingHref("/search", filters, { q, page: result.page }));
+  }
+  // The filter bar stays visible while a filter yields nothing (so it can be undone).
+  const showFilterBar = result !== null && (result.total > 0 || countActiveFilters(filters) > 0);
 
   return (
     <main className="py-[clamp(24px,4vw,40px)]">
@@ -80,8 +81,11 @@ export default async function SearchPage(props: SearchPageProps) {
               </p>
             )}
           </div>
-          {result && result.total > 0 && <SearchSortSelect state={state} />}
         </div>
+
+        {result && showFilterBar && (
+          <ListingFilterBar basePath="/search" q={q} filters={filters} defaultSort={DEFAULT_PRODUCT_SORT} facets={result.facets} />
+        )}
 
         {!q ? (
           <p className="rounded-[14px] bg-card-image px-6 py-16 text-center text-[0.95rem] text-text-secondary">
@@ -96,10 +100,17 @@ export default async function SearchPage(props: SearchPageProps) {
               totalPages={result?.totalPages ?? 0}
               infinite={window.infinite}
               loadedThrough={progress?.loadedThrough ?? 1}
-              source={{ kind: "search", q, sort }}
-              baseHref={buildSearchHref(state)}
+              source={{ kind: "search", q, filters }}
+              baseHref={buildListingHref("/search", filters, { q })}
               pagination={(current) => (
-                <SearchPagination state={state} page={current} totalPages={result?.totalPages ?? 0} />
+                <ListingPagination
+                  basePath="/search"
+                  q={q}
+                  filters={filters}
+                  defaultSort={DEFAULT_PRODUCT_SORT}
+                  page={current}
+                  totalPages={result?.totalPages ?? 0}
+                />
               )}
             />
           </>

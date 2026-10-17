@@ -1,5 +1,50 @@
 # Trends Progress Report
 
+## Latest change: unified filters on all product list pages (user-requested)
+Status: COMPLETE WITH FOLLOW-UP. `tsc --noEmit` ✔, `eslint .` ✔, `next build` ✔, 223 unit + 107 integration tests pass
+(Postgres 16, fresh migrate + `db:seed`). Smoke-tested on a production build: `/category/men` (+ filtered, + `?page=2`),
+`/search`, `/collection/new-arrivals`, `/collection/top-selling` → 200, filter bar in the HTML, filtered URLs `noindex, follow`,
+hostile params (`sort=hack&min=abc&page=-3`) → 200.
+
+- **Scope**: every product list page — `/category/[slug]`, `/search`, `/collection/[slug]`, `/sale/[slug]`. (`/accessories` is a
+  fixed preview and `/brands` is not a product list — untouched.) **No DB changes.**
+- **Filter bar** (`components/catalog/filters/*`, client): dropdowns **مرتب‌سازی** (ارزان‌ترین · گران‌ترین · جدیدترین · بیشترین تخفیف ·
+  پرفروش‌ترین), **برند** (multi-select + search box), **قیمت** («از»/«تا» inputs + two-thumb slider, same draft), **دسته‌بندی**, **سایز**,
+  **رنگ** (multi-select, colour swatches) and a **«فقط کالاهای موجود»** switch. Sort and the switch apply immediately; the other
+  dropdowns apply with «اعمال فیلتر» (one page load per selection, not per click). Popover from `lg`, anchored to the bar below `lg`,
+  bottom sheet on phones; Escape / outside click close; one panel open at a time. «حذف همه فیلترها» appears when any filter is on.
+- **URL contract** (`domains/catalog/listing-filters.ts`, client-safe): `?sort= &brand= (repeat) &cat= (repeat) &size= (repeat)
+  &color= (repeat) &min= &max= &available=1 &page=`. Defaults are omitted; params are sorted so equal filters give equal URLs; old
+  `?size=M&color=…` links still work. Everything from the URL is parsed/capped (≤30 values per facet, ≤100 chars, price ≤ 10¹² Toman,
+  invalid sort ignored, reversed price range swapped).
+- **Engine** (`domains/catalog/listing-engine.ts`, pure, unit-tested): `filterCandidates` / `sortCandidates` / `computeFacets` /
+  `runListing`. Queries (`queries.ts`: `selectCandidateRows` → `assembleCandidates` → `finishListing`) load a list's candidates once
+  (2 batched queries, no N+1) and the engine does the rest, so all four pages share one implementation. `getProductsByCategorySlug` /
+  `searchProducts` now take `filters` (not `sort/size/color`) and return `facets` (not `availableSizes/availableColors`).
+  `getCollectionPage(slug, page, span, filters)` and `getCampaignLanding(slug, page, now, span, filters)` likewise.
+- **Semantics (confirm)**: filters combine with AND; values inside one filter with OR. **Variant-level filters (size, colour, price,
+  available-only) must hold on ONE variant** ("black + M + in stock" = a black M that is in stock). Price = the shopper-facing
+  campaign-adjusted variant price. Brand/category match the product. Dropdown options come from the *whole* list (not narrowed by other
+  filters), and a dropdown with < 2 choices is hidden unless something is selected. «Category» options = the product types present
+  (on an audience/group page: the types beneath it; on a type page it is hidden — one choice).
+- **Defaults (confirm)**: default sort = **newest** (the old default; shown as the selected option) — the «top-selling» collection
+  defaults to **best-selling**. The availability switch is **off by default = all products incl. out-of-stock** (as before); on =
+  products with at least one in-stock variant. *Best-selling* = units in paid/processing/shipped/delivered orders (same rule as the
+  homepage row), queried only when that sort is chosen. *Most discounts* = the card's discount % (includes sale campaigns).
+- **Infinite scroll**: `InfiniteProductGrid` is keyed by `baseHref` so it restarts when filters change; `loadMoreProducts` carries the
+  filters (zod-validated, same bounds) so pages 2–5 continue the *filtered* list.
+- **SEO**: any filter / non-default sort / page > 1 → `noindex, follow`; canonical stays the clean list URL.
+- **Removed** (superseded): `CategoryFilters`, `SortSelect`, `SearchSortSelect`, `Pagination`, `SearchPagination`,
+  `CollectionPagination` → `ListingFilterBar` + `ListingPagination`. `buildCategoryHref/buildSearchHref` → `buildListingHref`.
+- **Tests**: `tests/unit/listing-filters.test.ts`, `listing-engine.test.ts` (new), `infinite-scroll-window.test.ts` (schema),
+  `tests/integration/listing-filters.test.ts` (new; read-only on the seeded catalog).
+- **Not verified**: the filter UI in a real browser (no browser automation in the sandbox) — dropdown open/close, focus handling,
+  the two-thumb slider in RTL (native ranges should mirror; the highlighted segment uses logical insets), mobile bottom sheet, and
+  the infinite-scroll `replaceState` interplay after a filter change. Click through these first next session.
+- **Known limitations**: filters need JS (the old sort/size/color links worked without it; pagination links still do). The whole list
+  is still loaded and filtered in memory per request (the existing tradeoff) — move to SQL when categories reach thousands of
+  products. Facet options are not narrowed by other filters and show no per-option counts.
+
 ## Latest change: infinite scroll on product list pages (pages 1–5), pagination from page 6
 
 - Scope: `/category/[slug]`, `/search`, `/collection/[slug]`, `/sale/[slug]` (campaign pages). `/accessories` is a preview page (no pagination) and `/brands` is not a product list — both untouched.
