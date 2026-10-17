@@ -1,5 +1,19 @@
 # Trends Progress Report
 
+## Latest change: promo banners are image-only (user-requested)
+Status: COMPLETE. `tsc --noEmit` and eslint clean. `next build`/tests not re-run (change is one presentational component).
+
+- `src/components/home/PromoBanners.tsx` rewritten: each banner is only its image, covering the whole card (`object-cover`,
+  `aspect-[16/9]` mobile / `aspect-[2.2/1]` from md, 22px radius). No title text, description, button or tone background.
+  The whole card is a link when `ctaHref` is set (campaign banners always are); `title` is used as the image `alt`.
+- A banner with no image is **not rendered** (previously a pastel placeholder); the section disappears if none have images.
+- **Unchanged on purpose**: DB schema, `/admin/content` PromoBannerManager and the campaign admin step still collect
+  tone/title/description/button text. They are now unused by the storefront (title still feeds alt text).
+- **Follow-up to confirm**: remove those now-unused admin fields (and make image required for manual banners)? Needs a migration decision.
+- **Not verified**: visual result in a real browser; aspect ratio may need tuning to the real banner artwork.
+
+---
+
 ## Latest change: header nav — دسته‌بندی‌ها / برندها + `/brands` page (user-requested)
 Status: COMPLETE WITH FOLLOW-UP. tsc, eslint, `next build` clean; 178 unit + 96 integration tests pass
 (Postgres 16, fresh migrate + `db:seed`). Smoke-tested on a production build: `/` and `/brands` → 200,
