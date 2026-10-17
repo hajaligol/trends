@@ -240,3 +240,31 @@ export function ChevronRightIcon(props: SVGProps<SVGSVGElement>) {
     <svg {...strokeProps} {...props}><path d="m9 18 6-6-6-6" /></svg>
   );
 }
+
+/** Lucide "list-sort-descending" — header «دسته‌بندی‌ها» trigger. */
+export function ListSortDescendingIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...strokeProps} {...props}><path d="M15 12H3" /><path d="M3 5h18" /><path d="M9 19H3" /></svg>
+  );
+}
+
+/** Lucide "mars" — «مردانه» in the category menu. */
+export function MarsIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...strokeProps} {...props}><path d="M16 3h5v5" /><path d="m21 3-6.75 6.75" /><circle cx="10" cy="14" r="6" /></svg>
+  );
+}
+
+/** Lucide "venus" — «زنانه» in the category menu. */
+export function VenusIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...strokeProps} {...props}><path d="M12 15v7" /><path d="M9 19h6" /><circle cx="12" cy="9" r="6" /></svg>
+  );
+}
+
+/** Lucide "baby" — «بچگانه» in the category menu. */
+export function BabyIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...strokeProps} {...props}><path d="M10 16c.5.3 1.2.5 2 .5s1.5-.2 2-.5" /><path d="M15 12h.01" /><path d="M19.38 6.813A9 9 0 0 1 20.8 10.2a2 2 0 0 1 0 3.6 9 9 0 0 1-17.6 0 2 2 0 0 1 0-3.6A9 9 0 0 1 12 3c2 0 3.5 1.1 3.5 2.5s-.9 2.5-2 2.5c-.8 0-1.5-.4-1.5-1" /><path d="M9 12h.01" /></svg>
+  );
+}

@@ -4,6 +4,7 @@ import { useRef, useState, type ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Container } from "@/components/ui/Container";
+import { BabyIcon, ListSortDescendingIcon, MarsIcon, TagIcon, VenusIcon } from "@/components/ui/icons";
 import type { NavCategory } from "@/domains/categories/tree";
 import type { NavBrand } from "@/domains/brands/queries";
 import { navLinkClass } from "@/components/layout/nav-styles";
@@ -38,6 +39,12 @@ import { useDimPage } from "@/components/overlays/UIOverlayProvider";
  */
 
 type MenuId = "categories" | "brands";
+
+/** Icon per audience slug (the three level-1 slugs are fixed by the taxonomy); unknown slugs get none. */
+const AUDIENCE_ICONS: Record<string, typeof MarsIcon> = { men: MarsIcon, women: VenusIcon, kids: BabyIcon };
+
+const TRIGGER_ICON = "h-[20px] w-[20px] shrink-0";
+const TRIGGER_LAYOUT = "inline-flex items-center gap-1.5";
 
 /** Panel shell shared by both menus: same surface, border, slide-and-fade as the old category menus. */
 function panelClass(isOpen: boolean): string {
@@ -112,8 +119,9 @@ export function HeaderNav({ categories, brands }: { categories: NavCategory[]; b
             ref={categoriesTriggerRef}
             aria-expanded={categoriesOpen}
             aria-controls="category-menu"
-            className={`${navLinkClass(categoriesOpen)} cursor-pointer`}
+            className={`${navLinkClass(categoriesOpen)} ${TRIGGER_LAYOUT} cursor-pointer`}
           >
+            <ListSortDescendingIcon aria-hidden="true" strokeWidth={2} className={TRIGGER_ICON} />
             دسته‌بندی‌ها
           </button>
 
@@ -123,6 +131,7 @@ export function HeaderNav({ categories, brands }: { categories: NavCategory[]; b
               <ul aria-label="دسته‌های اصلی" className="flex flex-col gap-1 border-e border-[#c9ced2] pe-4">
                 {categories.map((root) => {
                   const isActive = root.slug === audience.slug;
+                  const Icon = AUDIENCE_ICONS[root.slug];
                   return (
                     <li key={root.slug}>
                       <Link
@@ -131,10 +140,11 @@ export function HeaderNav({ categories, brands }: { categories: NavCategory[]; b
                         onMouseEnter={() => setActiveAudience(root.slug)}
                         onFocus={() => setActiveAudience(root.slug)}
                         aria-current={isActive ? "true" : undefined}
-                        className={`block rounded-[8px] px-3 py-2.5 text-[1rem] font-semibold transition-colors duration-150 ${
+                        className={`flex items-center gap-2.5 rounded-[8px] px-3 py-2.5 text-[1rem] font-semibold transition-colors duration-150 ${
                           isActive ? "bg-ink/6 text-brand" : "text-ink hover:bg-ink/5"
                         }`}
                       >
+                        {Icon && <Icon aria-hidden="true" strokeWidth={2} className="h-[20px] w-[20px] shrink-0" />}
                         {root.name}
                       </Link>
                     </li>
@@ -203,8 +213,9 @@ export function HeaderNav({ categories, brands }: { categories: NavCategory[]; b
           href="/brands"
           ref={brandsTriggerRef}
           onClick={close}
-          className={navLinkClass(brandsOpen)}
+          className={`${navLinkClass(brandsOpen)} ${TRIGGER_LAYOUT}`}
         >
+          <TagIcon aria-hidden="true" strokeWidth={2} className={TRIGGER_ICON} />
           برندها
         </Link>
 
