@@ -74,6 +74,11 @@ export default async function AdminCampaignsPage() {
                         {item.row.name}
                       </Link>
                       <div className="text-[0.76rem] text-brand-dark">{KIND_META[item.row.kind].title}</div>
+                      {item.row.homePlacement !== "none" && (
+                        <div className="text-[0.74rem] text-text-secondary">
+                          صفحه اصلی: {item.row.homePlacement === "hero" ? "اسلاید اصلی" : "بنر تبلیغاتی"}
+                        </div>
+                      )}
                       <div className={`text-[0.76rem] ${item.configValid ? "text-text-secondary" : "text-red-700"}`}>{item.summary}</div>
                     </td>
                     <td className={TD_MUTED}>{scopeText(item)}</td>

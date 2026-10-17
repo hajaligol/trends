@@ -15,6 +15,7 @@ import {
 import { brands } from "./brands";
 import { categories } from "./categories";
 import { orders } from "./orders";
+import { promoBannerToneEnum } from "./promo-banners";
 import { products } from "./products";
 
 /**
@@ -49,12 +50,22 @@ export const campaignKindEnum = pgEnum("campaign_kind", [
   "free_shipping",
 ]);
 
+/**
+ * Where a campaign advertises itself on the homepage: nowhere, as a slide in
+ * the hero carousel, or as a promo-banner card. Either way it links to the
+ * campaign's own products page (`/sale/<slug>`) and is shown only while the
+ * campaign is live.
+ */
+export const campaignHomePlacementEnum = pgEnum("campaign_home_placement", ["none", "hero", "banner"]);
+
 export const campaigns = pgTable(
   "campaigns",
   {
     id: uuid("id").defaultRandom().primaryKey(),
     /** Customer-facing name, e.g. «حراج پاییزه». */
     name: text("name").notNull(),
+    /** Stable public path segment of the campaign's products page, `/sale/<slug>`. */
+    slug: text("slug").notNull(),
     /** Optional customer-facing sentence shown on the product page. */
     description: text("description"),
     kind: campaignKindEnum("kind").notNull(),
@@ -63,12 +74,23 @@ export const campaigns = pgTable(
     stackable: boolean("stackable").notNull().default(false),
     showCountdown: boolean("show_countdown").notNull().default(false),
     isActive: boolean("is_active").notNull().default(true),
+    /** Homepage advertising. Image is required for `hero`/`banner` (DB-checked);
+     * the text fields are optional overrides of name/description/«مشاهده محصولات». */
+    homePlacement: campaignHomePlacementEnum("home_placement").notNull().default("none"),
+    homeImageUrl: text("home_image_url"),
+    homeBannerTone: promoBannerToneEnum("home_banner_tone").notNull().default("pink"),
+    homeTitle: text("home_title"),
+    homeDescription: text("home_description"),
+    homeCtaLabel: text("home_cta_label"),
     startsAt: timestamp("starts_at", { withTimezone: true }),
     endsAt: timestamp("ends_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
+    uniqueIndex("campaigns_slug_unique_idx").on(table.slug),
+    index("campaigns_home_placement_idx").on(table.homePlacement),
+    check("campaigns_home_image_required", sql`${table.homePlacement} = 'none' OR ${table.homeImageUrl} IS NOT NULL`),
     index("campaigns_is_active_window_idx").on(table.isActive, table.startsAt, table.endsAt),
     check(
       "campaigns_window_valid",

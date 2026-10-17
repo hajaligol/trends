@@ -63,6 +63,24 @@ covered, sample before/after prices, overlap with other live campaigns). List pa
 (live/scheduled/ended/paused), results (orders + discount given), on/off switch, duplicate (as paused), delete.
 All actions are role-checked, validated server-side and audit-logged (`campaign.*`).
 
+## Homepage placement and the campaign page
+
+Each campaign chooses **none**, a **hero slide** or a **promo banner** for the homepage
+(`campaigns.home_placement`; image required, DB-checked). Hero = image only; banner = image + title,
+description, button text, pink/blue tone (blank text falls back to campaign name → description/summary →
+«مشاهده محصولات»). Images must be uploaded through the admin picker (`/assets/<folder>/<file>`) — enforced on
+save and again when reading, because an unconfigured image host would crash the homepage.
+
+- Shown **only while the campaign is live** (switched on, inside its window, valid config). Before start,
+  after end, or when paused it disappears by itself.
+- Campaign slides/banners come **before** the manually managed ones (`/admin/content`), newest campaign first.
+- Clicking goes to **`/sale/<slug>`**: live → header (name, offer, optional countdown) + every active product the
+  scope covers (12/page, campaign prices shown); ended → "campaign has ended" notice; paused/scheduled/unknown → real 404.
+  Live campaign pages are in the sitemap. Product pages link to the campaign page too.
+- `slug` is generated from the name once (Persian allowed, `-2`… on clash) and never changes, so links stay stable.
+- Side fixes: hero slides and banner cards with a manual `ctaHref` are now clickable too (before, `ctaHref` was ignored);
+  a swipe on the carousel no longer triggers the link underneath.
+
 ## Caching
 
 Product, category, collection and search pages are dynamic. The homepage is static with

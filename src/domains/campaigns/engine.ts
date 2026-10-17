@@ -41,6 +41,7 @@ export type CampaignScope = {
 type CampaignBase = {
   id: string;
   name: string;
+  slug: string;
   description: string | null;
   stackable: boolean;
   showCountdown: boolean;

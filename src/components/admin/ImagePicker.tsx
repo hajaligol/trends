@@ -20,6 +20,9 @@ type ImagePickerProps = {
   /** Preview shape: `square` (default), `wide` (hero/banners) or `portrait` (products). */
   shape?: "square" | "wide" | "portrait";
   hint?: string;
+  /** Called with the new URL ("" when removed) whenever it changes — for
+   * controlled forms that don't submit this field as a plain `<form>` value. */
+  onChange?: (url: string) => void;
 };
 
 const SHAPES = {
@@ -41,10 +44,14 @@ const SHAPES = {
  * without re-uploading it — the browse button is the primary path, not
  * the only path.
  */
-export function ImagePicker({ name, folder, label, defaultValue, required, shape = "square", hint }: ImagePickerProps) {
+export function ImagePicker({ name, folder, label, defaultValue, required, shape = "square", hint, onChange }: ImagePickerProps) {
   const inputId = useId();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [url, setUrl] = useState(defaultValue ?? "");
+  const [url, setUrlState] = useState(defaultValue ?? "");
+  const setUrl = (next: string) => {
+    setUrlState(next);
+    onChange?.(next);
+  };
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showUrlFallback, setShowUrlFallback] = useState(false);

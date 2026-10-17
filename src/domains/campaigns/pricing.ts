@@ -13,6 +13,8 @@ import type { CampaignKind } from "@/lib/db/schema/campaigns";
 export type CatalogCampaignInfo = {
   id: string;
   name: string;
+  /** Public products page of the campaign: `/sale/<slug>`. */
+  slug: string;
   kind: CampaignKind;
   /** Short Persian description of the offer, e.g. «۲ بخر، ۱ رایگان بگیر». */
   summary: string;
@@ -52,6 +54,7 @@ export function campaignInfosFor(pricing: CatalogPricing, ref: ProductRef): Cata
     .map((campaign) => ({
       id: campaign.id,
       name: campaign.name,
+      slug: campaign.slug,
       kind: campaign.kind,
       summary: describeDefinition(campaign),
       description: campaign.description,

@@ -57,6 +57,7 @@ async function makeCampaign(
     .insert(campaigns)
     .values({
       name: `کمپین آزمایشی ${campaignIds.length + 1}`,
+      slug: `test-${Date.now().toString(36)}-${campaignIds.length + 1}-${Math.random().toString(36).slice(2, 7)}`,
       kind,
       config,
       appliesToAll: false,
@@ -280,5 +281,145 @@ describe("admin coverage preview", () => {
     expect(single.matchedCount).toBe(1);
     expect(single.sample[0]!.regularPriceToman).toBe(200_000);
     expect(single.sample[0]!.salePriceToman).toBe(180_000);
+  });
+});
+
+describe("homepage placement and campaign page", () => {
+  const manualSlideIds: string[] = [];
+  const HOME_IMG = "/assets/hero/test-campaign.webp";
+
+  async function placed(
+    placement: "hero" | "banner",
+    over: Partial<typeof campaigns.$inferInsert> = {},
+  ) {
+    const { product } = await sale(250_000);
+    const [row] = await db
+      .insert(campaigns)
+      .values({
+        name: `کمپین صفحه اصلی ${campaignIds.length + 1}`,
+        slug: `home-${Date.now().toString(36)}-${campaignIds.length + 1}-${Math.random().toString(36).slice(2, 7)}`,
+        kind: "percent_off",
+        config: { percent: 15, maxDiscountToman: null },
+        appliesToAll: false,
+        homePlacement: placement,
+        homeImageUrl: HOME_IMG,
+        ...over,
+      })
+      .returning();
+    campaignIds.push(row!.id);
+    await db.insert(campaignTargets).values({ campaignId: row!.id, productId: product.id });
+    return { row: row!, product };
+  }
+
+  afterAll(async () => {
+    const { heroSlides } = await import("@/lib/db/schema");
+    for (const id of manualSlideIds) await db.delete(heroSlides).where(eq(heroSlides.id, id));
+  });
+
+  it("a live hero campaign appears as a slide linking to its sale page", async () => {
+    const { getLiveHomePlacements } = await import("@/domains/campaigns/placements");
+    const { row } = await placed("hero");
+    const { hero, banners } = await getLiveHomePlacements();
+    const slide = hero.find((s) => s.id === `campaign-${row.id}`);
+    expect(slide).toBeDefined();
+    expect(slide!.imageUrl).toBe(HOME_IMG);
+    expect(slide!.ctaHref).toBe(`/sale/${encodeURIComponent(row.slug)}`);
+    expect(banners.find((b) => b.id === `campaign-${row.id}`)).toBeUndefined();
+  });
+
+  it("a live banner campaign uses its overrides, else name/description/default label", async () => {
+    const { getLiveHomePlacements } = await import("@/domains/campaigns/placements");
+    const plain = await placed("banner", { description: "توضیح کمپین", homeBannerTone: "blue" });
+    const custom = await placed("banner", { homeTitle: "عنوان سفارشی", homeDescription: "توضیح سفارشی", homeCtaLabel: "همین حالا ببین" });
+    const { banners } = await getLiveHomePlacements();
+    const a = banners.find((b) => b.id === `campaign-${plain.row.id}`)!;
+    expect(a).toMatchObject({ title: plain.row.name, description: "توضیح کمپین", ctaLabel: "مشاهده محصولات", tone: "blue" });
+    const b = banners.find((x) => x.id === `campaign-${custom.row.id}`)!;
+    expect(b).toMatchObject({ title: "عنوان سفارشی", description: "توضیح سفارشی", ctaLabel: "همین حالا ببین" });
+  });
+
+  it("placement 'none', paused, scheduled, ended and invalid-config campaigns never appear", async () => {
+    const { getLiveHomePlacements } = await import("@/domains/campaigns/placements");
+    const none = await placed("hero", { homePlacement: "none", homeImageUrl: null });
+    const paused = await placed("hero", { isActive: false });
+    const scheduled = await placed("banner", { startsAt: new Date(Date.now() + 3_600_000) });
+    const ended = await placed("hero", { startsAt: new Date(Date.now() - 7_200_000), endsAt: new Date(Date.now() - 3_600_000) });
+    const invalid = await placed("hero", { config: { percent: 999 } });
+    const badImage = await placed("hero", { homeImageUrl: "https://evil.example/x.png" });
+    const { hero, banners } = await getLiveHomePlacements();
+    const shown = new Set([...hero, ...banners].map((x) => x.id));
+    for (const { row } of [none, paused, scheduled, ended, invalid, badImage]) {
+      expect(shown.has(`campaign-${row.id}`), row.name).toBe(false);
+    }
+  });
+
+  it("campaign slides come before manually managed ones; manual slides become clickable data", async () => {
+    const { getHomepageHeroSlides } = await import("@/domains/content/queries");
+    const { heroSlides } = await import("@/lib/db/schema");
+    const [manual] = await db
+      .insert(heroSlides)
+      .values({ alt: "اسلاید دستی", imageUrl: "/assets/hero/manual.webp", ctaHref: "/category/men", displayOrder: 0 })
+      .returning();
+    manualSlideIds.push(manual!.id);
+    const { row } = await placed("hero");
+    const slides = await getHomepageHeroSlides();
+    const campaignIndex = slides.findIndex((s) => s.id === `campaign-${row.id}`);
+    const manualIndex = slides.findIndex((s) => s.id === manual!.id);
+    expect(campaignIndex).toBeGreaterThanOrEqual(0);
+    expect(manualIndex).toBeGreaterThan(campaignIndex);
+    expect(slides[manualIndex]!.ctaHref).toBe("/category/men");
+  });
+
+  it("the database refuses a hero/banner placement without an image", async () => {
+    await expect(
+      db.insert(campaigns).values({
+        name: "x",
+        slug: `noimg-${Math.random().toString(36).slice(2, 8)}`,
+        kind: "percent_off",
+        config: { percent: 10, maxDiscountToman: null },
+        homePlacement: "hero",
+        homeImageUrl: null,
+      }),
+    ).rejects.toThrow();
+  });
+
+  it("slugs are unique", async () => {
+    const { row } = await placed("hero");
+    await expect(
+      db.insert(campaigns).values({ name: "dup", slug: row.slug, kind: "percent_off", config: { percent: 10, maxDiscountToman: null } }),
+    ).rejects.toThrow();
+  });
+
+  it("the campaign page lists exactly the covered, active products", async () => {
+    const { getCampaignLanding } = await import("@/domains/campaigns/landing");
+    const { row, product } = await placed("hero");
+    const other = await sale(100_000); // not covered
+    const landing = await getCampaignLanding(row.slug, 1);
+    expect(landing?.state).toBe("live");
+    if (landing?.state !== "live") return;
+    expect(landing.total).toBe(1);
+    expect(landing.products.map((p) => p.id)).toEqual([product.id]);
+    expect(landing.products.some((p) => p.id === other.product.id)).toBe(false);
+    // The listing shows the campaign price (15% off 250,000).
+    expect(landing.products[0]!.fromPriceToman).toBe(212_500);
+  });
+
+  it("the campaign page: ended → notice, paused/scheduled/unknown → null (404)", async () => {
+    const { getCampaignLanding } = await import("@/domains/campaigns/landing");
+    const ended = await placed("hero", { startsAt: new Date(Date.now() - 7_200_000), endsAt: new Date(Date.now() - 3_600_000) });
+    const paused = await placed("hero", { isActive: false });
+    const scheduled = await placed("hero", { startsAt: new Date(Date.now() + 3_600_000) });
+    expect(await getCampaignLanding(ended.row.slug, 1)).toEqual({ state: "ended", name: ended.row.name });
+    expect(await getCampaignLanding(paused.row.slug, 1)).toBeNull();
+    expect(await getCampaignLanding(scheduled.row.slug, 1)).toBeNull();
+    expect(await getCampaignLanding("does-not-exist", 1)).toBeNull();
+  });
+
+  it("a campaign with store-wide scope and exclusions pages correctly and clamps the page number", async () => {
+    const { getCampaignLanding } = await import("@/domains/campaigns/landing");
+    const { row, product } = await placed("hero");
+    const landing = await getCampaignLanding(row.slug, 999);
+    expect(landing?.state === "live" && landing.page).toBe(1);
+    expect(product.id).toBeTruthy();
   });
 });

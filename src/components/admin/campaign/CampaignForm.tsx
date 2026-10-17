@@ -9,7 +9,8 @@ import { parseCampaignConfig } from "@/domains/campaigns/config";
 import { describeDefinition, KIND_META } from "@/domains/campaigns/labels";
 import type { CampaignKind } from "@/lib/db/schema/campaigns";
 import { dateToTehranInput } from "@/lib/utils/tehran-time";
-import { FormAlert, Spinner, TextField, TextareaField } from "@/components/admin/ui/form";
+import { FormAlert, SelectField, Spinner, TextField, TextareaField } from "@/components/admin/ui/form";
+import { ImagePicker } from "@/components/admin/ImagePicker";
 import { adminButton, Card } from "@/components/admin/ui/layout";
 import { ConfigFields } from "./ConfigFields";
 import { draftFromDefinition, draftToConfig, type Draft } from "./draft";
@@ -71,6 +72,12 @@ export function CampaignForm({
   const [showCountdown, setShowCountdown] = useState(campaign?.row.showCountdown ?? false);
   const [stackable, setStackable] = useState(campaign?.row.stackable ?? false);
   const [isActive, setIsActive] = useState(campaign?.row.isActive ?? true);
+  const [homePlacement, setHomePlacement] = useState<"none" | "hero" | "banner">(campaign?.row.homePlacement ?? "none");
+  const [homeImageUrl, setHomeImageUrl] = useState(campaign?.row.homeImageUrl ?? "");
+  const [homeBannerTone, setHomeBannerTone] = useState<"pink" | "blue">(campaign?.row.homeBannerTone ?? "pink");
+  const [homeTitle, setHomeTitle] = useState(campaign?.row.homeTitle ?? "");
+  const [homeDescription, setHomeDescription] = useState(campaign?.row.homeDescription ?? "");
+  const [homeCtaLabel, setHomeCtaLabel] = useState(campaign?.row.homeCtaLabel ?? "");
 
   const config = useMemo(() => draftToConfig(kind, draft), [kind, draft]);
   const parsedConfig = useMemo(() => parseCampaignConfig(kind, config), [kind, config]);
@@ -104,6 +111,12 @@ export function CampaignForm({
       stackable,
       showCountdown,
       isActive,
+      homePlacement,
+      homeImageUrl: homePlacement === "none" ? null : homeImageUrl || null,
+      homeBannerTone,
+      homeTitle: homeTitle.trim() || null,
+      homeDescription: homeDescription.trim() || null,
+      homeCtaLabel: homeCtaLabel.trim() || null,
       startsAt: startsAt || null,
       endsAt: endsAt || null,
     });
@@ -140,7 +153,106 @@ export function CampaignForm({
           <ScopePicker scope={scope} onChange={(patch) => setScope((current) => ({ ...current, ...patch }))} brands={brands} categories={categories} />
         </Step>
 
-        <Step n={4} title="زمان‌بندی" description="زمان‌ها به وقت تهران است. خالی گذاشتن شروع = از همین حالا؛ خالی گذاشتن پایان = تا زمانی که دستی متوقف کنید.">
+        <Step
+          n={4}
+          title="نمایش در صفحه اصلی"
+          description="کمپین را می‌توانید در صفحه اصلی تبلیغ کنید. با کلیک روی آن، مشتری به صفحه محصولات همین کمپین می‌رود."
+        >
+          <div className="flex flex-col gap-4">
+            <fieldset className="m-0 grid min-w-0 gap-2.5 border-0 p-0 sm:grid-cols-3">
+              <legend className="sr-only">نحوه نمایش در صفحه اصلی</legend>
+              {(
+                [
+                  ["none", "بدون نمایش", "فقط تخفیف اعمال می‌شود."],
+                  ["hero", "اسلاید اصلی", "یک تصویر بزرگ در اسلایدر بالای صفحه."],
+                  ["banner", "بنر تبلیغاتی", "کارت پاستلی با عنوان، توضیح و دکمه."],
+                ] as const
+              ).map(([value, title, text]) => (
+                <label
+                  key={value}
+                  className={`flex cursor-pointer flex-col gap-0.5 rounded-[var(--radius-md)] border p-3.5 transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-brand/50 ${
+                    homePlacement === value ? "border-brand bg-lavender/30 shadow-[0_0_0_1px_var(--color-brand)]" : "border-line bg-white hover:border-ink/30"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="campaign-home-placement"
+                    className="sr-only"
+                    checked={homePlacement === value}
+                    onChange={() => setHomePlacement(value)}
+                  />
+                  <span className="text-[0.9rem] font-semibold text-ink">{title}</span>
+                  <span className="text-[0.76rem] leading-5 text-text-secondary">{text}</span>
+                </label>
+              ))}
+            </fieldset>
+
+            {homePlacement !== "none" && (
+              <div className="flex flex-col gap-4 rounded-[var(--radius-md)] border border-line bg-header-bg/40 p-4">
+                <ImagePicker
+                  // Remount when the placement changes so the picker's folder/shape follow it.
+                  key={homePlacement}
+                  name="campaign-home-image"
+                  folder={homePlacement === "hero" ? "hero" : "banners"}
+                  label={homePlacement === "hero" ? "تصویر اسلاید" : "تصویر بنر"}
+                  shape="wide"
+                  required
+                  defaultValue={homeImageUrl}
+                  onChange={setHomeImageUrl}
+                  hint={homePlacement === "hero" ? "پیشنهاد: تصویر عریض با نسبت حدود ۲۱ به ۸." : "تصویر کنار متن بنر نمایش داده می‌شود."}
+                />
+                {homePlacement === "banner" && (
+                  <div className="flex flex-col gap-4">
+                    <SelectField label="رنگ بنر" name="campaign-home-tone" value={homeBannerTone} onChange={(e) => setHomeBannerTone(e.target.value as "pink" | "blue")}>
+                      <option value="pink">صورتی</option>
+                      <option value="blue">آبی</option>
+                    </SelectField>
+                    <TextField
+                      label="عنوان بنر"
+                      name="campaign-home-title"
+                      optional
+                      maxLength={120}
+                      placeholder={name.trim() || "پیش‌فرض: نام کمپین"}
+                      value={homeTitle}
+                      onChange={(e) => setHomeTitle(e.target.value)}
+                    />
+                    <TextareaField
+                      label="توضیح بنر"
+                      name="campaign-home-description"
+                      optional
+                      rows={2}
+                      maxLength={400}
+                      placeholder={description.trim() || summary || "پیش‌فرض: توضیح کمپین یا خلاصه تخفیف"}
+                      value={homeDescription}
+                      onChange={(e) => setHomeDescription(e.target.value)}
+                    />
+                    <TextField
+                      label="متن دکمه"
+                      name="campaign-home-cta"
+                      optional
+                      maxLength={60}
+                      placeholder="مشاهده محصولات"
+                      value={homeCtaLabel}
+                      onChange={(e) => setHomeCtaLabel(e.target.value)}
+                    />
+                  </div>
+                )}
+                <p className="m-0 text-[0.78rem] leading-6 text-text-secondary">
+                  فقط تا وقتی کمپین <b className="text-ink">فعال و در بازه زمانی خودش</b> باشد در صفحه اصلی دیده می‌شود (قبل از شروع و بعد از پایان، خودکار حذف می‌شود).{" "}
+                  {campaign ? (
+                    <>
+                      لینک: <span dir="ltr" className="font-mono">/sale/{campaign.row.slug}</span>
+                    </>
+                  ) : (
+                    "صفحه محصولات کمپین هنگام ذخیره به‌صورت خودکار ساخته می‌شود."
+                  )}
+                </p>
+              </div>
+            )}
+          </div>
+        </Step>
+
+        <Step n={5} title="زمان‌بندی" description="زمان‌ها به وقت تهران است. خالی گذاشتن شروع = از همین حالا؛ خالی گذاشتن پایان = تا زمانی که دستی متوقف کنید.">
           <div className="flex flex-col gap-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <TextField label="شروع" name="campaign-starts" type="datetime-local" optional value={startsAt} onChange={(e) => setStartsAt(e.target.value)} />
@@ -155,7 +267,7 @@ export function CampaignForm({
           </div>
         </Step>
 
-        <Step n={5} title="نام و قوانین">
+        <Step n={6} title="نام و قوانین">
           <div className="flex flex-col gap-4">
             <TextField
               label="نام کمپین (نمایش به مشتری)"

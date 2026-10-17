@@ -2,6 +2,7 @@ import { z } from "zod";
 import { campaignKindEnum } from "@/lib/db/schema/campaigns";
 import { parseCampaignConfig, type CampaignDefinition } from "./config";
 import { tehranInputToDate } from "@/lib/utils/tehran-time";
+import { isValidHomeImagePath } from "./home-image";
 
 /**
  * Everything the campaign form submits, as ONE JSON payload (the form has
@@ -26,6 +27,14 @@ const tehranDateTime = z
     return date;
   });
 
+const optionalText = (max: number, label: string) =>
+  z
+    .string()
+    .trim()
+    .max(max, `${label} حداکثر ${max} کاراکتر باشد`)
+    .nullable()
+    .transform((value) => value || null);
+
 const scopeShape = {
   appliesToAll: z.boolean(),
   brandIds: ids(300),
@@ -49,6 +58,18 @@ export const campaignInputSchema = z
     stackable: z.boolean(),
     showCountdown: z.boolean(),
     isActive: z.boolean(),
+    // Omitted ⇒ "no homepage display", so older clients keep working.
+    homePlacement: z.enum(["none", "hero", "banner"]).default("none"),
+    homeImageUrl: z
+      .string()
+      .trim()
+      .nullable()
+      .default(null)
+      .transform((value) => value || null),
+    homeBannerTone: z.enum(["pink", "blue"]).default("pink"),
+    homeTitle: optionalText(120, "عنوان بنر").default(null),
+    homeDescription: optionalText(400, "توضیح بنر").default(null),
+    homeCtaLabel: optionalText(60, "متن دکمه").default(null),
     startsAt: tehranDateTime,
     endsAt: tehranDateTime,
   })
@@ -66,6 +87,17 @@ export const campaignInputSchema = z
     }
     if (input.showCountdown && !input.endsAt) {
       ctx.addIssue({ code: "custom", message: "برای نمایش شمارش معکوس، زمان پایان را مشخص کنید", path: ["endsAt"] });
+    }
+    if (input.homePlacement !== "none") {
+      if (!input.homeImageUrl) {
+        ctx.addIssue({
+          code: "custom",
+          message: input.homePlacement === "hero" ? "برای اسلاید صفحه اصلی، تصویر انتخاب کنید" : "برای بنر صفحه اصلی، تصویر انتخاب کنید",
+          path: ["homeImageUrl"],
+        });
+      } else if (!isValidHomeImagePath(input.homeImageUrl)) {
+        ctx.addIssue({ code: "custom", message: "تصویر باید از طریق «انتخاب فایل» بارگذاری شده باشد", path: ["homeImageUrl"] });
+      }
     }
     const includeCount = input.brandIds.length + input.categoryIds.length + input.productIds.length;
     if (!input.appliesToAll && includeCount === 0) {

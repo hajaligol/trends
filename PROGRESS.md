@@ -1,5 +1,30 @@
 # Trends Progress Report
 
+## Latest change: campaign → homepage hero slide / promo banner (user-requested)
+Status: COMPLETE WITH FOLLOW-UP. tsc, eslint, `next build` clean; 178 unit + 94 integration tests pass.
+Smoke-tested on a production build: a hero campaign and a banner campaign rendered on `/` linking to
+`/sale/<slug>`; paused campaign absent; `/sale/<paused|unknown>` → 404; live campaigns in `sitemap.xml`.
+Details: `docs/SALE_CAMPAIGNS.md` ("Homepage placement and the campaign page").
+
+- **Admin**: new form step «نمایش در صفحه اصلی» — none / hero slide / promo banner, image upload (`ImagePicker`
+  gained an optional `onChange`), banner tone/title/description/button text. List page shows the placement.
+- **DB (migration `0018_campaign_home_placement`)**: `campaigns.slug` (unique, NOT NULL; hand-edited to backfill
+  existing rows as `campaign-<id8>`), `home_placement` enum, `home_image_url`, `home_banner_tone`, `home_title`,
+  `home_description`, `home_cta_label`; check `campaigns_home_image_required`.
+- **Homepage**: `getHomepageHeroSlides()` / `getHomepagePromoBanners()` (`domains/content/queries.ts`) merge live campaign
+  placements (`domains/campaigns/placements.ts`, campaigns first) with the manual rows; `src/app/page.tsx` uses them.
+  `HeroCarousel` slides and `PromoBanners` cards are now links (new `lib/utils/safe-href.ts`; swipe-vs-click guard).
+- **New page** `src/app/sale/[slug]/page.tsx` + `domains/campaigns/landing.ts` (no `loading.tsx` on purpose: with it Next
+  returns HTTP 200 for `notFound()`). Sitemap + product-page notice link to it.
+- **Assumptions to confirm**: placement shows only while the campaign is live (not "coming soon" before start);
+  campaign slides are placed before manual ones, no manual ordering between campaigns; a store-wide banner links to a page
+  listing the whole catalog.
+- **Not verified**: the new admin form step in a real browser (login required) — only typecheck/lint/build/tests.
+- **Known, pre-existing**: other pages with a `loading.tsx` (`/collection/*`, `/category/*`) return HTTP 200 on `notFound()`
+  (soft 404, noindex present). Not changed here.
+
+---
+
 ## Latest change: sale campaigns (user-requested)
 Status: COMPLETE WITH FOLLOW-UP. `tsc --noEmit`, eslint, `next build` clean; 174 unit +
 85 integration tests pass (Postgres 16, fresh migrate + `db:seed`). Full design/rules:

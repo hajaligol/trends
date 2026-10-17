@@ -60,6 +60,7 @@ export function toEngineCampaign(
   return {
     id: row.id,
     name: row.name,
+    slug: row.slug,
     description: row.description,
     stackable: row.stackable,
     showCountdown: row.showCountdown,

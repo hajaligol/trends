@@ -3,6 +3,8 @@ import { getSitemapEntries } from "@/domains/catalog/queries";
 import { COLLECTIONS } from "@/domains/catalog/presentation";
 import { SITE_URL } from "@/lib/site-config";
 import { productHref } from "@/domains/catalog/slug";
+import { getLiveCampaignSlugs } from "@/domains/campaigns/landing";
+import { campaignHref } from "@/domains/campaigns/slug";
 
 const STATIC_PAGES = [
   "/accessories",
@@ -16,7 +18,7 @@ const STATIC_PAGES = [
 ] as const;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const { categories, products } = await getSitemapEntries();
+  const [{ categories, products }, campaignSlugs] = await Promise.all([getSitemapEntries(), getLiveCampaignSlugs()]);
 
   return [
     { url: SITE_URL, changeFrequency: "daily", priority: 1 },
@@ -30,6 +32,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     })),
     ...Object.keys(COLLECTIONS).map((slug) => ({
       url: `${SITE_URL}/collection/${slug}`,
+      changeFrequency: "daily" as const,
+      priority: 0.6,
+    })),
+    ...campaignSlugs.map((slug) => ({
+      url: `${SITE_URL}${campaignHref(slug)}`,
       changeFrequency: "daily" as const,
       priority: 0.6,
     })),

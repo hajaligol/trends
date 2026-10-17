@@ -1,16 +1,18 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AssetSlot } from "@/components/ui/AssetSlot";
 import { toPersianDigits } from "@/lib/utils/persian-digits";
+import { safeHref } from "@/lib/utils/safe-href";
 
 /** Structural type, not a specific table's row — the carousel only ever
  * needs an `id` (React key / dot target), `alt` text, and an optional
  * `imageUrl`; whether the caller sourced that from `hero_slides` (Phase
  * 11, the real path) or a future different content source doesn't
  * matter to this component. */
-type HeroSlideLike = { id: string; alt: string; imageUrl: string | null };
+type HeroSlideLike = { id: string; alt: string; imageUrl: string | null; ctaHref?: string | null };
 
 const AUTOPLAY_DELAY_MS = 5000;
 const SWIPE_THRESHOLD_RATIO = 0.15;
@@ -35,6 +37,9 @@ export function HeroCarousel({ slides }: { slides: HeroSlideLike[] }) {
   const draggingRef = useRef(false);
   const startXRef = useRef(0);
   const deltaXRef = useRef(0);
+  // True right after a real swipe, so the click that follows a drag doesn't
+  // also follow the slide's link.
+  const swipedRef = useRef(false);
 
   const goTo = useCallback(
     (index: number) => {
@@ -77,6 +82,7 @@ export function HeroCarousel({ slides }: { slides: HeroSlideLike[] }) {
     }
 
     function onDown(event: MouseEvent | TouchEvent) {
+      swipedRef.current = false;
       draggingRef.current = true;
       startXRef.current = clientXOf(event);
       deltaXRef.current = 0;
@@ -93,6 +99,7 @@ export function HeroCarousel({ slides }: { slides: HeroSlideLike[] }) {
     function onUp() {
       if (!draggingRef.current || !wrap) return;
       draggingRef.current = false;
+      swipedRef.current = Math.abs(deltaXRef.current) > 8;
       setIsDragging(false);
       setDragOffsetPercent(0);
       const threshold = wrap.offsetWidth * SWIPE_THRESHOLD_RATIO;
@@ -169,6 +176,20 @@ export function HeroCarousel({ slides }: { slides: HeroSlideLike[] }) {
               />
             ) : (
               <AssetSlot label={slide.alt} tone="banner" rounded="none" className="h-full w-full" />
+            )}
+            {safeHref(slide.ctaHref) && (
+              <Link
+                href={safeHref(slide.ctaHref)!}
+                aria-label={slide.alt}
+                draggable={false}
+                onClick={(event) => {
+                  if (swipedRef.current) {
+                    event.preventDefault();
+                    swipedRef.current = false;
+                  }
+                }}
+                className="absolute inset-0 z-[1] cursor-pointer"
+              />
             )}
           </div>
         ))}

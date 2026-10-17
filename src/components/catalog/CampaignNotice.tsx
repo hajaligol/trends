@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { campaignHref } from "@/domains/campaigns/slug";
 import type { CatalogCampaignInfo } from "@/domains/campaigns/pricing";
 import { CampaignCountdown } from "@/components/catalog/CampaignCountdown";
 
@@ -11,6 +13,9 @@ export function CampaignNotice({ campaigns }: { campaigns: CatalogCampaignInfo[]
           <span className="font-bold text-ink">{campaign.name}</span>
           <span className="text-ink">{campaign.summary}</span>
           {campaign.description && <span className="text-[0.8rem] text-text-secondary">{campaign.description}</span>}
+          <Link href={campaignHref(campaign.slug)} className="mt-1 w-fit text-[0.8rem] font-semibold text-brand-dark underline underline-offset-2">
+            مشاهده همه محصولات این کمپین
+          </Link>
           {campaign.countdownEndsAt && (
             <span className="mt-1 text-[0.8rem] text-text-secondary">
               زمان باقی‌مانده: <CampaignCountdown endsAt={campaign.countdownEndsAt} />

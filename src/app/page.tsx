@@ -10,7 +10,7 @@ import { Container } from "@/components/ui/Container";
 import { demoBenefits } from "@/domains/catalog/demo-data";
 import { HOME_ROW_MAX_PRODUCTS } from "@/domains/catalog/presentation";
 import { getFeaturedProducts, getNewArrivals, getTopSellingProducts } from "@/domains/catalog/queries";
-import { getActiveHeroSlides, getActivePromoBanners, getHomeCategoryTiles } from "@/domains/content/queries";
+import { getHomeCategoryTiles, getHomepageHeroSlides, getHomepagePromoBanners } from "@/domains/content/queries";
 
 /**
  * The homepage is statically generated, and its product rows now show sale
@@ -47,8 +47,8 @@ export default async function HomePage() {
     getFeaturedProducts(HOME_ROW_MAX_PRODUCTS + 1),
     getTopSellingProducts(HOME_ROW_MAX_PRODUCTS + 1),
     getNewArrivals(HOME_ROW_MAX_PRODUCTS + 1),
-    getActiveHeroSlides(),
-    getActivePromoBanners(),
+    getHomepageHeroSlides(),
+    getHomepagePromoBanners(),
   ]);
 
   return (

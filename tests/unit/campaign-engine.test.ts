@@ -24,6 +24,7 @@ function campaign(def: Pick<EngineCampaign, "kind" | "config">, over: Partial<En
   seq += 1;
   return {
     id: `c${String(seq).padStart(3, "0")}`,
+    slug: `campaign-${seq}`,
     name: `کمپین ${seq}`,
     description: null,
     stackable: false,

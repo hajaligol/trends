@@ -9,6 +9,7 @@ import { isStaffOrAdmin, UNAUTHORIZED_ERROR, type ActionResult } from "@/domains
 import { recordAuditLog } from "@/domains/analytics/audit";
 import { campaignInputSchema, campaignPreviewSchema, firstIssue, type CampaignInput } from "./admin-schema";
 import { parseCampaignConfig } from "./config";
+import { generateCampaignSlug } from "./slug";
 import { previewCampaignCoverage, type CampaignPreview } from "./admin-queries";
 
 /**
@@ -56,6 +57,7 @@ function targetRows(campaignId: string, input: Pick<CampaignInput, "appliesToAll
 
 function mapDbError(error: unknown): string {
   const code = (error as { code?: string; cause?: { code?: string } } | null)?.code ?? (error as { cause?: { code?: string } } | null)?.cause?.code;
+  if (code === "23505") return "نشانی صفحه کمپین تکراری شد؛ دوباره ذخیره کنید";
   if (code === "23503") return "برخی برندها، دسته‌بندی‌ها یا محصولات انتخاب‌شده دیگر وجود ندارند؛ صفحه را تازه کنید";
   console.error("campaign action failed", error);
   return "خطا در ذخیره کمپین؛ دوباره تلاش کنید";
@@ -81,6 +83,13 @@ export async function saveCampaignAction(payload: string, id: string | null): Pr
     stackable: input.stackable,
     showCountdown: input.showCountdown,
     isActive: input.isActive,
+    // Homepage advertising: the image only matters while a placement is chosen.
+    homePlacement: input.homePlacement,
+    homeImageUrl: input.homePlacement === "none" ? null : input.homeImageUrl,
+    homeBannerTone: input.homeBannerTone,
+    homeTitle: input.homePlacement === "banner" ? input.homeTitle : null,
+    homeDescription: input.homePlacement === "banner" ? input.homeDescription : null,
+    homeCtaLabel: input.homePlacement === "banner" ? input.homeCtaLabel : null,
     startsAt: input.startsAt,
     endsAt: input.endsAt,
   };
@@ -89,7 +98,8 @@ export async function saveCampaignAction(payload: string, id: string | null): Pr
     const savedId = await db.transaction(async (tx) => {
       let campaignId: string;
       if (id === null) {
-        const [created] = await tx.insert(campaigns).values(values).returning({ id: campaigns.id });
+        const slug = await generateCampaignSlug(tx, input.name);
+        const [created] = await tx.insert(campaigns).values({ ...values, slug }).returning({ id: campaigns.id });
         campaignId = created!.id;
       } else {
         const updated = await tx
@@ -116,6 +126,7 @@ export async function saveCampaignAction(payload: string, id: string | null): Pr
       products: input.productIds.length,
       excludedProducts: input.excludedProductIds.length,
       isActive: input.isActive,
+      homePlacement: input.homePlacement,
     });
     revalidateStorefront();
     revalidatePath(`/admin/campaigns/${savedId}`);
@@ -155,6 +166,7 @@ export async function duplicateCampaignAction(id: string): Promise<ActionResult<
         .insert(campaigns)
         .values({
           name: `${source.name} (کپی)`.slice(0, 60),
+          slug: await generateCampaignSlug(tx, `${source.name} کپی`),
           description: source.description,
           kind: source.kind,
           config: source.config,
@@ -162,6 +174,12 @@ export async function duplicateCampaignAction(id: string): Promise<ActionResult<
           stackable: source.stackable,
           showCountdown: source.showCountdown,
           isActive: false,
+          homePlacement: source.homePlacement,
+          homeImageUrl: source.homeImageUrl,
+          homeBannerTone: source.homeBannerTone,
+          homeTitle: source.homeTitle,
+          homeDescription: source.homeDescription,
+          homeCtaLabel: source.homeCtaLabel,
           startsAt: null,
           endsAt: null,
         })
