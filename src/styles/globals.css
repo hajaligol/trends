@@ -68,6 +68,60 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Site-wide scrollbar: wide (14px hit area), minimal (a slim rounded ink thumb on a
+   near-invisible track) and easy to grab (min thumb length, darker on hover/drag).
+   Chromium/Safari use the ::-webkit-scrollbar rules; Firefox (and any engine without
+   them) falls back to the standard properties. The two must stay separate: Chromium
+   ignores ::-webkit-scrollbar once `scrollbar-width`/`scrollbar-color` are set.
+   Lists that deliberately hide their scrollbar (swipe rows) override this with the
+   `[scrollbar-width:none]` / `[&::-webkit-scrollbar]:hidden` utilities, which win on
+   specificity. */
+:root {
+  --scrollbar-thumb: rgba(24, 38, 48, 0.38);
+  --scrollbar-thumb-hover: rgba(24, 38, 48, 0.58);
+  --scrollbar-thumb-active: rgba(24, 38, 48, 0.75);
+  --scrollbar-track: rgba(24, 38, 48, 0.04);
+}
+
+::-webkit-scrollbar {
+  width: 14px;
+  height: 14px;
+}
+::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  background-clip: padding-box;
+  /* Transparent border = padding: a 6px-thick thumb inside the 14px grab area. */
+  border: 4px solid transparent;
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:vertical {
+  min-height: 48px;
+}
+::-webkit-scrollbar-thumb:horizontal {
+  min-width: 48px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:active {
+  background: var(--scrollbar-thumb-active);
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+@supports not selector(::-webkit-scrollbar) {
+  * {
+    scrollbar-width: auto;
+    scrollbar-color: var(--scrollbar-thumb) transparent;
+  }
+}
+
 .container {
   max-width: var(--max-width);
   margin-inline: auto;
