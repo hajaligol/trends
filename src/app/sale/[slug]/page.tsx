@@ -65,16 +65,31 @@ export default async function SalePage(props: SalePageProps) {
       <Container>
         <Breadcrumbs items={[{ label: "صفحه اصلی", href: "/" }, { label: landing.name }]} />
 
-        <header className="mb-8 flex flex-col gap-2 rounded-[22px] bg-blush px-[clamp(20px,4vw,40px)] py-[clamp(20px,3vw,32px)]">
-          <h1 className="m-0 text-[clamp(1.5rem,3vw,2.1rem)] font-bold">{landing.name}</h1>
-          <p className="m-0 text-[1rem] font-semibold text-brand-dark">{landing.summary}</p>
-          {landing.description && <p className="m-0 max-w-[60ch] text-[0.92rem] leading-7 text-ink/80">{landing.description}</p>}
-          {landing.countdownEndsAt && (
-            <p className="m-0 text-[0.88rem] text-text-secondary">
-              زمان باقی‌مانده: <CampaignCountdown endsAt={landing.countdownEndsAt} />
-            </p>
-          )}
-          {landing.total > 0 && <p className="m-0 text-[0.84rem] text-text-secondary">{toPersianDigits(landing.total)} محصول مشمول این کمپین</p>}
+        <header className="mb-10 overflow-hidden rounded-[var(--radius-lg)] border border-line bg-hero-beige">
+          <div className="grid gap-8 px-[clamp(22px,4vw,48px)] py-[clamp(26px,4vw,44px)] md:grid-cols-[1fr_auto] md:items-center md:gap-14">
+            <div className="flex flex-col items-start gap-4">
+              <span className="text-[0.78rem] font-semibold tracking-wide text-text-secondary">کمپین ویژه ترندز</span>
+              <h1 className="m-0 text-[clamp(1.7rem,3.4vw,2.6rem)] font-extrabold leading-[1.25] text-ink">{landing.name}</h1>
+              <span className="inline-flex items-center rounded-[var(--radius-pill)] bg-ink px-4 py-1.5 text-[0.9rem] font-semibold text-bg">{landing.summary}</span>
+              {landing.description && <p className="m-0 max-w-[58ch] text-[0.95rem] leading-8 text-ink/75">{landing.description}</p>}
+            </div>
+
+            {(landing.countdownEndsAt || landing.total > 0) && (
+              <div className="flex flex-col gap-5 border-t border-line pt-6 md:min-w-[17rem] md:border-t-0 md:border-s md:ps-12 md:pt-0">
+                {landing.countdownEndsAt && (
+                  <div className="flex flex-col gap-3">
+                    <span className="text-[0.82rem] font-semibold text-text-secondary">زمان باقی‌مانده تا پایان کمپین</span>
+                    <CampaignCountdown endsAt={landing.countdownEndsAt} variant="blocks" />
+                  </div>
+                )}
+                {landing.total > 0 && (
+                  <p className="m-0 text-[0.88rem] text-text-secondary">
+                    <span className="text-[1.15rem] font-bold text-ink">{toPersianDigits(landing.total)}</span> محصول مشمول این کمپین
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
         </header>
 
         <ProductGrid products={landing.products} emptyMessage="در حال حاضر محصولی مشمول این کمپین نیست." />
