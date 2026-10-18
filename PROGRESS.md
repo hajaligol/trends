@@ -1,5 +1,30 @@
 # Trends Progress Report
 
+## Latest change: new icons for «جدیدترین محصولات» and «پرفروش‌ترین محصولات» (user-requested)
+Status: COMPLETE. `tsc` ✔, `eslint .` ✔. Visual only, **no DB changes**. Previewed the two SVGs on the band colour (`#2b2d30`); not checked in a browser.
+
+- `components/ui/icons.tsx`: `NewArrivalsStarIcon` (yellow star, orange→yellow body, flat yellow highlight cap) and `TopSellingMedalIcon` (gold medal on two orange ribbons).
+  Both keep their own colours (not `currentColor`). Used in the dark title band (`SectionTitleBand`) of `NewArrivals.tsx` / `TopSellingProducts.tsx`, sized `1.5em` / `1.6em` tall,
+  so the band is slightly taller than before (the old icons were `1.1em`).
+- The star SVG you supplied embedded a small JPEG gradient clipped to the star; it was replaced by an equivalent vector `linearGradient` (`#FFB602` → `#F8D300`,
+  sampled from the image) so no raster ships in the bundle. Fixed gradient id `trends-new-star-body` → render once per page.
+- `StarIcon` and `LayersArrowUpIcon` (old Lucide icons) are now unused.
+
+---
+
+## Latest change: premium black/purple «شگفت‌انگیزها» section (user-requested, revised)
+Status: COMPLETE. `tsc` ✔, `eslint .` ✔. Visual only, **no DB changes**. Not checked in a browser (no browser/Postgres in the sandbox).
+
+- `components/home/FeaturedProducts.tsx`: header and product row are now **one rounded card** with a single black → deep-purple gradient
+  (`to_bottom_left`, `#0a0610 → #170830 → #3a0d72`) and a hairline `border-white/10`. Header = large fire icon (64–96px, no background disc), white title,
+  short lavender→purple rule. Product tiles stay white. **No glows, no new animation.**
+- **Fire icon**: `FireIcon` in `components/ui/icons.tsx` is the user's red/orange-yellow gradient flame SVG (own colours, not `currentColor`; fixed gradient
+  id `trends-fire-core`, so render it once per page). The earlier black/red clipart version and the Lucide `FlameIcon` usage are gone (`FlameIcon` is unused).
+- `ShowAllTile` has an optional `tone="dark"` (translucent white tile, white text, lavender arrow disc) used only here.
+- Other homepage rows are untouched.
+
+---
+
 ## Latest change: demo size charts for every seeded product
 Status: COMPLETE WITH FOLLOW-UP. `tsc` ✔, `eslint .` ✔, 248 unit tests ✔ (new `tests/unit/seed-size-charts.test.ts`: every level-3 category in the
 taxonomy produces a table that passes the admin `sizeChartSchema` unchanged and whose first column equals the product's sizes). **Not run against

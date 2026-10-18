@@ -3,7 +3,7 @@ import { ProductCard } from "@/components/catalog/ProductCard";
 import { SectionTitleBand } from "@/components/home/SectionTitleBand";
 import { SwipeRow } from "@/components/home/SwipeRow";
 import { ShowAllTile } from "@/components/home/ShowAllTile";
-import { LayersArrowUpIcon } from "@/components/ui/icons";
+import { TopSellingMedalIcon } from "@/components/ui/icons";
 import { COLLECTIONS, HOME_ROW_MAX_PRODUCTS } from "@/domains/catalog/presentation";
 import type { CatalogProductSummary } from "@/domains/catalog/queries";
 
@@ -24,7 +24,7 @@ export function TopSellingProducts({ products }: { products: CatalogProductSumma
     <section id="top-selling" className="py-[clamp(30px,5vw,54px)]">
       <SectionTitleBand
         title="پرفروش‌ترین محصولات"
-        icon={<LayersArrowUpIcon className="h-[1.1em] w-[1.1em]" />}
+        icon={<TopSellingMedalIcon aria-hidden="true" className="h-[1.6em] w-auto" />}
       />
       <Container className="mt-[clamp(20px,3vw,34px)]">
         <SwipeRow

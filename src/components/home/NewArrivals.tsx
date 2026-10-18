@@ -4,7 +4,7 @@ import { Container } from "@/components/ui/Container";
 import { SectionTitleBand } from "@/components/home/SectionTitleBand";
 import { SwipeRow } from "@/components/home/SwipeRow";
 import { ShowAllTile } from "@/components/home/ShowAllTile";
-import { StarIcon } from "@/components/ui/icons";
+import { NewArrivalsStarIcon } from "@/components/ui/icons";
 import { COLLECTIONS, HOME_ROW_MAX_PRODUCTS } from "@/domains/catalog/presentation";
 import { StockBadge } from "@/components/catalog/StockBadge";
 import { WishlistButton } from "@/components/ui/WishlistButton";
@@ -28,7 +28,7 @@ export function NewArrivals({ arrivals }: { arrivals: CatalogProductSummary[] })
     <section id="new-arrivals" className="py-[clamp(30px,5vw,54px)]">
       <SectionTitleBand
         title="جدیدترین محصولات"
-        icon={<StarIcon className="h-[1.1em] w-[1.1em]" />}
+        icon={<NewArrivalsStarIcon aria-hidden="true" className="h-[1.5em] w-auto" />}
       />
       <Container className="mt-[clamp(20px,3vw,34px)]">
         <SwipeRow
