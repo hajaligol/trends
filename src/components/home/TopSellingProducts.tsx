@@ -1,6 +1,5 @@
-import { Container } from "@/components/ui/Container";
 import { ProductCard } from "@/components/catalog/ProductCard";
-import { SectionTitleBand } from "@/components/home/SectionTitleBand";
+import { SectionFrame } from "@/components/home/SectionFrame";
 import { SwipeRow } from "@/components/home/SwipeRow";
 import { ShowAllTile } from "@/components/home/ShowAllTile";
 import { TopSellingMedalIcon } from "@/components/ui/icons";
@@ -22,11 +21,10 @@ export function TopSellingProducts({ products }: { products: CatalogProductSumma
 
   return (
     <section id="top-selling" className="py-[clamp(30px,5vw,54px)]">
-      <SectionTitleBand
+      <SectionFrame
         title="پرفروش‌ترین محصولات"
         icon={<TopSellingMedalIcon aria-hidden="true" className="h-[1.6em] w-auto" />}
-      />
-      <Container className="mt-[clamp(20px,3vw,34px)]">
+      >
         <SwipeRow
           label={COLLECTIONS["top-selling"].title}
           showArrows
@@ -40,7 +38,7 @@ export function TopSellingProducts({ products }: { products: CatalogProductSumma
             <ShowAllTile key="show-all" href="/collection/top-selling" label="مشاهده همه" productsLabel={COLLECTIONS["top-selling"].title} />
           )}
         </SwipeRow>
-      </Container>
+      </SectionFrame>
     </section>
   );
 }

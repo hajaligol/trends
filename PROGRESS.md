@@ -1,5 +1,21 @@
 # Trends Progress Report
 
+## Latest change: framed «جدیدترین محصولات» / «پرفروش‌ترین محصولات» sections + purple icons (user-requested)
+Status: COMPLETE. `tsc` ✔, `eslint` (home + icons) ✔, Tailwind output of the gradient-border class checked. Visual only, **no DB changes**. Not checked in a browser.
+
+- `components/home/SectionTitleBand.tsx` (dark-gray header band) **removed**, replaced by `SectionFrame.tsx`: the whole section (icon + title + `SwipeRow`)
+  sits in one rounded card, light-gray fill (`#f1f2f4`), 3px black → purple gradient border (`#0a0610 → #2a0f55 → #7c3aed`, drawn as a `border-box`
+  background layer under a transparent border so it follows the rounded corners). Title is now ink-coloured on the gray fill. Used by `NewArrivals.tsx` and `TopSellingProducts.tsx`.
+- `NewArrivalsStarIcon` is now the supplied "NEW" starburst badge recoloured red → purple (body + ribbon `#0f0817`, burst `#7c3aed`, white lettering kept). No gradient ids, safe to render more than once.
+- `TopSellingMedalIcon` recoloured gold/orange → black/purple (ribbons black + `#6d28d9`, medal body near-black, ring `#8b5cf6`, star `#c4b5fd`).
+- Other homepage rows (e.g. «شگفت‌انگیزها») untouched.
+
+---
+
+## Latest change: «شگفت‌انگیزها» title rule is now full-length
+The gradient rule under the title spans the whole header width (icon excluded) and fades out at the end. Visual only.
+
+---
 ## Latest change: new icons for «جدیدترین محصولات» and «پرفروش‌ترین محصولات» (user-requested)
 Status: COMPLETE. `tsc` ✔, `eslint .` ✔. Visual only, **no DB changes**. Previewed the two SVGs on the band colour (`#2b2d30`); not checked in a browser.
 

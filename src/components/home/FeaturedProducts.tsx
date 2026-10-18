@@ -34,13 +34,13 @@ export function FeaturedProducts({
         <div className="rounded-[clamp(18px,2.8vw,30px)] border border-white/10 bg-[linear-gradient(to_bottom_left,#0a0610_0%,#170830_50%,#3a0d72_100%)] px-[clamp(14px,3vw,40px)] py-[clamp(18px,3vw,36px)]">
           <div className="mb-[clamp(16px,2.6vw,28px)] flex items-center gap-[clamp(12px,2vw,20px)]">
             <FireIcon aria-hidden="true" className="h-[clamp(64px,9vw,96px)] w-auto shrink-0" />
-            <div>
+            <div className="min-w-0 flex-1">
               <h2 className="m-0 text-[clamp(1.7rem,3.6vw,2.7rem)] font-extrabold leading-[1.25] text-white">
                 شگفت‌انگیزها
               </h2>
               <span
                 aria-hidden="true"
-                className="mt-2 block h-[3px] w-12 rounded-full bg-[linear-gradient(to_left,#d9c2f5,#8a3fe0)]"
+                className="mt-2 block h-[3px] w-full rounded-full bg-[linear-gradient(to_left,#d9c2f5,#8a3fe0_55%,rgba(138,63,224,0))]"
               />
             </div>
           </div>
