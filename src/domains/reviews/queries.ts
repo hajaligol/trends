@@ -11,7 +11,7 @@ import type { Review } from "@/lib/db/schema";
 
 export type PublicReview = Pick<
   Review,
-  "id" | "rating" | "title" | "body" | "isVerifiedPurchase" | "createdAt"
+  "id" | "rating" | "title" | "body" | "isVerifiedPurchase" | "createdAt" | "adminReply" | "adminReplyAt"
 > & {
   authorName: string;
 };
@@ -34,6 +34,8 @@ export async function getApprovedReviewsForProduct(productId: string): Promise<P
       body: reviews.body,
       isVerifiedPurchase: reviews.isVerifiedPurchase,
       createdAt: reviews.createdAt,
+      adminReply: reviews.adminReply,
+      adminReplyAt: reviews.adminReplyAt,
       authorName: users.fullName,
     })
     .from(reviews)
@@ -53,6 +55,8 @@ export async function getApprovedReviewsForProduct(productId: string): Promise<P
       body: row.body,
       isVerifiedPurchase: row.isVerifiedPurchase,
       createdAt: row.createdAt,
+      adminReply: row.adminReply,
+      adminReplyAt: row.adminReplyAt,
       // A reviewer's full name is optional at registration (Phase 6) —
       // fall back to a generic Persian label rather than showing "null"
       // or leaking their mobile number on a public page.

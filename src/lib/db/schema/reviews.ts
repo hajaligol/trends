@@ -59,6 +59,13 @@ export const reviews = pgTable(
     moderatedByUserId: uuid("moderated_by_user_id").references(() => users.id, { onDelete: "set null" }),
     moderatedAt: timestamp("moderated_at", { withTimezone: true }),
     moderationNote: text("moderation_note"),
+    // One public store reply per review (written by staff/admin through
+    // `replyToReviewAction`). Shown under the review on the product page
+    // only while the review itself is `approved`. All three columns are
+    // set/cleared together (see the check constraint below).
+    adminReply: text("admin_reply"),
+    adminReplyAt: timestamp("admin_reply_at", { withTimezone: true }),
+    adminReplyByUserId: uuid("admin_reply_by_user_id").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -67,6 +74,10 @@ export const reviews = pgTable(
     index("reviews_product_id_idx").on(table.productId),
     index("reviews_status_idx").on(table.status),
     check("reviews_rating_range", sql`${table.rating} >= 1 AND ${table.rating} <= 5`),
+    check(
+      "reviews_admin_reply_length",
+      sql`${table.adminReply} IS NULL OR char_length(${table.adminReply}) BETWEEN 1 AND 1000`,
+    ),
   ],
 );
 
@@ -74,6 +85,7 @@ export const reviewsRelations = relations(reviews, ({ one }) => ({
   product: one(products, { fields: [reviews.productId], references: [products.id] }),
   user: one(users, { fields: [reviews.userId], references: [users.id] }),
   moderatedBy: one(users, { fields: [reviews.moderatedByUserId], references: [users.id] }),
+  repliedBy: one(users, { fields: [reviews.adminReplyByUserId], references: [users.id] }),
 }));
 
 export type Review = typeof reviews.$inferSelect;

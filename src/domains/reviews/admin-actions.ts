@@ -5,7 +5,7 @@ import { eq } from "drizzle-orm";
 import { auth } from "@/lib/auth/config";
 import { db } from "@/lib/db/client";
 import { reviews } from "@/lib/db/schema";
-import { reviewModerationSchema } from "@/lib/validation/admin";
+import { reviewModerationSchema, reviewReplySchema } from "@/lib/validation/admin";
 import { isStaffOrAdmin, UNAUTHORIZED_ERROR, type ActionResult } from "@/domains/auth/roles";
 import { recordAuditLog } from "@/domains/analytics/audit";
 import { notifyEvent } from "@/domains/notifications/provider";
@@ -60,6 +60,59 @@ export async function moderateReviewAction(_prev: ActionResult, formData: FormDa
           note: parsed.data.moderationNote,
         },
   );
+
+  revalidatePath("/admin/reviews");
+  revalidateProductPage(review.productSlug);
+  return { ok: true };
+}
+
+/**
+ * Creates, edits or removes the store's public reply to a review (one
+ * reply per review, stored on the review row). Same authorization +
+ * server-side validation + audit discipline as `moderateReviewAction`:
+ * the reviewer, product and "who replied" are all resolved server-side —
+ * the form only sends the review id, the intent and the text.
+ *
+ * A reply is public, so it can only be written while the review is
+ * `approved`; removing an existing reply is always allowed (e.g. after
+ * a review is later rejected). The storefront additionally only renders
+ * a reply under approved reviews (`getApprovedReviewsForProduct`).
+ */
+export async function replyToReviewAction(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user || !isStaffOrAdmin(session.user.role)) return { ok: false, error: UNAUTHORIZED_ERROR };
+
+  const parsed = reviewReplySchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "اطلاعات وارد شده معتبر نیست" };
+
+  const review = await getReviewForAdmin(parsed.data.reviewId);
+  if (!review) return { ok: false, error: "دیدگاه یافت نشد" };
+
+  if (parsed.data.intent === "delete") {
+    if (!review.adminReply) return { ok: true };
+    await db
+      .update(reviews)
+      .set({ adminReply: null, adminReplyAt: null, adminReplyByUserId: null, updatedAt: new Date() })
+      .where(eq(reviews.id, review.id));
+    await recordAuditLog(session.user, "review.reply_deleted", "review", review.id, { productTitle: review.productTitle });
+  } else {
+    if (review.status !== "approved") {
+      return { ok: false, error: "فقط به دیدگاه‌های تأیید شده می‌توان پاسخ داد" };
+    }
+    const isEdit = Boolean(review.adminReply);
+    await db
+      .update(reviews)
+      .set({
+        adminReply: parsed.data.reply,
+        adminReplyAt: new Date(),
+        adminReplyByUserId: session.user.id,
+        updatedAt: new Date(),
+      })
+      .where(eq(reviews.id, review.id));
+    await recordAuditLog(session.user, isEdit ? "review.reply_edited" : "review.reply_created", "review", review.id, {
+      productTitle: review.productTitle,
+    });
+  }
 
   revalidatePath("/admin/reviews");
   revalidateProductPage(review.productSlug);

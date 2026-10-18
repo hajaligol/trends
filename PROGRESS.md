@@ -1,5 +1,23 @@
 # Trends Progress Report
 
+## Latest change: admin replies to product reviews (user-requested)
+Status: COMPLETE. `tsc` ✔, `eslint .` ✔, 251 unit tests ✔ (3 new in `tests/unit/review-reply-validation.test.ts`), `npm run build` ✔,
+fresh-DB `drizzle-kit migrate` (0000→0021) ✔ on Postgres 16, query-level smoke test ✔ (reply saved → returned by the public + admin queries; empty reply rejected by CHECK).
+**Not verified:** the Server Action through a real browser/Next-Action request and the visual look of the reply block (no browser in the sandbox) — try it once in /admin/reviews.
+
+- **DB (migration `0021_review_admin_reply`)**: `reviews.admin_reply` (text), `admin_reply_at` (timestamptz), `admin_reply_by_user_id` (FK users, ON DELETE SET NULL),
+  CHECK `reviews_admin_reply_length` (NULL or 1–1000 chars). One reply per review (stored on the review row, no new table).
+- **Action** `replyToReviewAction` (`domains/reviews/admin-actions.ts`): `auth()` + `isStaffOrAdmin`, Zod `reviewReplySchema` (discriminated on `intent`: `save` | `delete`;
+  trimmed, 1–1000 chars), review resolved server-side, audit log (`review.reply_created` / `reply_edited` / `reply_deleted`), revalidates `/admin/reviews` + the product page.
+  Saving is only allowed while the review is `approved` (the reply is public); deleting is always allowed.
+- **Admin UI**: `ReviewModerationRow` shows a «پاسخ فروشگاه» form (ثبت/ویرایش/حذف پاسخ) for approved reviews, or for any review that already has a reply.
+- **Storefront**: `getApprovedReviewsForProduct` now returns `adminReply`/`adminReplyAt`; `ReviewsSection` renders a «پاسخ ترندز» block (with date) under the review.
+  Replies are only ever read together with approved reviews, so rejecting a review hides its reply.
+- **Not done (not requested):** no customer notification when the store replies (`notifications/provider.ts` untouched); no per-staff-name display (public label is always «پاسخ ترندز»).
+- Deploy: run `npm run db:migrate` before shipping.
+
+---
+
 ## Latest change: paintbrush style for «شگفت‌انگیزها» (user-requested)
 Status: COMPLETE. `tsc` ✔, `eslint` ✔. Visual only, **no DB changes**. **Not rendered/checked in a browser** (none in the sandbox) — check stroke intensity and the dry-brush filter look.
 

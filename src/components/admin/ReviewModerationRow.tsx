@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useFormStatus } from "react-dom";
-import { moderateReviewAction } from "@/domains/reviews/admin-actions";
+import { moderateReviewAction, replyToReviewAction } from "@/domains/reviews/admin-actions";
 import type { AdminReviewRow } from "@/domains/reviews/admin-queries";
 import type { ActionResult } from "@/domains/auth/roles";
 import { toPersianDigits } from "@/lib/utils/persian-digits";
@@ -13,6 +13,7 @@ import { CheckIcon, XIcon } from "@/components/ui/icons";
 import { RatingStarIcon } from "@/components/ui/icons";
 import Link from "next/link";
 import { productHref } from "@/domains/catalog/slug";
+import { MAX_REVIEW_REPLY_LENGTH } from "@/lib/validation/admin";
 
 const STATUS_LABELS: Record<AdminReviewRow["status"], string> = {
   pending: "در انتظار بررسی",
@@ -31,6 +32,56 @@ function DecisionButton({ value, tone, children }: { value: "approved" | "reject
       {isThis && <Spinner />}
       {children}
     </button>
+  );
+}
+
+function ReplyButton({ intent, tone, children }: { intent: "save" | "delete"; tone: "primary" | "secondary"; children: React.ReactNode }) {
+  const { pending, data } = useFormStatus();
+  const isThis = pending && data?.get("intent") === intent;
+  return (
+    <button type="submit" name="intent" value={intent} disabled={pending} formNoValidate={intent === "delete"} className={adminButton(tone, "sm")}>
+      {isThis && <Spinner />}
+      {children}
+    </button>
+  );
+}
+
+/** The store's public reply to one approved review (create / edit / remove). */
+function ReviewReplyForm({ review }: { review: AdminReviewRow }) {
+  const router = useRouter();
+  const [state, formAction] = useAdminAction(replyToReviewAction, initialState, {
+    successMessage: "پاسخ دیدگاه به‌روزرسانی شد",
+    onSuccess: () => router.refresh(),
+  });
+  const [reply, setReply] = useState(review.adminReply ?? "");
+
+  return (
+    <form action={formAction} className="flex flex-col gap-3 border-t border-line pt-4">
+      <input type="hidden" name="reviewId" value={review.id} />
+      <FormAlert state={state} />
+      <TextareaField
+        label="پاسخ فروشگاه"
+        name="reply"
+        rows={3}
+        maxLength={MAX_REVIEW_REPLY_LENGTH}
+        value={reply}
+        onChange={(event) => setReply(event.target.value)}
+        hint="این پاسخ به‌صورت عمومی زیر دیدگاه در صفحه محصول نمایش داده می‌شود."
+      />
+      <div className="flex flex-wrap items-center gap-2.5">
+        <ReplyButton intent="save" tone="primary">
+          {review.adminReply ? "ویرایش پاسخ" : "ثبت پاسخ"}
+        </ReplyButton>
+        {review.adminReply && (
+          <ReplyButton intent="delete" tone="secondary">
+            حذف پاسخ
+          </ReplyButton>
+        )}
+        {review.adminReplyAt && (
+          <span className="text-[0.76rem] text-text-secondary">آخرین ثبت: {formatDate(review.adminReplyAt)}</span>
+        )}
+      </div>
+    </form>
   );
 }
 
@@ -101,6 +152,8 @@ export function ReviewModerationRow({ review }: { review: AdminReviewRow }) {
           </DecisionButton>
         </div>
       </form>
+
+      {(review.status === "approved" || review.adminReply) && <ReviewReplyForm review={review} />}
     </article>
   );
 }

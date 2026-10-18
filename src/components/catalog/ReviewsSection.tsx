@@ -157,6 +157,17 @@ export async function ReviewsSection({
                 </div>
                 {review.title && <p className="font-semibold text-ink">{review.title}</p>}
                 <p className="text-[0.9rem] leading-7 whitespace-pre-line text-ink/85">{review.body}</p>
+                {review.adminReply && (
+                  <div className="mt-1 flex flex-col gap-1.5 rounded-[var(--radius-md)] bg-header-bg px-4 py-3">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <span className="text-[0.82rem] font-semibold text-ink">پاسخ ترندز</span>
+                      {review.adminReplyAt && (
+                        <span className="text-[0.72rem] text-text-secondary">{dateFormat.format(review.adminReplyAt)}</span>
+                      )}
+                    </div>
+                    <p className="m-0 text-[0.88rem] leading-7 whitespace-pre-line text-ink/85">{review.adminReply}</p>
+                  </div>
+                )}
               </li>
             ))}
           </ul>

@@ -423,3 +423,20 @@ export const reviewModerationSchema = z.object({
   status: z.enum(["approved", "rejected"]),
   moderationNote: optionalTrimmed(500),
 });
+
+export const MAX_REVIEW_REPLY_LENGTH = 1000;
+
+/** `intent: "save"` creates/edits the store's public reply (non-empty,
+ * trimmed); `intent: "delete"` removes it. */
+export const reviewReplySchema = z.discriminatedUnion("intent", [
+  z.object({
+    intent: z.literal("save"),
+    reviewId: z.string().uuid(),
+    reply: z
+      .string()
+      .trim()
+      .min(1, "متن پاسخ را وارد کنید")
+      .max(MAX_REVIEW_REPLY_LENGTH, `پاسخ نباید بیشتر از ${MAX_REVIEW_REPLY_LENGTH} نویسه باشد`),
+  }),
+  z.object({ intent: z.literal("delete"), reviewId: z.string().uuid() }),
+]);
