@@ -84,6 +84,7 @@ export function Footer({ categories }: { categories: NavCategory[] }) {
           <span className="text-[1.2rem] font-bold">ترندز</span>
           <nav aria-label="لینک‌های فوتر" className="flex flex-wrap gap-[22px] text-[0.85rem] text-text-secondary">
             <Link href="/">صفحه اصلی</Link>
+            <Link href="/tmag">تی‌مگ؛ مجله مد و استایل</Link>
             <Link href="/about">درباره ما</Link>
             <Link href="/contact">تماس با ما</Link>
             <Link href="/faq">سوالات متداول</Link>

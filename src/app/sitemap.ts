@@ -5,6 +5,8 @@ import { SITE_URL } from "@/lib/site-config";
 import { productHref } from "@/domains/catalog/slug";
 import { getLiveCampaignSlugs } from "@/domains/campaigns/landing";
 import { campaignHref } from "@/domains/campaigns/slug";
+import { getBlogCategorySlugs, getBlogIndexEntries } from "@/domains/blog/queries";
+import { BLOG_BASE, blogCategoryHref, blogPostHref } from "@/domains/blog/paths";
 
 const STATIC_PAGES = [
   "/accessories",
@@ -19,7 +21,12 @@ const STATIC_PAGES = [
 ] as const;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [{ categories, products }, campaignSlugs] = await Promise.all([getSitemapEntries(), getLiveCampaignSlugs()]);
+  const [{ categories, products }, campaignSlugs, blogPosts, blogCategories] = await Promise.all([
+    getSitemapEntries(),
+    getLiveCampaignSlugs(),
+    getBlogIndexEntries(),
+    getBlogCategorySlugs(),
+  ]);
 
   return [
     { url: SITE_URL, changeFrequency: "daily", priority: 1 },
@@ -30,6 +37,22 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       url: `${SITE_URL}${path}`,
       changeFrequency: "monthly" as const,
       priority: 0.3,
+    })),
+    // T-Mag: the magazine home, its category pages and every live article
+    // (with its cover image, so image search can pick it up).
+    { url: `${SITE_URL}${BLOG_BASE}`, lastModified: blogPosts[0]?.updatedAt, changeFrequency: "daily" as const, priority: 0.7 },
+    ...blogCategories.map((category) => ({
+      url: `${SITE_URL}${blogCategoryHref(category.slug)}`,
+      lastModified: category.updatedAt,
+      changeFrequency: "weekly" as const,
+      priority: 0.5,
+    })),
+    ...blogPosts.map((post) => ({
+      url: `${SITE_URL}${blogPostHref(post.slug)}`,
+      lastModified: post.updatedAt,
+      changeFrequency: "monthly" as const,
+      priority: 0.6,
+      images: post.coverImageUrl ? [`${SITE_URL}${post.coverImageUrl}`] : undefined,
     })),
     ...Object.keys(COLLECTIONS).map((slug) => ({
       url: `${SITE_URL}/collection/${slug}`,

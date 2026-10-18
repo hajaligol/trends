@@ -13,7 +13,7 @@ type ImagePickerProps = {
   name: string;
   /** Which `ALLOWED_FOLDERS` bucket (`src/app/api/admin/media/route.ts`)
    * this picker uploads into. */
-  folder: "products" | "hero" | "categories" | "banners" | "brands";
+  folder: "products" | "hero" | "categories" | "banners" | "brands" | "blog";
   label: string;
   defaultValue?: string | null;
   required?: boolean;

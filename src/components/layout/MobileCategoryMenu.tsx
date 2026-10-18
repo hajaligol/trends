@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { NewspaperIcon } from "@/components/ui/icons";
 import type { NavCategory } from "@/domains/categories/tree";
 
 function Chevron({ className }: { className: string }) {
@@ -106,6 +107,15 @@ export function MobileCategoryMenu({
         className="rounded-md px-2 py-2.5 text-[0.95rem] font-semibold text-ink hover:bg-ink/5"
       >
         برندها
+      </Link>
+
+      <Link
+        href="/tmag"
+        onClick={onNavigate}
+        className="flex items-center gap-2 rounded-md px-2 py-2.5 text-[0.95rem] font-semibold text-ink hover:bg-ink/5"
+      >
+        <NewspaperIcon aria-hidden="true" strokeWidth={2} className="h-[20px] w-[20px] shrink-0" />
+        تی‌مگ
       </Link>
     </div>
   );

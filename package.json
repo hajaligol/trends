@@ -13,6 +13,7 @@
     "db:studio": "drizzle-kit studio",
     "db:seed": "tsx --env-file=.env.local src/lib/db/seed.ts",
     "db:seed-catalog": "tsx --env-file=.env.local src/lib/db/seed-catalog.ts",
+    "db:seed-tmag": "tsx --env-file=.env.local src/lib/db/seed-tmag.ts",
     "db:seed-reviews": "tsx --env-file=.env.local src/lib/db/seed-reviews.ts",
     "db:sync-categories": "tsx --env-file=.env.local src/lib/db/sync-categories.ts",
     "db:persian-slugs": "tsx --env-file=.env.local src/lib/db/migrate-product-slugs.ts",
@@ -24,11 +25,15 @@
   "dependencies": {
     "bcryptjs": "^3.0.3",
     "drizzle-orm": "^0.45.2",
+    "github-slugger": "^2.0.0",
     "next": "^16.3.4",
     "next-auth": "^5.0.0-beta.32",
     "postgres": "^3.4.9",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
+    "react-markdown": "^10.1.0",
+    "rehype-slug": "^6.0.0",
+    "remark-gfm": "^4.0.1",
     "zod": "^4.6.2"
   },
   "devDependencies": {

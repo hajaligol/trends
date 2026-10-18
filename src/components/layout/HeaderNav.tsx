@@ -4,14 +4,14 @@ import { useRef, useState, type ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Container } from "@/components/ui/Container";
-import { BabyIcon, ListSortDescendingIcon, MarsIcon, TagIcon, VenusIcon } from "@/components/ui/icons";
+import { BabyIcon, ListSortDescendingIcon, MarsIcon, NewspaperIcon, TagIcon, VenusIcon } from "@/components/ui/icons";
 import type { NavCategory } from "@/domains/categories/tree";
 import type { NavBrand } from "@/domains/brands/queries";
 import { navLinkClass } from "@/components/layout/nav-styles";
 import { useDimPage } from "@/components/overlays/UIOverlayProvider";
 
 /**
- * Desktop header navigation (second row of the centre column): two items.
+ * Desktop header navigation (second row of the centre column): three items.
  *
  * - **دسته‌بندی‌ها** — hover/focus opens a full-width panel. Its start side is
  *   a rail with the three audiences (مردانه / زنانه / بچگانه); hovering one
@@ -20,6 +20,7 @@ import { useDimPage } from "@/components/overlays/UIOverlayProvider";
  *   shown when the panel opens, so it is never empty.
  * - **برندها** — hover/focus opens a wide panel of the best-selling brands
  *   (logo + name). The trigger itself links to `/brands`.
+ * - **تی‌مگ** — a plain link to the magazine (`/tmag`).
  *
  * Behaviour (WCAG 1.4.13 "content on hover or focus"):
  * - opens on hover **and** keyboard focus; the panel is a DOM child of the
@@ -279,6 +280,16 @@ export function HeaderNav({ categories, brands }: { categories: NavCategory[]; b
           </Container>
         </div>
       </MenuWrapper>
+
+      {DIVIDER}
+
+      {/* تی‌مگ — the magazine. A plain link (no panel), so it needs no hover wiring. */}
+      <div className="flex items-center">
+        <Link href="/tmag" className={`${navLinkClass(false)} ${TRIGGER_LAYOUT}`}>
+          <NewspaperIcon aria-hidden="true" strokeWidth={2} className={TRIGGER_ICON} />
+          تی‌مگ
+        </Link>
+      </div>
     </>
   );
 }

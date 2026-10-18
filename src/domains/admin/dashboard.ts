@@ -3,6 +3,7 @@ import { db } from "@/lib/db/client";
 import { orders, productVariants, users } from "@/lib/db/schema";
 import { countPendingReviews } from "@/domains/reviews/admin-queries";
 import { countUnresolvedSupportMessages } from "@/domains/support/queries";
+import { countPendingBlogComments } from "@/domains/blog/admin-queries";
 
 /**
  * A single aggregate read for `/admin` (the dashboard landing page) —
@@ -81,10 +82,11 @@ export type AdminNavBadges = {
   inventory: number;
   reviews: number;
   support: number;
+  blogComments: number;
 };
 
 export async function getAdminNavBadges(): Promise<AdminNavBadges> {
-  const [awaitingRows, lowStockRows, reviews, support] = await Promise.all([
+  const [awaitingRows, lowStockRows, reviews, support, blogComments] = await Promise.all([
     db.select({ total: count() }).from(orders).where(inArray(orders.status, ["paid", "processing"])),
     db
       .select({ total: count() })
@@ -92,11 +94,13 @@ export async function getAdminNavBadges(): Promise<AdminNavBadges> {
       .where(and(eq(productVariants.isActive, true), sql`${productVariants.stock} <= ${productVariants.lowStockThreshold}`)),
     countPendingReviews(),
     countUnresolvedSupportMessages(),
+    countPendingBlogComments(),
   ]);
   return {
     orders: awaitingRows[0]?.total ?? 0,
     inventory: lowStockRows[0]?.total ?? 0,
     reviews,
     support,
+    blogComments,
   };
 }

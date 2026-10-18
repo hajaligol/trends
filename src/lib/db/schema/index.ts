@@ -28,3 +28,4 @@ export * from "./site-settings";
 export * from "./reviews";
 export * from "./newsletter-subscribers";
 export * from "./support-messages";
+export * from "./blog";

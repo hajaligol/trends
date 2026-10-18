@@ -1,5 +1,33 @@
 # Trends Progress Report
 
+## Latest change: «تی‌مگ» — the magazine/blog (user-requested)
+Status: COMPLETE WITH FOLLOW-UP. `tsc` ✔, `eslint .` ✔, `next build` ✔, 241 unit + 107 integration tests pass (Postgres 16,
+fresh migrate + `db:seed` + `db:seed-tmag`). Smoke-tested on a production build: `/tmag`, `/tmag/<slug>`, `/tmag/category/<slug>`,
+`/tmag/feed.xml`, `/llms.txt` → 200; unknown slug → 404; TOC hrefs match heading ids; table, FAQ, JSON-LD present; `/sitemap.xml` lists T-Mag.
+
+- **Header**: «تی‌مگ» link with the Lucide `newspaper` icon after دسته‌بندی‌ها and برندها (`HeaderNav.tsx`, new `NewspaperIcon`); also in the mobile menu and footer.
+- **Public routes**: `/tmag` (header «مجله مد و استایل تی‌مگ», newest article as lead card, 9/page, category chips, `?page=`),
+  `/tmag/category/[slug]`, `/tmag/[slug]`. Persian slugs (same helpers as products); canonical/OG/Twitter + `article:*` OG tags.
+- **Article page**: breadcrumbs, author/dates/reading time, cover (priority), «خلاصه‌ی مقاله», Markdown body, tags, FAQ, then
+  **مقالات مفید بیشتر** (related: +2 same category, +1 per shared tag, newest fallback), **آخرین مقالات**, **دیدگاه‌ها**.
+  **فهرست مطالب**: sticky sidebar from `lg`, collapsible above the text on mobile; ids from `github-slugger` = `rehype-slug`.
+- **Markdown** (`components/blog/MarkdownContent.tsx`): `react-markdown` + `remark-gfm` (tables, lists), NO raw HTML. Images render only if uploaded
+  (`/assets/...`) via `next/image` in a `<figure>` (title = caption); others dropped (CSP `img-src 'self'`). `#` in body renders as h2.
+- **SEO/GEO**: JSON-LD `BlogPosting` + `BreadcrumbList` (+ `FAQPage`; `Blog` on index); answer-first excerpt + key takeaways; visible author/dates;
+  sitemap entries (index, categories, posts + cover image); RSS `/tmag/feed.xml`; `/llms.txt`; drafts/scheduled posts never public.
+- **Comments**: signed-in only, `pending` until staff approve; IP + per-user rate limits, ≤5 pending/user, duplicate check, no links, plain text.
+  Login state is decided client-side (`useSession`) so the page stays cacheable; the action re-checks the session.
+- **Admin** (`/admin/tmag`, nav item + pending-comment badge): posts list, create/edit with Markdown editor (toolbar, table template, image upload to
+  `public/assets/blog/`, live preview with the storefront renderer), key takeaways, FAQ editor, cover+alt, category, tags, status, scheduled time (Tehran),
+  SEO fields; categories CRUD; comment moderation. Every action: role check, zod, audit log, revalidation.
+- **DB (migration `0019_blog`)**: `blog_categories`, `blog_posts` (unique slug, GIN on tags, check published ⇒ `published_at`), `blog_comments`.
+- **Deps**: `react-markdown`, `remark-gfm`, `rehype-slug`, `github-slugger`. Media route allow-list gained `blog`. Seed: `npm run db:seed-tmag`.
+- **Assumptions to confirm**: comments need login + moderation (like reviews); no replies; article images must be uploaded; author is free text.
+- **Not verified in a browser**: admin editor/upload/preview, comment submit + moderation, RTL/sticky-TOC/mobile layout. Demo articles have no covers.
+- **Follow-ups**: site-wide `Organization`/`WebSite` JSON-LD; product picker inside articles; `robots.ts` unchanged (admin/account rely on `noindex`).
+
+---
+
 ## Latest change: removed the admin page-level scrollbar (far right)
 `AdminShell` wrapper is now `lg:fixed lg:inset-0` (+ `.admin-shell`), and `globals.css` sets `html:has(.admin-shell){overflow:hidden}` from 1024px, so only the content column's left scrollbar remains. Below `lg` unchanged. `tsc`/`eslint` ✔; not verified in a browser.
 

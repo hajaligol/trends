@@ -13,6 +13,7 @@ import {
   LayersIcon,
   MailIcon,
   MessageIcon,
+  NewspaperIcon,
   SettingsIcon,
   ShirtIcon,
   StarIcon,
@@ -52,6 +53,7 @@ export const NAV_GROUPS: NavGroup[] = [
     title: "ارتباط و محتوا",
     items: [
       { href: "/admin/reviews", label: "دیدگاه‌ها", icon: StarIcon, badge: "reviews" },
+      { href: "/admin/tmag", label: "تی‌مگ (مجله)", icon: NewspaperIcon, badge: "blogComments" },
       { href: "/admin/support", label: "پیام‌های پشتیبانی", icon: MessageIcon, badge: "support" },
       { href: "/admin/content", label: "محتوای صفحه اصلی", icon: ImageIcon },
       { href: "/admin/newsletter", label: "خبرنامه", icon: MailIcon },
