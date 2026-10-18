@@ -10,6 +10,7 @@ import {
   productImageSchema,
   productSchema,
   productSpecificationsSchema,
+  sizeChartSchema,
   productVariantSchema,
 } from "@/lib/validation/admin";
 import { getPaletteColor, KEEP_CURRENT_COLOR } from "@/domains/catalog/color-palette";
@@ -24,6 +25,7 @@ import {
   type BulkVariantResult,
 } from "@/domains/catalog/product-service";
 import { replaceProductSpecifications } from "@/domains/catalog/specifications";
+import { replaceProductSizeChart } from "@/domains/catalog/size-chart";
 import { isStaffOrAdmin, UNAUTHORIZED_ERROR, type ActionResult } from "@/domains/auth/roles";
 import { recordAuditLog } from "@/domains/analytics/audit";
 import { getProductCategoryError } from "@/domains/categories/queries";
@@ -208,6 +210,44 @@ export async function saveProductSpecificationsAction(
   revalidateStorefrontForProduct(product.slug);
   revalidatePath(`/admin/products/${productId}`);
   return { ok: true, data: { saved: true } };
+}
+
+export async function saveProductSizeChartAction(
+  _prev: ActionResult<{ saved: boolean; removed: boolean }>,
+  formData: FormData,
+): Promise<ActionResult<{ saved: boolean; removed: boolean }>> {
+  const session = await auth();
+  if (!session?.user || !isStaffOrAdmin(session.user.role)) return { ok: false, error: UNAUTHORIZED_ERROR };
+
+  const productId = String(formData.get("productId") ?? "");
+  const [product] = productId
+    ? await db.select({ slug: products.slug }).from(products).where(eq(products.id, productId)).limit(1)
+    : [];
+  if (!product) return { ok: false, error: "محصول یافت نشد" };
+
+  const parsed = sizeChartSchema.safeParse({
+    columns: formData.getAll("sizeChartColumn").map(String),
+    cells: formData.getAll("sizeChartCell").map(String),
+    note: String(formData.get("sizeChartNote") ?? ""),
+  });
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "اطلاعات وارد شده معتبر نیست" };
+
+  try {
+    await replaceProductSizeChart(productId, parsed.data);
+  } catch {
+    // The table's CHECK constraints back up the schema above; never leak the raw error.
+    return { ok: false, error: "ذخیره جدول سایز ممکن نشد" };
+  }
+
+  await recordAuditLog(session.user, "product.sizeChart.update", "product", productId, {
+    removed: parsed.data === null,
+    columns: parsed.data?.columns ?? [],
+    rowCount: parsed.data?.rows.length ?? 0,
+  });
+
+  revalidateStorefrontForProduct(product.slug);
+  revalidatePath(`/admin/products/${productId}`);
+  return { ok: true, data: { saved: parsed.data !== null, removed: parsed.data === null } };
 }
 
 // ---------------------------------------------------------------------

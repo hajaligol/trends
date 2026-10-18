@@ -7,6 +7,7 @@ import { Container } from "@/components/ui/Container";
 import { Breadcrumbs } from "@/components/catalog/Breadcrumbs";
 import { ProductGallery } from "@/components/catalog/ProductGallery";
 import { ProductColorProvider } from "@/components/catalog/ProductColorContext";
+import { SizeChartButton } from "@/components/catalog/SizeChartButton";
 import { VariantSelector } from "@/components/catalog/VariantSelector";
 import { CampaignNotice } from "@/components/catalog/CampaignNotice";
 import { WishlistToggleButton } from "@/components/ui/WishlistButton";
@@ -185,6 +186,16 @@ export default async function ProductPage({ params, searchParams }: ProductPageP
               <div className="border-t border-line pt-6">
                 <VariantSelector
                   variants={product.variants}
+                  sizeChartAction={
+                    product.sizeChart && (
+                      <SizeChartButton
+                        title={product.title}
+                        columns={product.sizeChart.columns}
+                        rows={product.sizeChart.rows}
+                        note={product.sizeChart.note}
+                      />
+                    )
+                  }
                   secondaryAction={
                     <WishlistToggleButton productId={product.id} productName={product.title} />
                   }

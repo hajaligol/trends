@@ -5,6 +5,7 @@ import { brands, categories, productImages, productVariants, products } from "@/
 import type { Product, ProductImage, ProductVariant } from "@/lib/db/schema";
 import { getCategorySubtreeIds } from "@/domains/categories/queries";
 import { listProductSpecifications, type SpecificationRow } from "@/domains/catalog/specifications";
+import { getProductSizeChart, type SizeChart } from "@/domains/catalog/size-chart";
 
 /**
  * Admin-facing catalog reads — distinct from
@@ -132,6 +133,7 @@ export type AdminProductDetail = Product & {
   images: ProductImage[];
   /** Custom «مشخصات محصول» rows, in display order. */
   specifications: SpecificationRow[];
+  sizeChart: SizeChart | null;
 };
 
 export async function getProductForAdmin(id: string): Promise<AdminProductDetail | null> {
@@ -143,13 +145,14 @@ export async function getProductForAdmin(id: string): Promise<AdminProductDetail
     .limit(1);
   if (!product) return null;
 
-  const [variants, images, specifications] = await Promise.all([
+  const [variants, images, specifications, sizeChart] = await Promise.all([
     db.select().from(productVariants).where(eq(productVariants.productId, id)).orderBy(asc(productVariants.size)),
     db.select().from(productImages).where(eq(productImages.productId, id)).orderBy(asc(productImages.displayOrder)),
     listProductSpecifications(id),
+    getProductSizeChart(id),
   ]);
 
-  return { ...product.product, categoryName: product.categoryName, variants, images, specifications };
+  return { ...product.product, categoryName: product.categoryName, variants, images, specifications, sizeChart };
 }
 
 export async function isProductSlugTaken(slug: string, excludeId?: string): Promise<boolean> {

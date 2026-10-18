@@ -33,8 +33,11 @@ function isInStock(variant: CatalogProductVariant) {
 export function VariantSelector({
   variants,
   secondaryAction,
+  sizeChartAction,
 }: {
   variants: CatalogProductVariant[];
+  /** Rendered under the size choices (the page passes the «راهنمای سایز» button). */
+  sizeChartAction?: ReactNode;
   /** Rendered beside the add-to-cart button (the page passes the wishlist toggle). */
   secondaryAction?: ReactNode;
 }) {
@@ -206,6 +209,8 @@ export function VariantSelector({
           </div>
         </fieldset>
       )}
+
+      {sizeChartAction}
 
       {colors.length > 1 && (
         <fieldset className="m-0 flex min-w-0 flex-col gap-2.5 border-0 p-0">

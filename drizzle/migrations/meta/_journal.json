@@ -141,6 +141,13 @@
       "when": 1792276935010,
       "tag": "0019_blog",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1792324529462,
+      "tag": "0020_product_size_charts",
+      "breakpoints": true
     }
   ]
 }

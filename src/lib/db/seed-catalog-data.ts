@@ -11,11 +11,13 @@
  * Categories are READ from the database (never created/deleted here), so a
  * category the admin added later is covered too. Brand names are invented
  * placeholders and may coincide with real brands by accident; replace them in
- * `/admin/brands`. No images/logos are created.
+ * `/admin/brands`. No images/logos are created. Each product also gets a demo
+ * sizing table (`seed-size-chart-data.ts`).
  */
 import { sql } from "drizzle-orm";
 import type { DbTransaction } from "./client";
-import { brands, categories, products } from "./schema";
+import { brands, categories, productSizeCharts, products } from "./schema";
+import { buildSeedSizeChart, parseTypeSlug } from "./seed-size-chart-data";
 import { generateProductSlug, insertVariantsBulk } from "@/domains/catalog/product-service";
 
 type BrandSeed = {
@@ -218,6 +220,10 @@ export async function seedCatalog(tx: DbTransaction): Promise<SeedCatalogResult>
 
     const result = await insertVariantsBulk(tx, created, { material: null, lowStockThreshold: 5, isActive: true, rows });
     variantTotal += result.created;
+
+    // Every seeded product gets a sizing table matching its own sizes.
+    const slugParts = parseTypeSlug(leaf.slug) ?? { audience: leaf.isKids ? "kids" : leaf.audience === "women" ? "women" : "men", group: leaf.group, typeKey: leaf.slug };
+    await tx.insert(productSizeCharts).values({ productId: created.id, ...buildSeedSizeChart({ ...slugParts, sizes }) });
   }
 
   // 3) Guarantees.

@@ -5,6 +5,7 @@ export * from "./product-slug-redirects";
 export * from "./product-variants";
 export * from "./product-images";
 export * from "./product-specifications";
+export * from "./product-size-charts";
 export * from "./users";
 export * from "./addresses";
 export * from "./password-reset-tokens";

@@ -5,6 +5,7 @@ import { listCategoryPickerNodes } from "@/domains/categories/queries";
 import { listBrandOptions } from "@/domains/brands/queries";
 import { ProductForm } from "@/components/admin/ProductForm";
 import { ProductSpecificationsEditor } from "@/components/admin/ProductSpecificationsEditor";
+import { ProductSizeChartEditor } from "@/components/admin/ProductSizeChartEditor";
 import { ProductVariantsAndImages } from "@/components/admin/ProductVariantsAndImages";
 import { DeleteProductButton } from "@/components/admin/DeleteProductButton";
 import { Card, PageHeader, StatusBadge } from "@/components/admin/ui/layout";
@@ -52,6 +53,8 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
             <a href="#images" className="text-brand hover:underline">تصاویر</a>
             {" · "}
             <a href="#specs" className="text-brand hover:underline">جدول مشخصات</a>
+            {" · "}
+            <a href="#size-chart" className="text-brand hover:underline">جدول سایز</a>
           </>
         }
       />
@@ -66,6 +69,19 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
         description="برند، دسته‌بندی، جنس، سایزها، رنگ‌ها و برچسب‌ها خودکار در جدول نمایش داده می‌شوند. ردیف‌های زیر به انتهای جدول اضافه می‌شوند."
       >
         <ProductSpecificationsEditor productId={product.id} initialRows={product.specifications} />
+      </Card>
+
+      <Card
+        id="size-chart"
+        title="جدول سایز (راهنمای سایز)"
+        description="در صفحه‌ی محصول، کنار انتخاب سایز، دکمه‌ی «راهنمای سایز» نمایش داده می‌شود و جدول زیر را در یک پنجره باز می‌کند. اگر جدولی ثبت نکنید، دکمه نمایش داده نمی‌شود."
+      >
+        <ProductSizeChartEditor
+          productId={product.id}
+          variantSizes={[...new Set(product.variants.map((variant) => variant.size))]}
+          initialChart={product.sizeChart ? { columns: product.sizeChart.columns, rows: product.sizeChart.rows } : null}
+          initialNote={product.sizeChart?.note ?? null}
+        />
       </Card>
     </div>
   );

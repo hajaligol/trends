@@ -1,5 +1,47 @@
 # Trends Progress Report
 
+## Latest change: demo size charts for every seeded product
+Status: COMPLETE WITH FOLLOW-UP. `tsc` ✔, `eslint .` ✔, 248 unit tests ✔ (new `tests/unit/seed-size-charts.test.ts`: every level-3 category in the
+taxonomy produces a table that passes the admin `sizeChartSchema` unchanged and whose first column equals the product's sizes). **Not run against
+Postgres** (none in the sandbox) — run the seed once to confirm.
+
+- `lib/db/seed-size-chart-data.ts` (pure): `buildSeedSizeChart({audience, group, typeKey, sizes})`, `parseTypeSlug(slug)`. The size column always
+  uses the product's real variant sizes; values are plausible demo numbers derived from each size's position.
+  - Clothing: tops/outerwear/dresses (سینه، قد لباس، شانه، آستین — sleeve column dropped for vests/dresses/jumpsuits; short sleeve for t-shirts/polo/tops),
+    bottoms (کمر، باسن، طول), underwear, socks (maps to shoe sizes); kids use child height (قد کودک).
+  - Shoes: EU size → foot length in cm (Paris-point formula). Bags: عرض/ارتفاع/عمق per type. Accessories: per-type dimensions (head circumference
+    for caps/beanies/hats, lens/bridge/temple for sunglasses, watch case/strap, belt, scarf, jewellery…). Unknown types fall back to a generic table.
+- `seedCatalog` (used by `npm run db:seed` and `db:seed-catalog -- --yes`) now inserts a chart for each product it creates.
+- **New script** `npm run db:seed-size-charts` (`lib/db/seed-size-charts.ts`) for databases seeded before this feature: non-destructive, fills only
+  products with no chart; `-- --force` overwrites all. Products in admin-made (non-taxonomy) categories are skipped and listed.
+- **Assumption to confirm**: free-size products (bags, accessories) get a *dimensions* table rather than none, so every product shows the button.
+  Measurements are placeholders, not real brand data — the admin should replace them per product.
+
+---
+
+## Latest change: product sizing table «راهنمای سایز» (user-requested)
+Status: COMPLETE WITH FOLLOW-UP. `tsc --noEmit` ✔, `eslint .` ✔, 245 unit tests ✔ (new `tests/unit/size-chart.test.ts`). Migration generated
+but **not applied/run against Postgres** (none in the sandbox); integration tests and `next build` not run.
+
+- **Admin** (`/admin/products/[id]` → card «جدول سایز», link `#size-chart`): `ProductSizeChartEditor`. Pick a template by product type
+  (لباس بالاتنه / شلوار و دامن / کفش / کلاه / دلخواه) or start from a custom grid; headings and every cell are editable, add/remove rows and
+  columns, optional note under the table. The size column is pre-filled from the product's own variant sizes. Saving an empty grid removes the table.
+- **Storefront** (`/product/[slug]`): a «راهنمای سایز» button under the size choices (`SizeChartButton`, passed to `VariantSelector` as
+  `sizeChartAction`) opens a modal (`useDialogA11y`: focus trap, Escape, backdrop click, focus restore) with the table and note.
+  No table entered → no button. Digits shown in Persian.
+- **DB (migration `0020_product_size_charts`)**: `product_size_charts` — PK = `product_id` (one per product, cascade delete), `columns jsonb`,
+  `rows jsonb`, `note`, `updated_at`; CHECKs on array shape/limits (≤8 columns, ≤24 rows, note ≤400).
+- **Server**: `saveProductSizeChartAction` (staff/admin check, product must exist, `sizeChartSchema` zod: rectangular grid, blank rows/columns
+  dropped, unique non-empty headings, ≤40 chars per cell, audit log `product.sizeChart.update`, revalidates storefront + admin).
+  Domain: `domains/catalog/size-chart.ts`, presets `size-chart-presets.ts`, limits `lib/validation/size-chart-limits.ts`.
+  `getProductDetailBySlug` / `getProductForAdmin` now return `sizeChart`.
+- **Assumptions to confirm**: the table is per product (not shared per category); «by type» is implemented as admin-side templates, not a
+  type-level default table; cells are free text; the modal is separate from the «سایز را انتخاب کنید» picker.
+- **Not verified**: migration on a real DB, admin editor and modal in a browser (RTL, small phones, long tables scroll inside the modal).
+- **Follow-up ideas**: reuse a chart across products of one category; show a chart-driven size recommendation.
+
+---
+
 ## Latest change: «تی‌مگ» — the magazine/blog (user-requested)
 Status: COMPLETE WITH FOLLOW-UP. `tsc` ✔, `eslint .` ✔, `next build` ✔, 241 unit + 107 integration tests pass (Postgres 16,
 fresh migrate + `db:seed` + `db:seed-tmag`). Smoke-tested on a production build: `/tmag`, `/tmag/<slug>`, `/tmag/category/<slug>`,

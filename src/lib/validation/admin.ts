@@ -1,5 +1,11 @@
 import { z } from "zod";
 import { MAX_SPEC_ROWS } from "@/lib/validation/spec-limits";
+import {
+  MAX_SIZE_CHART_CELL_LENGTH,
+  MAX_SIZE_CHART_COLUMNS,
+  MAX_SIZE_CHART_NOTE_LENGTH,
+  MAX_SIZE_CHART_ROWS,
+} from "@/lib/validation/size-chart-limits";
 import { MAX_BULK_VARIANTS } from "@/lib/validation/admin-limits";
 import { normalizeSpecLabel } from "@/lib/utils/spec-label";
 import { isValidProductSlug } from "@/domains/catalog/slug";
@@ -247,6 +253,64 @@ export const productSpecificationsSchema = z
       }
       seen.add(key);
     }
+  });
+
+// ---------------------------------------------------------------------
+// Product sizing table («راهنمای سایز»)
+// ---------------------------------------------------------------------
+
+const sizeChartCell = z.string().trim().max(MAX_SIZE_CHART_CELL_LENGTH, `هر خانه حداکثر ${MAX_SIZE_CHART_CELL_LENGTH} نویسه می‌تواند باشد`);
+
+/** Input: `columns` headings and `cells` in row-major order (as posted by
+ * the editor). Output: a rectangular `{columns, rows, note}`, or `null`
+ * when the admin left the table empty (= remove the table). Fully blank
+ * rows are dropped; a half-blank heading or a table with no filled cell
+ * is an error rather than being saved as junk. */
+export const sizeChartSchema = z
+  .object({
+    columns: z.array(sizeChartCell).max(MAX_SIZE_CHART_COLUMNS + 4, "تعداد ستون‌ها بیش از حد مجاز است"),
+    cells: z.array(sizeChartCell).max((MAX_SIZE_CHART_COLUMNS + 4) * (MAX_SIZE_CHART_ROWS + 10)),
+    note: z.string().trim().max(MAX_SIZE_CHART_NOTE_LENGTH, `توضیح حداکثر ${MAX_SIZE_CHART_NOTE_LENGTH} نویسه می‌تواند باشد`),
+  })
+  .transform((input, ctx) => {
+    const width = input.columns.length;
+    if (width === 0 || input.cells.length % width !== 0) {
+      if (width !== 0) ctx.addIssue({ code: "custom", message: "اطلاعات جدول معتبر نیست" });
+    }
+    const rows: string[][] = [];
+    if (width > 0) {
+      for (let i = 0; i + width <= input.cells.length; i += width) rows.push(input.cells.slice(i, i + width));
+    }
+    // Drop fully blank rows and fully blank columns (heading and every cell).
+    const filledRows = rows.filter((row) => row.some((cell) => cell !== ""));
+    const keep = input.columns
+      .map((heading, index) => (heading !== "" || filledRows.some((row) => row[index] !== "") ? index : -1))
+      .filter((index) => index >= 0);
+    const note = input.note === "" ? null : input.note;
+    if (keep.length === 0 || filledRows.length === 0) {
+      if (input.columns.some((heading) => heading !== "") && filledRows.length === 0) {
+        ctx.addIssue({ code: "custom", message: "حداقل یک ردیف از جدول را پر کنید یا جدول را خالی بگذارید" });
+      }
+      return null;
+    }
+    if (keep.length > MAX_SIZE_CHART_COLUMNS) {
+      ctx.addIssue({ code: "custom", message: `حداکثر ${MAX_SIZE_CHART_COLUMNS} ستون مجاز است` });
+    }
+    if (filledRows.length > MAX_SIZE_CHART_ROWS) {
+      ctx.addIssue({ code: "custom", message: `حداکثر ${MAX_SIZE_CHART_ROWS} ردیف مجاز است` });
+    }
+    const columns = keep.map((index) => input.columns[index]!);
+    if (columns.some((heading) => heading === "")) {
+      ctx.addIssue({ code: "custom", message: "برای هر ستون یک عنوان وارد کنید" });
+    }
+    if (new Set(columns.map(normalizeSpecLabel)).size !== columns.length) {
+      ctx.addIssue({ code: "custom", message: "عنوان ستون‌ها نباید تکراری باشد" });
+    }
+    return {
+      columns,
+      rows: filledRows.map((row) => keep.map((index) => row[index]!)),
+      note,
+    };
   });
 
 // ---------------------------------------------------------------------

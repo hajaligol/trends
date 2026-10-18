@@ -33,6 +33,7 @@ import {
 } from "@/domains/campaigns/pricing";
 import type { ProductRef } from "@/domains/campaigns/engine";
 import { listProductSpecifications, type SpecificationRow } from "@/domains/catalog/specifications";
+import { getProductSizeChart, type SizeChart } from "@/domains/catalog/size-chart";
 
 /**
  * Catalog read model returned to callers (Server Components, future route
@@ -617,6 +618,8 @@ export type CatalogProductDetail = CatalogProductSummary & {
   variants: CatalogProductVariant[];
   /** Admin-authored extra rows of the specifications table, in order. */
   specifications: SpecificationRow[];
+  /** Admin-entered sizing table, or null when the product has none. */
+  sizeChart: SizeChart | null;
 };
 
 /**
@@ -672,7 +675,7 @@ export async function getProductDetailBySlug(rawSlug: string): Promise<CatalogPr
     name: category.name,
   }));
 
-  const [variantRows, imageRows, specifications] = await Promise.all([
+  const [variantRows, imageRows, specifications, sizeChart] = await Promise.all([
     db
       .select(VARIANT_COLUMNS)
       .from(productVariants)
@@ -683,6 +686,7 @@ export async function getProductDetailBySlug(rawSlug: string): Promise<CatalogPr
       .where(eq(productImages.productId, row.id))
       .orderBy(asc(productImages.displayOrder)),
     listProductSpecifications(row.id),
+    getProductSizeChart(row.id),
   ]);
 
   const pricing = await getCatalogPricing();
@@ -714,6 +718,7 @@ export async function getProductDetailBySlug(rawSlug: string): Promise<CatalogPr
     categoryTrail,
     variants,
     specifications,
+    sizeChart,
   };
 }
 
