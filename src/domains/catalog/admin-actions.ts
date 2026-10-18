@@ -7,6 +7,7 @@ import { db } from "@/lib/db/client";
 import { productImages, productVariants, products } from "@/lib/db/schema";
 import {
   parseBulkVariantsField,
+  parseCreateImagesField,
   productImageSchema,
   productSchema,
   productSpecificationsSchema,
@@ -24,8 +25,8 @@ import {
   VariantInputError,
   type BulkVariantResult,
 } from "@/domains/catalog/product-service";
-import { replaceProductSpecifications } from "@/domains/catalog/specifications";
-import { replaceProductSizeChart } from "@/domains/catalog/size-chart";
+import { insertProductSpecifications, replaceProductSpecifications } from "@/domains/catalog/specifications";
+import { insertProductSizeChart, replaceProductSizeChart } from "@/domains/catalog/size-chart";
 import { isStaffOrAdmin, UNAUTHORIZED_ERROR, type ActionResult } from "@/domains/auth/roles";
 import { recordAuditLog } from "@/domains/analytics/audit";
 import { getProductCategoryError } from "@/domains/categories/queries";
@@ -69,6 +70,30 @@ export async function createProductAction(
   const variantsField = parseBulkVariantsField(formData.get("variantsJson"));
   if (!variantsField.ok) return { ok: false, error: variantsField.error };
 
+  // Optional: photos added in the staged form. A colour-scoped photo may only
+  // name a colour of the variants created in this same request.
+  const variantColorNames = (variantsField.value?.rows ?? []).flatMap((row) => {
+    const color = getPaletteColor(row.colorCode);
+    return color ? [color.name] : [];
+  });
+  const imagesField = parseCreateImagesField(formData.get("imagesJson"), variantColorNames);
+  if (!imagesField.ok) return { ok: false, error: imagesField.error };
+
+  // Optional: custom «مشخصات محصول» rows and the «راهنمای سایز» table, posted
+  // with the same field names the standalone edit-page editors use.
+  const specLabels = formData.getAll("specLabel").map(String);
+  const specValues = formData.getAll("specValue").map(String);
+  if (specLabels.length !== specValues.length) return { ok: false, error: "اطلاعات جدول مشخصات معتبر نیست" };
+  const specsParsed = productSpecificationsSchema.safeParse(specLabels.map((label, index) => ({ label, value: specValues[index] })));
+  if (!specsParsed.success) return { ok: false, error: specsParsed.error.issues[0]?.message ?? "اطلاعات جدول مشخصات معتبر نیست" };
+
+  const sizeChartParsed = sizeChartSchema.safeParse({
+    columns: formData.getAll("sizeChartColumn").map(String),
+    cells: formData.getAll("sizeChartCell").map(String),
+    note: String(formData.get("sizeChartNote") ?? ""),
+  });
+  if (!sizeChartParsed.success) return { ok: false, error: sizeChartParsed.error.issues[0]?.message ?? "اطلاعات جدول سایز معتبر نیست" };
+
   // Products live on the type level of the category tree only.
   const categoryError = await getProductCategoryError(parsed.data.categoryId);
   if (categoryError) return { ok: false, error: categoryError };
@@ -94,6 +119,11 @@ export async function createProductAction(
         .returning({ id: products.id, productCode: products.productCode, slug: products.slug });
       if (!row) throw new Error("product insert returned no row");
       if (variantsField.value) variantResult = await insertVariantsBulk(tx, row, variantsField.value);
+      if (imagesField.value.length > 0) {
+        await tx.insert(productImages).values(imagesField.value.map((image) => ({ ...image, productId: row.id })));
+      }
+      await insertProductSpecifications(tx, row.id, specsParsed.data);
+      if (sizeChartParsed.data) await insertProductSizeChart(tx, row.id, sizeChartParsed.data);
       return row;
     });
   } catch (error) {
@@ -107,6 +137,9 @@ export async function createProductAction(
     slug: created.slug,
     productCode: created.productCode,
     variantsCreated: variantResult.created,
+    imagesCreated: imagesField.value.length,
+    specificationRows: specsParsed.data.length,
+    sizeChartRows: sizeChartParsed.data?.rows.length ?? 0,
   });
 
   revalidateStorefrontForProduct(created.slug);

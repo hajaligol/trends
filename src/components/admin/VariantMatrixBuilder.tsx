@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ColorPalettePicker, Swatch } from "@/components/admin/ColorPalettePicker";
 import { TextField } from "@/components/admin/ui/form";
 import { COLOR_PALETTE, getPaletteColor } from "@/domains/catalog/color-palette";
@@ -22,6 +22,17 @@ type RowOverride = { price?: string; compareAt?: string; stock?: string };
 
 export type ExistingVariantKey = { size: string; color: string };
 
+/** What a parent (e.g. the staged new-product form) needs to know about the matrix. */
+export type VariantMatrixSummary = {
+  rowCount: number;
+  /** Colour names (as customers see them) that will exist once saved. */
+  colorNames: string[];
+  /** A price/stock cell is empty, or too many variants were generated. */
+  incomplete: boolean;
+  /** Small preview for a review screen. */
+  sizes: string[];
+};
+
 /**
  * Choose several sizes and several colours at once; every combination
  * becomes a variant. Shared price/stock fill the table, and any row can be
@@ -36,11 +47,13 @@ export function VariantMatrixBuilder({
   productCode,
   existing = [],
   compact = false,
+  onSummaryChange,
 }: {
   /** Known only for an existing product; on create the SKU preview shows a placeholder. */
   productCode?: number;
   existing?: ExistingVariantKey[];
   compact?: boolean;
+  onSummaryChange?: (summary: VariantMatrixSummary) => void;
 }) {
   const [sizes, setSizes] = useState<string[]>([]);
   const [colorCodes, setColorCodes] = useState<string[]>([]);
@@ -131,6 +144,20 @@ export function VariantMatrixBuilder({
 
   const missingPrice = activeRows.some((row) => parseInteger(row.priceText) === null);
   const missingStock = activeRows.some((row) => parseInteger(row.stockText) === null);
+
+  // Report a compact, primitive-keyed summary upward (the key keeps this from
+  // firing on every keystroke that doesn't change the summary).
+  const summaryKey = JSON.stringify([
+    activeRows.length,
+    orderedColors.map((color) => color.name),
+    orderedSizes,
+    missingPrice || missingStock || tooMany,
+  ]);
+  useEffect(() => {
+    if (!onSummaryChange) return;
+    const [rowCount, colorNames, sizeList, incomplete] = JSON.parse(summaryKey) as [number, string[], string[], boolean];
+    onSummaryChange({ rowCount, colorNames, sizes: sizeList, incomplete });
+  }, [summaryKey, onSummaryChange]);
 
   return (
     <div className="flex flex-col gap-5">

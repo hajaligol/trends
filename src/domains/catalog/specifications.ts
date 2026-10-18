@@ -1,8 +1,18 @@
 import { asc, eq } from "drizzle-orm";
-import { db } from "@/lib/db/client";
+import { db, type DbTransaction } from "@/lib/db/client";
 import { productSpecifications } from "@/lib/db/schema";
 
 export type SpecificationRow = { label: string; value: string };
+
+type Executor = typeof db | DbTransaction;
+
+/** Inserts a new product's spec rows (no delete); `rows` must be schema-validated. */
+export async function insertProductSpecifications(executor: Executor, productId: string, rows: SpecificationRow[]): Promise<void> {
+  if (rows.length === 0) return;
+  await executor.insert(productSpecifications).values(
+    rows.map((row, index) => ({ productId, label: row.label, value: row.value, displayOrder: index })),
+  );
+}
 
 /** Custom spec rows of one product, in the admin's order. */
 export async function listProductSpecifications(productId: string): Promise<SpecificationRow[]> {

@@ -12,11 +12,14 @@ import { dateToTehranInput } from "@/lib/utils/tehran-time";
 import { FormAlert, SelectField, Spinner, TextField, TextareaField } from "@/components/admin/ui/form";
 import { ImagePicker } from "@/components/admin/ImagePicker";
 import { adminButton, Card } from "@/components/admin/ui/layout";
+import { ReviewRow, WizardFooter, WizardPanel, WizardStepper, useWizard } from "@/components/admin/ui/wizard";
+import { toPersianDigits } from "@/lib/utils/persian-digits";
 import { ConfigFields } from "./ConfigFields";
 import { draftFromDefinition, draftToConfig, type Draft } from "./draft";
 import { KindPicker } from "./KindPicker";
 import { PreviewPanel } from "./PreviewPanel";
 import { ScopePicker, type Scope } from "./ScopePicker";
+import { CAMPAIGN_STEPS, firstInvalidCampaignStep, validateCampaignStep, type CampaignStepValues } from "./steps";
 
 function Switch({ checked, onChange, label, description }: { checked: boolean; onChange: (value: boolean) => void; label: string; description: string }) {
   return (
@@ -34,14 +37,6 @@ function Switch({ checked, onChange, label, description }: { checked: boolean; o
   );
 }
 
-function Step({ n, title, children, description }: { n: number; title: string; description?: string; children: React.ReactNode }) {
-  return (
-    <Card title={`${new Intl.NumberFormat("fa-IR").format(n)}. ${title}`} description={description}>
-      {children}
-    </Card>
-  );
-}
-
 export function CampaignForm({
   campaign,
   brands,
@@ -55,6 +50,8 @@ export function CampaignForm({
   const { showToast } = useToast();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const isEdit = campaign !== null;
+  const wizard = useWizard({ count: CAMPAIGN_STEPS.length, freeNavigation: isEdit });
 
   const [kind, setKind] = useState<CampaignKind>(campaign?.row.kind ?? "percent_off");
   const [draft, setDraft] = useState<Draft>(() => draftFromDefinition(campaign?.definition ?? null));
@@ -100,8 +97,45 @@ export function CampaignForm({
     [parsedConfig.ok, hasTargets, kind, config, scope, campaign?.row.id],
   );
 
+  const stepValues: CampaignStepValues = {
+    name,
+    description,
+    configError: parsedConfig.ok ? null : parsedConfig.error,
+    hasTargets,
+    startsAt,
+    endsAt,
+    showCountdown,
+    homePlacement,
+    homeImageUrl,
+  };
+
+  function goNext() {
+    wizard.next(() => validateCampaignStep(CAMPAIGN_STEPS[wizard.step]?.id ?? "review", stepValues));
+  }
+
+  function select(target: number) {
+    // Jumping forward through the stepper checks every stage it skips over.
+    if (target > wizard.step) {
+      for (let index = wizard.step; index < target; index += 1) {
+        const problem = validateCampaignStep(CAMPAIGN_STEPS[index]?.id ?? "review", stepValues);
+        if (problem) {
+          wizard.goTo(index);
+          wizard.setStepError(problem);
+          return;
+        }
+      }
+    }
+    wizard.select(target);
+  }
+
   function save() {
     setError(null);
+    const problem = firstInvalidCampaignStep(stepValues);
+    if (problem) {
+      wizard.goTo(problem.index);
+      wizard.setStepError(problem.error);
+      return;
+    }
     const payload = JSON.stringify({
       name,
       description: description.trim() === "" ? null : description,
@@ -135,30 +169,106 @@ export function CampaignForm({
 
   const summary = parsedConfig.ok ? describeDefinition(parsedConfig.definition) : null;
 
+  const panel = (index: number, title: string, description: string | undefined, children: React.ReactNode) => (
+    <WizardPanel
+      active={wizard.step === index}
+      index={index}
+      total={CAMPAIGN_STEPS.length}
+      title={title}
+      description={description}
+      headingRef={wizard.headingRef}
+      error={wizard.stepError}
+    >
+      {children}
+    </WizardPanel>
+  );
+
+  const placementLabel = { none: "بدون نمایش", hero: "اسلاید اصلی", banner: "بنر تبلیغاتی" }[homePlacement];
+  const scopeCount = scope.brandIds.length + scope.categoryIds.length + scope.products.length;
+  const formatWhen = (value: string) => (value ? toPersianDigits(value.replace("T", " ")) : null);
+  const saveLabel = campaign ? "ذخیره تغییرات" : "ایجاد کمپین";
+  const saveButton = (
+    <button type="button" onClick={save} disabled={isPending} aria-busy={isPending} className={adminButton("primary", "md")}>
+      {isPending && <Spinner />}
+      {isPending ? "در حال ذخیره..." : saveLabel}
+    </button>
+  );
+
   return (
-    <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_21rem]">
-      <div className="flex min-w-0 flex-col gap-5">
-        {error && <FormAlert state={{ ok: false, error } as { ok: boolean }} />}
+    <div className="flex flex-col gap-5">
+      <WizardStepper
+        label="مراحل ساخت کمپین"
+        steps={[...CAMPAIGN_STEPS]}
+        current={wizard.step}
+        maxReached={wizard.maxReached}
+        freeNavigation={wizard.freeNavigation}
+        onSelect={select}
+      />
+      {error && <FormAlert state={{ ok: false, error } as { ok: boolean }} />}
 
-        <Step n={1} title="نوع کمپین" description="چه نوع پیشنهادی می‌خواهید بدهید؟ هر نوع فقط فیلدهای لازم خودش را نشان می‌دهد.">
-          <KindPicker value={kind} onChange={setKind} />
-        </Step>
-
-        <Step n={2} title="تنظیمات تخفیف" description={KIND_META[kind].description}>
-          <ConfigFields kind={kind} draft={draft} onChange={(patch) => setDraft((current) => ({ ...current, ...patch }))} />
-          {!parsedConfig.ok && <p className="m-0 mt-3 text-[0.78rem] text-text-secondary">برای ادامه: {parsedConfig.error}</p>}
-        </Step>
-
-        <Step n={3} title="شامل چه محصولاتی؟" description="کمپین را روی کل فروشگاه یا فقط روی برند، دسته‌بندی یا محصولات انتخابی اعمال کنید.">
-          <ScopePicker scope={scope} onChange={(patch) => setScope((current) => ({ ...current, ...patch }))} brands={brands} categories={categories} />
-        </Step>
-
-        <Step
-          n={4}
-          title="نمایش در صفحه اصلی"
-          description="کمپین را می‌توانید در صفحه اصلی تبلیغ کنید. با کلیک روی آن، مشتری به صفحه محصولات همین کمپین می‌رود."
-        >
-          <div className="flex flex-col gap-4">
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_21rem]">
+        <div className="flex min-w-0 flex-col gap-5">
+          {panel(
+            0,
+            "نام و نوع کمپین",
+            "یک نام برای مشتری انتخاب کنید و مشخص کنید چه نوع پیشنهادی می‌دهید. هر نوع فقط فیلدهای لازم خودش را نشان می‌دهد.",
+            <>
+              <TextField
+              label="نام کمپین (نمایش به مشتری)"
+              name="campaign-name"
+              required
+              maxLength={60}
+              placeholder="مثلاً حراج پاییزه"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+            <TextareaField
+              label="توضیح کوتاه"
+              name="campaign-description"
+              optional
+              rows={2}
+              maxLength={160}
+              hint="در صفحه محصول زیر نام کمپین نمایش داده می‌شود."
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+              <KindPicker value={kind} onChange={setKind} />
+            </>,
+          )}
+          {panel(1, "تنظیمات تخفیف", KIND_META[kind].description, <><ConfigFields kind={kind} draft={draft} onChange={(patch) => setDraft((current) => ({ ...current, ...patch }))} />
+          {!parsedConfig.ok && <p className="m-0 mt-3 text-[0.78rem] text-text-secondary">برای ادامه: {parsedConfig.error}</p>}</>)}
+          {panel(2, "شامل چه محصولاتی؟", "کمپین را روی کل فروشگاه یا فقط روی برند، دسته‌بندی یا محصولات انتخابی اعمال کنید.", <><ScopePicker scope={scope} onChange={(patch) => setScope((current) => ({ ...current, ...patch }))} brands={brands} categories={categories} /></>)}
+          {panel(
+            3,
+            "زمان‌بندی و قوانین",
+            "زمان‌ها به وقت تهران است. خالی گذاشتن شروع = از همین حالا؛ خالی گذاشتن پایان = تا زمانی که دستی متوقف کنید.",
+            <>
+              <div className="flex flex-col gap-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <TextField label="شروع" name="campaign-starts" type="datetime-local" optional value={startsAt} onChange={(e) => setStartsAt(e.target.value)} />
+              <TextField label="پایان" name="campaign-ends" type="datetime-local" optional value={endsAt} onChange={(e) => setEndsAt(e.target.value)} />
+            </div>
+            <Switch
+              checked={showCountdown}
+              onChange={setShowCountdown}
+              label="نمایش شمارش معکوس"
+              description="در صفحه محصول زمان باقی‌مانده تا پایان کمپین نمایش داده می‌شود (نیازمند زمان پایان)."
+            />
+          </div>
+              <Switch
+              checked={stackable}
+              onChange={setStackable}
+              label="قابل ترکیب با سایر کمپین‌ها"
+              description="به‌طور پیش‌فرض کالایی که از یک کمپین تخفیف گرفته، در کمپین دیگری شرکت نمی‌کند. فقط وقتی هر دو کمپین «قابل ترکیب» باشند، تخفیف‌ها روی هم اعمال می‌شوند."
+            />
+            <Switch checked={isActive} onChange={setIsActive} label="کمپین فعال باشد" description="با خاموش کردن، کمپین بدون حذف متوقف می‌شود." />
+            </>,
+          )}
+          {panel(
+            4,
+            "نمایش در صفحه اصلی",
+            "کمپین را می‌توانید در صفحه اصلی تبلیغ کنید. با کلیک روی آن، مشتری به صفحه محصولات همین کمپین می‌رود. این مرحله اختیاری است.",
+            <><div className="flex flex-col gap-4">
             <fieldset className="m-0 grid min-w-0 gap-2.5 border-0 p-0 sm:grid-cols-3">
               <legend className="sr-only">نحوه نمایش در صفحه اصلی</legend>
               {(
@@ -249,78 +359,58 @@ export function CampaignForm({
                 </p>
               </div>
             )}
-          </div>
-        </Step>
+          </div></>,
+          )}
+          {panel(
+            5,
+            campaign ? "مرور نهایی" : "مرور و ایجاد",
+            campaign ? "قبل از ذخیره، خلاصه‌ی تغییرات را ببینید." : "همه‌چیز را یک بار مرور کنید؛ با زدن «ایجاد کمپین» کمپین ساخته می‌شود.",
+            <dl className="m-0 flex flex-col">
+              <ReviewRow label="نام">{name.trim() || "—"}</ReviewRow>
+              <ReviewRow label="نوع">{KIND_META[kind].title}</ReviewRow>
+              <ReviewRow label="تخفیف">{summary ?? "—"}</ReviewRow>
+              <ReviewRow label="دامنه">
+                {scope.appliesToAll
+                  ? "کل فروشگاه"
+                  : `${toPersianDigits(scopeCount)} مورد انتخابی${scope.excludedProducts.length > 0 ? ` (به‌جز ${toPersianDigits(scope.excludedProducts.length)} محصول)` : ""}`}
+              </ReviewRow>
+              <ReviewRow label="شروع">{formatWhen(startsAt) ?? "از همین حالا"}</ReviewRow>
+              <ReviewRow label="پایان">{formatWhen(endsAt) ?? "تا توقف دستی"}</ReviewRow>
+              <ReviewRow label="شمارش معکوس">{showCountdown ? "نمایش داده شود" : "خاموش"}</ReviewRow>
+              <ReviewRow label="ترکیب با کمپین‌های دیگر">{stackable ? "مجاز" : "غیرمجاز"}</ReviewRow>
+              <ReviewRow label="صفحه اصلی">{placementLabel}</ReviewRow>
+              <ReviewRow label="وضعیت">{isActive ? "فعال" : "غیرفعال (بدون اعمال در فروشگاه)"}</ReviewRow>
+            </dl>,
+          )}
 
-        <Step n={5} title="زمان‌بندی" description="زمان‌ها به وقت تهران است. خالی گذاشتن شروع = از همین حالا؛ خالی گذاشتن پایان = تا زمانی که دستی متوقف کنید.">
-          <div className="flex flex-col gap-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <TextField label="شروع" name="campaign-starts" type="datetime-local" optional value={startsAt} onChange={(e) => setStartsAt(e.target.value)} />
-              <TextField label="پایان" name="campaign-ends" type="datetime-local" optional value={endsAt} onChange={(e) => setEndsAt(e.target.value)} />
-            </div>
-            <Switch
-              checked={showCountdown}
-              onChange={setShowCountdown}
-              label="نمایش شمارش معکوس"
-              description="در صفحه محصول زمان باقی‌مانده تا پایان کمپین نمایش داده می‌شود (نیازمند زمان پایان)."
-            />
-          </div>
-        </Step>
-
-        <Step n={6} title="نام و قوانین">
-          <div className="flex flex-col gap-4">
-            <TextField
-              label="نام کمپین (نمایش به مشتری)"
-              name="campaign-name"
-              required
-              maxLength={60}
-              placeholder="مثلاً حراج پاییزه"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-            <TextareaField
-              label="توضیح کوتاه"
-              name="campaign-description"
-              optional
-              rows={2}
-              maxLength={160}
-              hint="در صفحه محصول زیر نام کمپین نمایش داده می‌شود."
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-            />
-            <Switch
-              checked={stackable}
-              onChange={setStackable}
-              label="قابل ترکیب با سایر کمپین‌ها"
-              description="به‌طور پیش‌فرض کالایی که از یک کمپین تخفیف گرفته، در کمپین دیگری شرکت نمی‌کند. فقط وقتی هر دو کمپین «قابل ترکیب» باشند، تخفیف‌ها روی هم اعمال می‌شوند."
-            />
-            <Switch checked={isActive} onChange={setIsActive} label="کمپین فعال باشد" description="با خاموش کردن، کمپین بدون حذف متوقف می‌شود." />
-          </div>
-        </Step>
-      </div>
-
-      <aside className="flex flex-col gap-4 lg:sticky lg:top-4">
-        <Card title="خلاصه کمپین">
-          <div className="flex flex-col gap-2 text-[0.84rem] leading-6">
-            <p className="m-0 font-semibold text-ink">{name.trim() || "بدون نام"}</p>
-            <p className="m-0 text-brand-dark">{KIND_META[kind].title}</p>
-            <p className="m-0 text-text-secondary">{summary ?? "تنظیمات تخفیف هنوز کامل نیست"}</p>
-            <p className="m-0 text-text-secondary">
-              {scope.appliesToAll ? "دامنه: کل فروشگاه" : hasTargets ? "دامنه: موارد انتخابی" : "دامنه: هنوز چیزی انتخاب نشده"}
-            </p>
-          </div>
-        </Card>
-        <Card title="پیش‌نمایش اثر">
-          <PreviewPanel payload={previewPayload} />
-        </Card>
-        <div className="flex flex-col gap-2">
-          <button type="button" onClick={save} disabled={isPending} aria-busy={isPending} className={adminButton("primary", "md", "w-full justify-center")}>
-            {isPending && <Spinner />}
-            {isPending ? "در حال ذخیره..." : campaign ? "ذخیره تغییرات" : "ایجاد کمپین"}
-          </button>
-          <p className="m-0 text-center text-[0.76rem] leading-5 text-text-secondary">قیمت‌ها در فروشگاه تا چند دقیقه بعد از ذخیره به‌روز می‌شوند؛ سبد خرید و پرداخت همیشه آخرین وضعیت را دارند.</p>
+          <WizardFooter
+            isFirst={wizard.isFirst}
+            isLast={wizard.isLast}
+            onBack={wizard.back}
+            onNext={goNext}
+            hint={wizard.freeNavigation ? "در حالت ویرایش می‌توانید آزادانه بین مراحل جابه‌جا شوید." : undefined}
+            extra={wizard.freeNavigation && !wizard.isLast ? saveButton : undefined}
+            submit={saveButton}
+          />
         </div>
-      </aside>
+
+        <aside className="flex flex-col gap-4 lg:sticky lg:top-4">
+          <Card title="خلاصه کمپین">
+            <div className="flex flex-col gap-2 text-[0.84rem] leading-6">
+              <p className="m-0 font-semibold text-ink">{name.trim() || "بدون نام"}</p>
+              <p className="m-0 text-brand-dark">{KIND_META[kind].title}</p>
+              <p className="m-0 text-text-secondary">{summary ?? "تنظیمات تخفیف هنوز کامل نیست"}</p>
+              <p className="m-0 text-text-secondary">
+                {scope.appliesToAll ? "دامنه: کل فروشگاه" : hasTargets ? "دامنه: موارد انتخابی" : "دامنه: هنوز چیزی انتخاب نشده"}
+              </p>
+            </div>
+          </Card>
+          <Card title="پیش‌نمایش اثر">
+            <PreviewPanel payload={previewPayload} />
+          </Card>
+          <p className="m-0 text-center text-[0.76rem] leading-5 text-text-secondary">قیمت‌ها در فروشگاه تا چند دقیقه بعد از ذخیره به‌روز می‌شوند؛ سبد خرید و پرداخت همیشه آخرین وضعیت را دارند.</p>
+        </aside>
+      </div>
     </div>
   );
 }

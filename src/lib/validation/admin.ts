@@ -221,6 +221,76 @@ export const productImageSchema = z.object({
   isPrimary: checkbox,
 });
 
+/** Most photos accepted in one create-product request. */
+export const MAX_CREATE_PRODUCT_IMAGES = 12;
+
+const createImageRow = z.object({
+  url: z.string().trim().min(1, "آدرس تصویر را وارد کنید").max(2000),
+  altText: z.string().trim().min(1, "متن جایگزین (alt) همه‌ی تصاویر را وارد کنید").max(300),
+  color: z
+    .string()
+    .trim()
+    .max(60)
+    .nullish()
+    .transform((value) => (value ? value : null)),
+  isPrimary: z.boolean().optional().default(false),
+});
+
+export type CreateImageRow = { url: string; altText: string; color: string | null; displayOrder: number; isPrimary: boolean };
+
+/**
+ * Parses the `imagesJson` field of the staged "new product" form.
+ *
+ * - Array order becomes `displayOrder`.
+ * - Exactly one image ends up primary: the first one flagged, or the first
+ *   image when none is flagged.
+ * - A colour-scoped image must name one of `allowedColors` (the colours of the
+ *   variants created in the same request); otherwise it would be stored but
+ *   never shown.
+ */
+export function parseCreateImagesField(
+  raw: FormDataEntryValue | null,
+  allowedColors: readonly string[],
+): { ok: true; value: CreateImageRow[] } | { ok: false; error: string } {
+  if (raw === null || raw === undefined) return { ok: true, value: [] };
+  const text = String(raw).trim();
+  if (text === "" || text === "null" || text === "[]") return { ok: true, value: [] };
+  if (text.length > 100_000) return { ok: false, error: "اطلاعات تصاویر بیش از حد بزرگ است" };
+  let json: unknown;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    return { ok: false, error: "اطلاعات تصاویر معتبر نیست" };
+  }
+  const parsed = z
+    .array(createImageRow)
+    .max(MAX_CREATE_PRODUCT_IMAGES, `حداکثر ${MAX_CREATE_PRODUCT_IMAGES} تصویر در هر بار قابل ثبت است`)
+    .safeParse(json);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "اطلاعات تصاویر معتبر نیست" };
+
+  const allowed = new Set(allowedColors);
+  for (const row of parsed.data) {
+    if (row.color !== null && !allowed.has(row.color)) {
+      return { ok: false, error: "رنگ انتخاب‌شده برای یکی از تصاویر در انواع محصول وجود ندارد" };
+    }
+  }
+
+  const primaryIndex = Math.max(
+    0,
+    parsed.data.findIndex((row) => row.isPrimary),
+  );
+  return {
+    ok: true,
+    value: parsed.data.map((row, index) => ({
+      url: row.url,
+      altText: row.altText,
+      color: row.color,
+      displayOrder: index,
+      isPrimary: index === primaryIndex,
+    })),
+  };
+}
+
 // ---------------------------------------------------------------------
 // Product specifications (custom rows of the «مشخصات محصول» table)
 // ---------------------------------------------------------------------

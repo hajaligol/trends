@@ -30,9 +30,14 @@ const iconButtonClass =
 export function ProductSpecificationsEditor({
   productId,
   initialRows,
+  embedded = false,
 }: {
-  productId: string;
+  /** Omit when `embedded` (the product does not exist yet). */
+  productId?: string;
   initialRows: Array<{ label: string; value: string }>;
+  /** Render only the fields (no own `<form>`/save button) so a surrounding
+   * form — the staged new-product flow — submits them as `specLabel`/`specValue`. */
+  embedded?: boolean;
 }) {
   const nextKey = useRef(initialRows.length);
   const [rows, setRows] = useState<Row[]>(() => initialRows.map((row, index) => ({ key: index, ...row })));
@@ -59,12 +64,14 @@ export function ProductSpecificationsEditor({
     });
   }
 
-  const listId = `spec-labels-${productId}`;
+  const listId = `spec-labels-${productId ?? "new"}`;
+
+  const Wrapper = embedded ? "div" : "form";
+  const wrapperProps = embedded ? {} : { action: formAction };
 
   return (
-    <form action={formAction} className="flex flex-col gap-4">
-      <input type="hidden" name="productId" value={productId} />
-
+    <Wrapper {...wrapperProps} className="flex flex-col gap-4">
+      {!embedded && <input type="hidden" name="productId" value={productId} />}
 
       <datalist id={listId}>
         {AUTO_ROW_LABELS.map((label) => (
@@ -72,7 +79,7 @@ export function ProductSpecificationsEditor({
         ))}
       </datalist>
 
-      <FormAlert state={state} />
+      {!embedded && <FormAlert state={state} />}
 
       {rows.length === 0 ? (
         <p className="m-0 rounded-[var(--radius-md)] border border-dashed border-ink/15 px-4 py-8 text-center text-[0.86rem] text-text-secondary">
@@ -144,8 +151,8 @@ export function ProductSpecificationsEditor({
           <PlusIcon width={17} height={17} />
           افزودن ردیف
         </button>
-        <AdminSubmitButton>ذخیره جدول مشخصات</AdminSubmitButton>
+        {!embedded && <AdminSubmitButton>ذخیره جدول مشخصات</AdminSubmitButton>}
       </div>
-    </form>
+    </Wrapper>
   );
 }

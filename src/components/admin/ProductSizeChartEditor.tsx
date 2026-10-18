@@ -35,8 +35,13 @@ export function ProductSizeChartEditor({
   variantSizes,
   initialChart,
   initialNote,
+  embedded = false,
 }: {
-  productId: string;
+  /** Omit when `embedded` (the product does not exist yet). */
+  productId?: string;
+  /** Render only the fields (no own `<form>`/save button) so a surrounding
+   * form — the staged new-product flow — submits them. */
+  embedded?: boolean;
   /** The product's own variant sizes — used to pre-fill the size column. */
   variantSizes: string[];
   initialChart: Chart | null;
@@ -99,10 +104,13 @@ export function ProductSizeChartEditor({
     setPresetId("");
   }
 
+  const Wrapper = embedded ? "div" : "form";
+  const wrapperProps = embedded ? {} : { action: formAction };
+
   return (
-    <form action={formAction} className="flex flex-col gap-4">
-      <input type="hidden" name="productId" value={productId} />
-      <FormAlert state={state} />
+    <Wrapper {...wrapperProps} className="flex flex-col gap-4">
+      {!embedded && <input type="hidden" name="productId" value={productId} />}
+      {!embedded && <FormAlert state={state} />}
 
       <div className="flex flex-wrap items-center gap-2.5">
         <label htmlFor="size-chart-preset" className="text-[0.86rem] text-text-secondary">
@@ -220,8 +228,8 @@ export function ProductSizeChartEditor({
             </button>
           </>
         )}
-        <AdminSubmitButton>ذخیره جدول سایز</AdminSubmitButton>
+        {!embedded && <AdminSubmitButton>ذخیره جدول سایز</AdminSubmitButton>}
       </div>
-    </form>
+    </Wrapper>
   );
 }

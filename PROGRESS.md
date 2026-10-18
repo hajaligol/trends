@@ -1,5 +1,26 @@
 # Trends Progress Report
 
+## Latest change: staged (wizard) flows for «محصول جدید» and «کمپین جدید» (user-requested)
+Status: COMPLETE WITH FOLLOW-UP. `tsc` ✔, `eslint .` ✔, 290 unit tests ✔ (16 new in `tests/unit/staged-forms.test.ts`), `next build` compile + TypeScript ✔.
+**Not verified:** `next build` page-data step and DB-backed tests (no Postgres in the sandbox, `DATABASE_URL` unset), and both flows in a real browser — walk through each once.
+**No DB/migration changes.**
+
+**Shared kit** `components/admin/ui/wizard.tsx`: `useWizard` (step state, forward-only gating, focus moves to the stage heading), `WizardStepper` (accessible `<ol>`, `aria-current="step"`, compact on mobile), `WizardPanel`, `WizardFooter`, `ReviewRow`.
+All panels stay mounted (inactive ones `hidden`), so uncontrolled inputs keep values and one `<form>` still submits every stage. Moving forward runs that stage's validator; moving back never does. Validators are UX gates only — Server Actions re-validate.
+
+**New product** (8 stages, `components/admin/product-wizard/`): اطلاعات اصلی → دسته‌بندی و برند → سایز و رنگ (optional) → تصاویر (optional) → جدول مشخصات (optional) → جدول سایز (optional) → نمایش و سئو → مرور و ساخت.
+- **Specs + size chart at creation:** `ProductSpecificationsEditor` / `ProductSizeChartEditor` have an `embedded` prop (fields only, no own form/save button; same field names `specLabel`/`specValue`, `sizeChartColumn`/`sizeChartCell`/`sizeChartNote`). `createProductAction` parses them with the existing `productSpecificationsSchema` / `sizeChartSchema` and inserts via new `insertProductSpecifications` / `insertProductSizeChart` (executor-based, `domains/catalog/specifications.ts` / `size-chart.ts`) **inside the same transaction**; an empty size chart creates nothing. The size-chart stage sits after the variants stage so its size column pre-fills from the chosen sizes. Edit page still uses the standalone forms.
+- Images can now be added **at creation** (previously only after, on the edit page). `createProductAction` accepts `imagesJson`, parsed by `parseCreateImagesField` (`lib/validation/admin.ts`): max 12, alt text required, array order = `displayOrder`, exactly one primary (first flagged, else first), a colour-scoped image must name a colour of the variants created in the same request. Product + variants + images are inserted in **one transaction**; audit log gets `imagesCreated`.
+- Enter in a text input no longer submits; only the last stage can save. Review stage warns (non-blocking) when there are no variants/images or the product is inactive.
+- `ProductForm` create path now delegates to `ProductCreateWizard`; `TitleAndSlug` moved to `ProductTitleAndSlug.tsx`. `VariantMatrixBuilder` got an optional `onSummaryChange` prop (colour names, row count, incomplete flag). Edit page is unchanged.
+
+**New campaign** (6 stages, `components/admin/campaign/`): نام و نوع → تنظیمات تخفیف → محصولات مشمول → زمان‌بندی و قوانین → صفحه اصلی → مرور و ایجاد. Gates in `campaign/steps.ts` (name; discount config parses; at least one target or whole store; end after start and countdown needs an end; hero/banner needs an image).
+- The live summary + effect preview sidebar stays visible on every stage. **Edit mode** uses the same component with free navigation between stages and a Save button always in the footer; Save re-checks all stages and jumps to the first failing one.
+- `saveCampaignAction` unchanged. The old single-page `Step` cards and sidebar Save button were removed.
+
+**Not done / notes:** product edit page left as-is (not requested); no draft persistence — leaving the page loses an unsaved wizard; images uploaded in an abandoned wizard stay in the media folder (same as before for abandoned uploads).
+
+---
 ## Latest change: search + filters on 8 admin lists (user-requested)
 Status: COMPLETE. `tsc` ✔, `eslint .` ✔, 274 unit tests ✔ (22 new in `tests/unit/admin-list-filters.test.ts`), `npm run build` ✔,
 4 new integration tests ✔ (`tests/integration/admin-list-filters.test.ts`, real Postgres 16, migrations 0000→0021 applied to a scratch DB).

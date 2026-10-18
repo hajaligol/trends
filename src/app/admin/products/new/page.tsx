@@ -14,7 +14,7 @@ export default async function NewProductPage() {
         title="محصول جدید"
         backHref="/admin/products"
         backLabel="بازگشت به محصولات"
-        description="اطلاعات اصلی را وارد کنید و در صورت تمایل چند سایز و رنگ را یکجا انتخاب کنید. تصاویر محصول را پس از ساخت در صفحه ویرایش اضافه می‌کنید."
+        description="در هشت مرحله: اطلاعات اصلی، دسته‌بندی و برند، سایز و رنگ، تصاویر، جدول مشخصات، جدول سایز، نمایش و سئو، و در پایان مرور و ساخت."
       />
       <ProductForm categoryNodes={categoryNodes} brandOptions={brandOptions} />
     </div>
