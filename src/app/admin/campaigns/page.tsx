@@ -1,9 +1,36 @@
 import Link from "next/link";
 import { listCampaignsForAdmin } from "@/domains/campaigns/admin-queries";
 import { campaignStatus, STATUS_LABEL, type CampaignStatus } from "@/domains/campaigns/status";
+import {
+  countCampaignsByStatus,
+  filterCampaigns,
+  filterCampaignsIgnoringStatus,
+  isCampaignFilterActive,
+  parseCampaignFilter,
+} from "@/domains/campaigns/admin-filter";
+import type { RawParam } from "@/lib/utils/admin-filters";
 import { KIND_META } from "@/domains/campaigns/labels";
 import { CampaignActiveToggle, DeleteCampaignButton, DuplicateCampaignButton } from "@/components/admin/campaign/CampaignRowActions";
-import { adminButton, EmptyState, formatDateTime, PageHeader, StatusBadge, TABLE, TableCard, TD, TD_MUTED, TH, THEAD, TR, type Tone } from "@/components/admin/ui/layout";
+import {
+  adminButton,
+  buildHref,
+  EmptyState,
+  FilterBar,
+  FilterTabs,
+  formatDateTime,
+  PageHeader,
+  SearchField,
+  SelectFilter,
+  StatusBadge,
+  TABLE,
+  TableCard,
+  TD,
+  TD_MUTED,
+  TH,
+  THEAD,
+  TR,
+  type Tone,
+} from "@/components/admin/ui/layout";
 import { PlusIcon } from "@/components/admin/ui/icons";
 import { formatToman } from "@/lib/utils/money";
 import { toPersianDigits } from "@/lib/utils/persian-digits";
@@ -23,9 +50,21 @@ function scopeText(item: Awaited<ReturnType<typeof listCampaignsForAdmin>>[numbe
   return parts.join("، ") || "—";
 }
 
-export default async function AdminCampaignsPage() {
-  const items = await listCampaignsForAdmin();
+const STATUS_ORDER: CampaignStatus[] = ["live", "scheduled", "paused", "ended"];
+
+export default async function AdminCampaignsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: RawParam; status?: RawParam; kind?: RawParam; home?: RawParam }>;
+}) {
+  const filter = parseCampaignFilter(await searchParams);
+  const allItems = await listCampaignsForAdmin();
   const now = new Date();
+  const items = filterCampaigns(allItems, filter, now);
+  const isFiltered = isCampaignFilterActive(filter);
+  // Tab counts respect the search/kind/placement filters but not the status itself.
+  const statusCounts = countCampaignsByStatus(filterCampaignsIgnoringStatus(allItems, filter), now);
+  const tabHref = (status?: CampaignStatus) => buildHref("/admin/campaigns", { q: filter.q, kind: filter.kind, home: filter.home, status });
 
   return (
     <div className="flex flex-col gap-6">
@@ -40,7 +79,37 @@ export default async function AdminCampaignsPage() {
         }
       />
 
-      {items.length === 0 ? (
+      {allItems.length > 0 && (
+        <>
+          <FilterTabs
+            items={[
+              { label: "همه", href: tabHref(), active: !filter.status, count: STATUS_ORDER.reduce((sum, key) => sum + statusCounts[key], 0) },
+              ...STATUS_ORDER.map((key) => ({ label: STATUS_LABEL[key], href: tabHref(key), active: filter.status === key, count: statusCounts[key] })),
+            ]}
+          />
+          <FilterBar resetHref="/admin/campaigns" isFiltered={isFiltered} submitLabel="جستجو">
+            {filter.status && <input type="hidden" name="status" value={filter.status} />}
+            <SearchField defaultValue={filter.q} placeholder="جستجوی نام، نوع یا توضیح کمپین..." />
+            <SelectFilter name="kind" label="نوع کمپین" defaultValue={filter.kind}>
+              <option value="">همه نوع‌ها</option>
+              {(Object.keys(KIND_META) as Array<keyof typeof KIND_META>).map((kind) => (
+                <option key={kind} value={kind}>
+                  {KIND_META[kind].title}
+                </option>
+              ))}
+            </SelectFilter>
+            <SelectFilter name="home" label="صفحه اصلی" defaultValue={filter.home}>
+              <option value="">همه</option>
+              <option value="hero">اسلاید اصلی</option>
+              <option value="banner">بنر تبلیغاتی</option>
+              <option value="none">بدون نمایش</option>
+            </SelectFilter>
+          </FilterBar>
+          {isFiltered && <p className="m-0 text-[0.82rem] text-text-secondary">{toPersianDigits(items.length)} کمپین مطابق فیلتر</p>}
+        </>
+      )}
+
+      {allItems.length === 0 ? (
         <EmptyState
           title="هنوز کمپینی ساخته نشده است"
           description="اولین کمپین خود را بسازید: تخفیف درصدی، «۲ بخر ۱ رایگان بگیر»، ارسال رایگان و…"
@@ -50,6 +119,8 @@ export default async function AdminCampaignsPage() {
             </Link>
           }
         />
+      ) : items.length === 0 ? (
+        <EmptyState title="کمپینی مطابق این فیلتر پیدا نشد" description="عبارت جستجو یا فیلترها را تغییر دهید." />
       ) : (
         <TableCard>
           <table className={`${TABLE} min-w-[980px]`}>

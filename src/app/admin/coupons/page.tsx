@@ -1,16 +1,56 @@
 import Link from "next/link";
 import { listCouponsForAdmin } from "@/domains/promotions/admin-queries";
+import {
+  COUPON_VALIDITY_LABELS,
+  countCouponsByValidity,
+  couponValidity,
+  filterCoupons,
+  filterCouponsIgnoringValidity,
+  isCouponFilterActive,
+  parseCouponFilter,
+  type CouponValidity,
+} from "@/domains/promotions/admin-filter";
+import type { RawParam } from "@/lib/utils/admin-filters";
 import { CouponActiveToggle } from "@/components/admin/CouponActiveToggle";
 import { formatToman } from "@/lib/utils/money";
 import { toPersianDigits } from "@/lib/utils/persian-digits";
-import { adminButton, EmptyState, PageHeader, StatusBadge, TABLE, TD, TD_MUTED, TableCard, TH, THEAD, TR } from "@/components/admin/ui/layout";
+import {
+  adminButton,
+  buildHref,
+  EmptyState,
+  FilterBar,
+  FilterTabs,
+  PageHeader,
+  SearchField,
+  SelectFilter,
+  StatusBadge,
+  TABLE,
+  TD,
+  TD_MUTED,
+  TableCard,
+  TH,
+  THEAD,
+  TR,
+} from "@/components/admin/ui/layout";
 import { PencilIcon, PlusIcon, TicketIcon } from "@/components/admin/ui/icons";
 
 export const metadata = { title: "کدهای تخفیف", robots: { index: false, follow: false } };
 
-export default async function AdminCouponsPage() {
-  const coupons = await listCouponsForAdmin();
+const VALIDITY_ORDER: CouponValidity[] = ["valid", "not_started", "expired", "exhausted"];
+const VALIDITY_TONES = { valid: "success", not_started: "info", expired: "danger", exhausted: "warning" } as const;
+
+export default async function AdminCouponsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: RawParam; validity?: RawParam; active?: RawParam; type?: RawParam }>;
+}) {
+  const filter = parseCouponFilter(await searchParams);
+  const allCoupons = await listCouponsForAdmin();
   const now = new Date();
+  const coupons = filterCoupons(allCoupons, filter, now);
+  const isFiltered = isCouponFilterActive(filter);
+  const validityCounts = countCouponsByValidity(filterCouponsIgnoringValidity(allCoupons, filter), now);
+  const tabHref = (validity?: CouponValidity) => buildHref("/admin/coupons", { q: filter.q, active: filter.active, type: filter.type, validity });
 
   return (
     <div className="flex flex-col gap-5">
@@ -25,7 +65,38 @@ export default async function AdminCouponsPage() {
         }
       />
 
-      {coupons.length === 0 ? (
+      {allCoupons.length > 0 && (
+        <>
+          <FilterTabs
+            items={[
+              { label: "همه", href: tabHref(), active: !filter.validity, count: VALIDITY_ORDER.reduce((sum, key) => sum + validityCounts[key], 0) },
+              ...VALIDITY_ORDER.map((key) => ({
+                label: COUPON_VALIDITY_LABELS[key],
+                href: tabHref(key),
+                active: filter.validity === key,
+                count: validityCounts[key],
+              })),
+            ]}
+          />
+          <FilterBar resetHref="/admin/coupons" isFiltered={isFiltered} submitLabel="جستجو">
+            {filter.validity && <input type="hidden" name="validity" value={filter.validity} />}
+            <SearchField defaultValue={filter.q} placeholder="جستجوی کد تخفیف..." />
+            <SelectFilter name="type" label="نوع تخفیف" defaultValue={filter.type}>
+              <option value="">همه</option>
+              <option value="percentage">درصدی</option>
+              <option value="fixed">مبلغ ثابت</option>
+            </SelectFilter>
+            <SelectFilter name="active" label="وضعیت فعال‌سازی" defaultValue={filter.active}>
+              <option value="">همه</option>
+              <option value="on">فعال</option>
+              <option value="off">غیرفعال</option>
+            </SelectFilter>
+          </FilterBar>
+          {isFiltered && <p className="m-0 text-[0.82rem] text-text-secondary">{toPersianDigits(coupons.length)} کد مطابق فیلتر</p>}
+        </>
+      )}
+
+      {allCoupons.length === 0 ? (
         <EmptyState
           icon={<TicketIcon width={26} height={26} />}
           title="هنوز کد تخفیفی ساخته نشده است"
@@ -37,6 +108,8 @@ export default async function AdminCouponsPage() {
             </Link>
           }
         />
+      ) : coupons.length === 0 ? (
+        <EmptyState icon={<TicketIcon width={26} height={26} />} title="کدی مطابق این فیلتر پیدا نشد" description="عبارت جستجو یا فیلترها را تغییر دهید." />
       ) : (
         <TableCard>
           <table className={`${TABLE} min-w-[780px]`}>
@@ -55,9 +128,7 @@ export default async function AdminCouponsPage() {
             </thead>
             <tbody>
               {coupons.map((coupon) => {
-                const expired = coupon.endsAt !== null && coupon.endsAt < now;
-                const notStarted = coupon.startsAt !== null && coupon.startsAt > now;
-                const exhausted = coupon.usageLimit !== null && coupon.redemptionCount >= coupon.usageLimit;
+                const validity = couponValidity(coupon, now);
                 return (
                   <tr key={coupon.id} className={TR}>
                     <td className={TD}>
@@ -74,15 +145,7 @@ export default async function AdminCouponsPage() {
                       {coupon.usageLimit ? <span className="text-text-secondary"> / {toPersianDigits(coupon.usageLimit)}</span> : null}
                     </td>
                     <td className={TD}>
-                      {expired ? (
-                        <StatusBadge tone="danger">منقضی‌شده</StatusBadge>
-                      ) : exhausted ? (
-                        <StatusBadge tone="warning">سقف پر شده</StatusBadge>
-                      ) : notStarted ? (
-                        <StatusBadge tone="info">شروع نشده</StatusBadge>
-                      ) : (
-                        <StatusBadge tone="success">معتبر</StatusBadge>
-                      )}
+                      <StatusBadge tone={VALIDITY_TONES[validity]}>{COUPON_VALIDITY_LABELS[validity]}</StatusBadge>
                     </td>
                     <td className={TD}>
                       <CouponActiveToggle couponId={coupon.id} isActive={coupon.isActive} />

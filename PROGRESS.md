@@ -1,5 +1,36 @@
 # Trends Progress Report
 
+## Latest change: search + filters on 8 admin lists (user-requested)
+Status: COMPLETE. `tsc` ✔, `eslint .` ✔, 274 unit tests ✔ (22 new in `tests/unit/admin-list-filters.test.ts`), `npm run build` ✔,
+4 new integration tests ✔ (`tests/integration/admin-list-filters.test.ts`, real Postgres 16, migrations 0000→0021 applied to a scratch DB).
+**Not verified:** the pages in a real browser (no browser in the sandbox; admin routes need a login) — open each list once and try a search + a date range.
+**No DB/migration changes.** All filters are GET forms (shareable URLs, back-button safe), same `FilterBar`/`FilterTabs`/`Pagination` kit orders/customers already used.
+
+| Page | Search | Filters |
+|---|---|---|
+| `/admin/campaigns` | name, slug, description, kind, summary | status tabs (with counts), kind, homepage placement |
+| `/admin/coupons` | code | validity tabs (valid / not started / expired / exhausted, with counts), type, active/inactive |
+| `/admin/categories` | name, slug, parent | level (مخاطب/گروه/نوع), active/inactive, has/no products |
+| `/admin/brands` | Persian name, English name, slug, country | active/inactive tabs (counts), country, has/no products |
+| `/admin/inventory` | product title, SKU, size, color, product code | stock-state tabs (out / low / in, with counts), brand, category (incl. subtree) |
+| `/admin/reviews` | user (name/email/mobile), product (title/slug/code), review text | status tabs (kept), date range |
+| `/admin/support` | user (sender name/email/mobile **or** linked account), subject/message text | unresolved tab (kept), date range |
+| `/admin/newsletter` | email | active / unsubscribed tabs (counts), subscription date range |
+
+- **Where filtering happens:** reviews, support, newsletter, inventory filter + paginate **in SQL** (they can grow). Campaigns, coupons, categories, brands are small curated lists
+  with *derived* statuses (campaign live/ended, coupon valid/exhausted), so they filter the already-loaded list in memory via pure functions in `domains/*/admin-filter.ts` — one definition of each status.
+  If coupons/brands ever reach thousands, move those to SQL + pagination.
+- **Shared helpers:** `lib/utils/admin-filters.ts` (`normalizeSearchText`: Persian/Arabic digits → ASCII, ي/ك → ی/ک; `escapeLike`/`containsPattern`: `%`/`_` match literally; `mobileSearchDigits`: `0912…`/`+98912…` all match the stored `+98912…`;
+  date-range sanitising), `domains/admin/search-conditions.ts` (user/product SQL fragments), `tehranDayStart`/`tehranDayEndExclusive` in `lib/utils/tehran-time.ts`.
+- **Dates:** `<input type="date">` values are Tehran calendar days; "to" is inclusive (converted to the next Tehran midnight, exclusive); a reversed range is swapped; invalid dates are ignored. The browser decides how the date picker is displayed.
+- **Inventory behaviour change:** `/admin/inventory` used to list only low-stock variants (`listLowStockVariants`, now unused but left in place). It now lists **all active variants**, lowest stock first, so the old "needs restocking" view is the «ناموجود» + «رو به اتمام» tabs.
+  «رو به اتمام» means stock > 0 and ≤ the variant's own threshold; «ناموجود» is exactly 0.
+- **Categories:** matches keep their ancestors (so groups keep their audience header) and every group opens while a filter is active; the result line says how many rows are real matches.
+- `FilterBar` now aligns items to the bottom (`items-end`) so labelled fields line up with the button; new helpers `FilterField`, `TextFilter`, `SelectFilter`, `DateRangeFields` in `components/admin/ui/layout.tsx`.
+- **Not done (not requested):** no pagination added to campaigns/coupons/categories/brands; no export of filtered results; no filter on rating in reviews.
+
+---
+
 ## Latest change: admin replies to product reviews (user-requested)
 Status: COMPLETE. `tsc` ✔, `eslint .` ✔, 251 unit tests ✔ (3 new in `tests/unit/review-reply-validation.test.ts`), `npm run build` ✔,
 fresh-DB `drizzle-kit migrate` (0000→0021) ✔ on Postgres 16, query-level smoke test ✔ (reply saved → returned by the public + admin queries; empty reply rejected by CHECK).

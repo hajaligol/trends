@@ -1,7 +1,21 @@
 import { listSupportMessagesForAdmin } from "@/domains/support/queries";
 import { SupportMessageResolvedToggle } from "@/components/admin/SupportMessageResolvedToggle";
+import { firstParam, normalizeSearchText, sanitizeDateRange, type RawParam } from "@/lib/utils/admin-filters";
 import { toPersianDigits } from "@/lib/utils/persian-digits";
-import { Avatar, buildHref, EmptyState, FilterTabs, formatDateTime, PageHeader, Pagination, StatusBadge } from "@/components/admin/ui/layout";
+import {
+  Avatar,
+  buildHref,
+  DateRangeFields,
+  EmptyState,
+  FilterBar,
+  FilterTabs,
+  formatDateTime,
+  PageHeader,
+  Pagination,
+  SearchField,
+  StatusBadge,
+  TextFilter,
+} from "@/components/admin/ui/layout";
 import { MailIcon, MessageIcon } from "@/components/admin/ui/icons";
 
 export const metadata = { title: "پیام‌های پشتیبانی", robots: { index: false, follow: false } };
@@ -9,12 +23,17 @@ export const metadata = { title: "پیام‌های پشتیبانی", robots: {
 export default async function AdminSupportPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string; unresolved?: string }>;
+  searchParams: Promise<{ page?: RawParam; unresolved?: RawParam; user?: RawParam; q?: RawParam; from?: RawParam; to?: RawParam }>;
 }) {
   const params = await searchParams;
-  const page = Number(params.page ?? "1") || 1;
-  const onlyUnresolved = params.unresolved === "1";
-  const messagePage = await listSupportMessagesForAdmin({ page, onlyUnresolved });
+  const page = Number(firstParam(params.page) ?? "1") || 1;
+  const onlyUnresolved = firstParam(params.unresolved) === "1";
+  const user = normalizeSearchText(params.user);
+  const q = normalizeSearchText(params.q);
+  const dateRange = sanitizeDateRange(params.from, params.to);
+  const isFiltered = Boolean(user || q || dateRange.from || dateRange.to);
+  const carried = { user, q, from: dateRange.from, to: dateRange.to };
+  const messagePage = await listSupportMessagesForAdmin({ page, onlyUnresolved, user, q, dateRange });
   const totalPages = Math.max(1, Math.ceil(messagePage.total / messagePage.pageSize));
 
   return (
@@ -26,16 +45,25 @@ export default async function AdminSupportPage({
 
       <FilterTabs
         items={[
-          { label: "همه", href: buildHref("/admin/support"), active: !onlyUnresolved },
-          { label: "فقط بدون پاسخ", href: buildHref("/admin/support", { unresolved: "1" }), active: onlyUnresolved },
+          { label: "همه", href: buildHref("/admin/support", carried), active: !onlyUnresolved },
+          { label: "فقط بدون پاسخ", href: buildHref("/admin/support", { ...carried, unresolved: "1" }), active: onlyUnresolved },
         ]}
       />
+
+      <FilterBar resetHref={onlyUnresolved ? "/admin/support?unresolved=1" : "/admin/support"} isFiltered={isFiltered} submitLabel="جستجو">
+        {onlyUnresolved && <input type="hidden" name="unresolved" value="1" />}
+        <TextFilter name="user" label="کاربر" defaultValue={user} placeholder="نام، ایمیل یا موبایل فرستنده" />
+        <DateRangeFields from={dateRange.from} to={dateRange.to} />
+        <div className="min-w-[200px] flex-1">
+          <SearchField defaultValue={q} placeholder="جستجو در موضوع و متن پیام..." />
+        </div>
+      </FilterBar>
 
       {messagePage.rows.length === 0 ? (
         <EmptyState
           icon={<MessageIcon width={26} height={26} />}
-          title={onlyUnresolved ? "پیام بی‌پاسخی وجود ندارد" : "هنوز پیامی دریافت نشده است"}
-          description={onlyUnresolved ? "همه پیام‌ها حل شده‌اند." : undefined}
+          title={isFiltered ? "پیامی مطابق این فیلتر پیدا نشد" : onlyUnresolved ? "پیام بی‌پاسخی وجود ندارد" : "هنوز پیامی دریافت نشده است"}
+          description={isFiltered ? "عبارت جستجو یا بازه تاریخ را تغییر دهید." : onlyUnresolved ? "همه پیام‌ها حل شده‌اند." : undefined}
         />
       ) : (
         <ul className="m-0 flex list-none flex-col gap-4 p-0">
@@ -87,7 +115,7 @@ export default async function AdminSupportPage({
 
       <Pagination
         pathname="/admin/support"
-        params={{ unresolved: onlyUnresolved ? "1" : undefined }}
+        params={{ unresolved: onlyUnresolved ? "1" : undefined, ...carried }}
         page={page}
         totalPages={totalPages}
         total={messagePage.total}

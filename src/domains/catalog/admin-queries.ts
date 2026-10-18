@@ -1,5 +1,6 @@
 import { and, asc, count, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import { toLatinDigits } from "@/lib/utils/digits";
+import { containsPattern } from "@/lib/utils/admin-filters";
 import { db } from "@/lib/db/client";
 import { brands, categories, productImages, productVariants, products } from "@/lib/db/schema";
 import type { Product, ProductImage, ProductVariant } from "@/lib/db/schema";
@@ -205,4 +206,113 @@ export async function listLowStockVariants(): Promise<LowStockRow[]> {
     .where(and(eq(productVariants.isActive, true), sql`${productVariants.stock} <= ${productVariants.lowStockThreshold}`))
     .orderBy(asc(productVariants.stock));
   return rows;
+}
+
+
+/* ------------------------------------------------------------------ */
+/* Inventory screen: every variant, filterable                         */
+/* ------------------------------------------------------------------ */
+
+export type StockState = "low" | "out" | "in";
+
+export type StockListFilter = {
+  /** Product title / SKU / size / color / product code (already normalised). */
+  q?: string;
+  /** `low` = in stock but at/below its own threshold, `out` = 0, `in` = above threshold. */
+  stock?: StockState;
+  brandId?: string;
+  /** Includes everything beneath the category. */
+  categoryId?: string;
+  page?: number;
+  pageSize?: number;
+};
+
+export type StockListPage = {
+  rows: LowStockRow[];
+  page: number;
+  pageSize: number;
+  /** Rows matching every filter. */
+  total: number;
+  /** Counts for the stock-state tabs: every filter except `stock`. */
+  counts: { all: number; low: number; out: number; in: number };
+};
+
+/**
+ * Active variants with their stock, for `/admin/inventory`. Replaces the old
+ * "low stock only" list: the same rows come first (ordered by stock
+ * ascending), but an operator can now search any variant and filter by
+ * stock state, brand and category. Filtering and paging happen in SQL.
+ */
+export async function listVariantStockForAdmin({
+  q,
+  stock,
+  brandId,
+  categoryId,
+  page = 1,
+  pageSize = 20,
+}: StockListFilter = {}): Promise<StockListPage> {
+  const safePage = Math.max(1, page);
+  const safePageSize = Math.min(100, Math.max(1, pageSize));
+
+  const categoryIds = categoryId ? await getCategorySubtreeIds(categoryId) : undefined;
+
+  const base = [
+    eq(productVariants.isActive, true),
+    brandId ? eq(products.brandId, brandId) : undefined,
+    // A category id that doesn't exist yields an empty subtree → no rows.
+    categoryIds ? (categoryIds.length > 0 ? inArray(products.categoryId, categoryIds) : sql`false`) : undefined,
+    q
+      ? or(
+          ilike(products.title, containsPattern(q)),
+          ilike(productVariants.sku, containsPattern(q)),
+          ilike(productVariants.size, containsPattern(q)),
+          ilike(productVariants.color, containsPattern(q)),
+          /^\d{1,9}$/.test(q) ? sql`${products.productCode} = ${Number(q)}` : undefined,
+        )
+      : undefined,
+  ];
+
+  const stockClause = {
+    out: sql`${productVariants.stock} = 0`,
+    low: sql`${productVariants.stock} > 0 AND ${productVariants.stock} <= ${productVariants.lowStockThreshold}`,
+    in: sql`${productVariants.stock} > ${productVariants.lowStockThreshold}`,
+  } satisfies Record<StockState, ReturnType<typeof sql>>;
+
+  const where = and(...base, stock ? stockClause[stock] : undefined);
+
+  const [rows, totals] = await Promise.all([
+    db
+      .select({
+        variantId: productVariants.id,
+        productId: products.id,
+        productTitle: products.title,
+        productSlug: products.slug,
+        sku: productVariants.sku,
+        size: productVariants.size,
+        color: productVariants.color,
+        stock: productVariants.stock,
+        lowStockThreshold: productVariants.lowStockThreshold,
+      })
+      .from(productVariants)
+      .innerJoin(products, eq(productVariants.productId, products.id))
+      .where(where)
+      // Lowest stock first (out-of-stock on top), then stable by title/sku.
+      .orderBy(asc(productVariants.stock), asc(products.title), asc(productVariants.sku))
+      .limit(safePageSize)
+      .offset((safePage - 1) * safePageSize),
+    db
+      .select({
+        all: count(),
+        out: sql<number>`count(*) filter (where ${stockClause.out})::int`,
+        low: sql<number>`count(*) filter (where ${stockClause.low})::int`,
+        in: sql<number>`count(*) filter (where ${stockClause.in})::int`,
+      })
+      .from(productVariants)
+      .innerJoin(products, eq(productVariants.productId, products.id))
+      .where(and(...base)),
+  ]);
+
+  const counts = totals[0] ?? { all: 0, out: 0, low: 0, in: 0 };
+  const total = stock ? counts[stock] : counts.all;
+  return { rows, page: safePage, pageSize: safePageSize, total, counts: { all: counts.all, low: counts.low, out: counts.out, in: counts.in } };
 }

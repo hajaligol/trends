@@ -1,44 +1,105 @@
 import Link from "next/link";
-import { listLowStockVariants } from "@/domains/catalog/admin-queries";
+import { listVariantStockForAdmin, type StockState } from "@/domains/catalog/admin-queries";
+import { listBrandsForAdmin } from "@/domains/brands/queries";
+import { listCategoryOptions } from "@/domains/categories/queries";
 import { StockAdjustForm } from "@/components/admin/StockAdjustForm";
+import { firstParam, normalizeSearchText, type RawParam } from "@/lib/utils/admin-filters";
 import { toPersianDigits } from "@/lib/utils/persian-digits";
-import { EmptyState, PageHeader, StatusBadge } from "@/components/admin/ui/layout";
+import { buildHref, EmptyState, FilterBar, FilterTabs, PageHeader, Pagination, SearchField, SelectFilter, StatusBadge } from "@/components/admin/ui/layout";
 import { CheckCircleIcon } from "@/components/admin/ui/icons";
 
 export const metadata = { title: "موجودی", robots: { index: false, follow: false } };
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const STOCK_STATES: StockState[] = ["out", "low", "in"];
+
 /**
- * Shows every active variant at or below its own low-stock threshold
- * (TRENDS_PROJECT_CONTEXT.md §6 "low-stock threshold", "out-of-stock
- * handling") with an inline adjustment form — see
- * `src/domains/inventory/actions.ts`'s header comment for why this is a
- * single audited delta-adjustment rather than a full movement ledger
- * table. Out-of-stock rows come first (the query orders by stock asc).
+ * Every active variant with its stock, lowest first (out-of-stock on top),
+ * searchable by product / SKU / size / color / product code and filterable by
+ * stock state, brand and category (see `listVariantStockForAdmin`). Each row
+ * keeps the inline adjustment form — see `src/domains/inventory/actions.ts`'s
+ * header comment for why this is a single audited delta-adjustment rather
+ * than a full movement ledger table.
  */
-export default async function AdminInventoryPage() {
-  const rows = await listLowStockVariants();
-  const outOfStock = rows.filter((row) => row.stock === 0).length;
+export default async function AdminInventoryPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: RawParam; stock?: RawParam; brand?: RawParam; category?: RawParam; page?: RawParam }>;
+}) {
+  const params = await searchParams;
+  const q = normalizeSearchText(params.q);
+  const stockParam = firstParam(params.stock);
+  const stock = STOCK_STATES.find((state) => state === stockParam);
+  const brandParam = firstParam(params.brand);
+  const brandId = brandParam && UUID.test(brandParam) ? brandParam : undefined;
+  const categoryParam = firstParam(params.category);
+  const categoryId = categoryParam && UUID.test(categoryParam) ? categoryParam : undefined;
+  const page = Number(firstParam(params.page) ?? "1") || 1;
+
+  const [result, brandOptions, categoryOptions] = await Promise.all([
+    listVariantStockForAdmin({ q, stock, brandId, categoryId, page }),
+    listBrandsForAdmin(),
+    listCategoryOptions(),
+  ]);
+  const totalPages = Math.max(1, Math.ceil(result.total / result.pageSize));
+  const isFiltered = Boolean(q || brandId || categoryId);
+  const anyFilter = isFiltered || Boolean(stock);
+
+  const tabHref = (value?: StockState) => buildHref("/admin/inventory", { q, brand: brandId, category: categoryId, stock: value });
 
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
         title="موجودی"
-        description={
-          rows.length === 0
-            ? "کالاهایی که موجودی‌شان به آستانه کمبود برسد، اینجا نمایش داده می‌شوند."
-            : `${toPersianDigits(rows.length)} نوع کالا رو به اتمام است${outOfStock > 0 ? ` که ${toPersianDigits(outOfStock)} مورد کاملاً ناموجود است` : ""}. موجودی را همین‌جا اصلاح کنید؛ هر تغییر در گزارش فعالیت‌ها ثبت می‌شود.`
-        }
+        description={`${toPersianDigits(result.counts.all)} نوع کالای فعال${isFiltered ? " مطابق جستجو" : ""}${
+          result.counts.out > 0 ? `، ${toPersianDigits(result.counts.out)} مورد ناموجود` : ""
+        }${result.counts.low > 0 ? ` و ${toPersianDigits(result.counts.low)} مورد رو به اتمام` : ""}. موجودی را همین‌جا اصلاح کنید؛ هر تغییر در گزارش فعالیت‌ها ثبت می‌شود.`}
       />
 
-      {rows.length === 0 ? (
-        <EmptyState
-          icon={<CheckCircleIcon width={28} height={28} />}
-          title="موجودی همه کالاها کافی است"
-          description="در حال حاضر هیچ کالای فعالی به آستانه کمبود موجودی نرسیده است."
-        />
+      <FilterTabs
+        items={[
+          { label: "همه", href: tabHref(), active: !stock, count: result.counts.all },
+          { label: "ناموجود", href: tabHref("out"), active: stock === "out", count: result.counts.out },
+          { label: "رو به اتمام", href: tabHref("low"), active: stock === "low", count: result.counts.low },
+          { label: "موجود", href: tabHref("in"), active: stock === "in", count: result.counts.in },
+        ]}
+      />
+
+      <FilterBar resetHref="/admin/inventory" isFiltered={anyFilter} submitLabel="جستجو">
+        {stock && <input type="hidden" name="stock" value={stock} />}
+        <SearchField defaultValue={q} placeholder="جستجوی محصول، کد کالا، SKU، سایز یا رنگ..." />
+        <SelectFilter name="brand" label="برند" defaultValue={brandId}>
+          <option value="">همه برندها</option>
+          {brandOptions.map((brand) => (
+            <option key={brand.id} value={brand.id}>
+              {brand.name}
+              {brand.isActive ? "" : " (غیرفعال)"}
+            </option>
+          ))}
+        </SelectFilter>
+        <SelectFilter name="category" label="دسته‌بندی" defaultValue={categoryId}>
+          <option value="">همه دسته‌ها</option>
+          {categoryOptions.map((category) => (
+            <option key={category.id} value={category.id}>
+              {category.name}
+            </option>
+          ))}
+        </SelectFilter>
+      </FilterBar>
+
+      {result.rows.length === 0 ? (
+        anyFilter ? (
+          <EmptyState title="کالایی مطابق این فیلتر پیدا نشد" description="عبارت جستجو یا فیلترها را تغییر دهید." />
+        ) : (
+          <EmptyState
+            icon={<CheckCircleIcon width={28} height={28} />}
+            title="هنوز کالایی ثبت نشده است"
+            description="پس از افزودن محصول و تنوع‌های آن، موجودی هر تنوع اینجا نمایش داده می‌شود."
+          />
+        )
       ) : (
         <ul className="m-0 flex list-none flex-col gap-4 p-0">
-          {rows.map((row) => (
+          {result.rows.map((row) => (
             <li
               key={row.variantId}
               className={`flex flex-col gap-4 rounded-[var(--radius-lg)] border bg-white p-5 lg:flex-row lg:items-start lg:justify-between ${
@@ -58,8 +119,10 @@ export default async function AdminInventoryPage() {
                 <div className="flex flex-wrap items-center gap-2">
                   {row.stock === 0 ? (
                     <StatusBadge tone="danger">ناموجود</StatusBadge>
-                  ) : (
+                  ) : row.stock <= row.lowStockThreshold ? (
                     <StatusBadge tone="warning">موجودی: {toPersianDigits(row.stock)}</StatusBadge>
+                  ) : (
+                    <StatusBadge tone="success">موجودی: {toPersianDigits(row.stock)}</StatusBadge>
                   )}
                   <span className="text-[0.76rem] text-text-secondary">آستانه: {toPersianDigits(row.lowStockThreshold)}</span>
                 </div>
@@ -71,6 +134,15 @@ export default async function AdminInventoryPage() {
           ))}
         </ul>
       )}
+
+      <Pagination
+        pathname="/admin/inventory"
+        params={{ q, stock, brand: brandId, category: categoryId }}
+        page={page}
+        totalPages={totalPages}
+        total={result.total}
+        pageSize={result.pageSize}
+      />
     </div>
   );
 }

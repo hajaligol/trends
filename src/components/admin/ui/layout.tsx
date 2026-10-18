@@ -278,6 +278,8 @@ const CONTROL_BASE =
  * element conflict, so the width is never baked into the shared base. */
 const CONTROL = `w-full ${CONTROL_BASE}`;
 export const ADMIN_CONTROL = CONTROL;
+/** Same look without a width, for inline filter controls. */
+export const ADMIN_CONTROL_INLINE = CONTROL_BASE;
 
 /**
  * GET form wrapper for list filters. Submitting reloads the page with the
@@ -295,7 +297,7 @@ export function FilterBar({
   submitLabel?: string;
 }) {
   return (
-    <form method="get" className="flex flex-wrap items-center gap-3 rounded-[var(--radius-lg)] border border-line bg-white p-3">
+    <form method="get" className="flex flex-wrap items-end gap-3 rounded-[var(--radius-lg)] border border-line bg-white p-3">
       {children}
       <button type="submit" className={adminButton("primary", "md")}>
         {submitLabel}
@@ -340,6 +342,72 @@ export function SelectInput({
     <select name={name} defaultValue={defaultValue} aria-label={label} className={`${CONTROL_BASE} min-w-[170px]`}>
       {children}
     </select>
+  );
+}
+
+/** A labelled filter control (the label sits above it, small and muted). */
+export function FilterField({ label, children, className = "" }: { label: string; children: ReactNode; className?: string }) {
+  return (
+    <label className={`flex flex-col gap-1 ${className}`}>
+      <span className="text-[0.74rem] text-text-secondary">{label}</span>
+      {children}
+    </label>
+  );
+}
+
+/** Plain text filter (user name, product, …) with a visible label. */
+export function TextFilter({
+  name,
+  label,
+  defaultValue,
+  placeholder,
+  className = "min-w-[200px] flex-1",
+}: {
+  name: string;
+  label: string;
+  defaultValue?: string;
+  placeholder?: string;
+  className?: string;
+}) {
+  return (
+    <FilterField label={label} className={className}>
+      <input type="search" name={name} defaultValue={defaultValue} placeholder={placeholder} className={`w-full ${CONTROL_BASE}`} />
+    </FilterField>
+  );
+}
+
+/** «از تاریخ / تا تاریخ» pair — values are `YYYY-MM-DD` (Tehran calendar day). */
+export function DateRangeFields({ from, to }: { from?: string; to?: string }) {
+  return (
+    <>
+      <FilterField label="از تاریخ">
+        <input type="date" name="from" defaultValue={from} className={CONTROL_BASE} />
+      </FilterField>
+      <FilterField label="تا تاریخ">
+        <input type="date" name="to" defaultValue={to} className={CONTROL_BASE} />
+      </FilterField>
+    </>
+  );
+}
+
+/** Labelled select for filter bars. */
+export function SelectFilter({
+  name,
+  label,
+  defaultValue,
+  children,
+}: {
+  name: string;
+  label: string;
+  defaultValue?: string;
+  children: ReactNode;
+}) {
+  return (
+    <FilterField label={label}>
+      <select name={name} defaultValue={defaultValue ?? ""} className={`${CONTROL_BASE} min-w-[150px]`}>
+        {children}
+      </select>
+    </FilterField>
   );
 }
 
