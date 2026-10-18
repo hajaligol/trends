@@ -1,5 +1,15 @@
 # Trends Progress Report
 
+## Latest change: paintbrush style for «شگفت‌انگیزها» (user-requested)
+Status: COMPLETE. `tsc` ✔, `eslint` ✔. Visual only, **no DB changes**. **Not rendered/checked in a browser** (none in the sandbox) — check stroke intensity and the dry-brush filter look.
+
+- New `components/home/BrushStrokes.tsx`: `BrushStrokes` (absolute, `-z-10`, `aria-hidden`, clipped to the card's radius) paints four wide black/purple/lavender strokes over the existing gradient; `BrushUnderline` replaces the plain gradient rule under the title (still full-length, fades at the end).
+- Brush look = SVG filter `trends-brush` (gentle displacement + 2.2 blur, faint soft streaks; stroke opacities 0.32–0.75; strokes 84–130 wide with per-stroke horizontal black→purple→lavender gradients `trends-brush-g1..g4`; underline 14 thick). Fixed ids (`trends-brush`, `trends-brush-line`) → render once per page. Strokes use `preserveAspectRatio="none"`, so they stretch with the card. No raster, no JS, no animation.
+- `FeaturedProducts.tsx`: card is now `relative isolate`; product tiles unchanged (white).
+- To tone down: lower the `strokeOpacity` values in `BrushStrokes`.
+
+---
+
 ## Latest change: framed «جدیدترین محصولات» / «پرفروش‌ترین محصولات» sections + purple icons (user-requested)
 Status: COMPLETE. `tsc` ✔, `eslint` (home + icons) ✔, Tailwind output of the gradient-border class checked. Visual only, **no DB changes**. Not checked in a browser.
 

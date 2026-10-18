@@ -1,6 +1,7 @@
 import { Container } from "@/components/ui/Container";
 import { ProductCard } from "@/components/catalog/ProductCard";
 import { SwipeRow } from "@/components/home/SwipeRow";
+import { BrushStrokes, BrushUnderline } from "@/components/home/BrushStrokes";
 import { ShowAllTile } from "@/components/home/ShowAllTile";
 import { FireIcon } from "@/components/ui/icons";
 import {
@@ -12,8 +13,8 @@ import type { CatalogProductSummary } from "@/domains/catalog/queries";
 /**
  * Homepage "hero" product section (شگفت‌انگیزها) in a premium black/purple
  * look, as ONE rounded card: the header (large fire icon, white title,
- * lavender rule) and the product row share a single black→purple gradient
- * background, each product on a white rounded tile. Gradients only: no glow
+ * brush-stroke underline) and the product row share a single black→purple gradient
+ * background, each product on a white rounded tile. Black/purple paintbrush strokes (`BrushStrokes`, SVG) sit behind the content. No glow
  * and no animation beyond the row's normal sliding arrows (see `SwipeRow`).
  *
  * More than `HOME_ROW_MAX_PRODUCTS` products → the row keeps its arrows
@@ -31,17 +32,15 @@ export function FeaturedProducts({
   return (
     <section id="featured" className="py-[clamp(30px,5vw,54px)]">
       <Container>
-        <div className="rounded-[clamp(18px,2.8vw,30px)] border border-white/10 bg-[linear-gradient(to_bottom_left,#0a0610_0%,#170830_50%,#3a0d72_100%)] px-[clamp(14px,3vw,40px)] py-[clamp(18px,3vw,36px)]">
+        <div className="rounded-[clamp(18px,2.8vw,30px)] border border-white/10 bg-[linear-gradient(to_bottom_left,#0a0610_0%,#170830_50%,#3a0d72_100%)] relative isolate px-[clamp(14px,3vw,40px)] py-[clamp(18px,3vw,36px)]">
+          <BrushStrokes />
           <div className="mb-[clamp(16px,2.6vw,28px)] flex items-center gap-[clamp(12px,2vw,20px)]">
             <FireIcon aria-hidden="true" className="h-[clamp(64px,9vw,96px)] w-auto shrink-0" />
             <div className="min-w-0 flex-1">
               <h2 className="m-0 text-[clamp(1.7rem,3.6vw,2.7rem)] font-extrabold leading-[1.25] text-white">
                 شگفت‌انگیزها
               </h2>
-              <span
-                aria-hidden="true"
-                className="mt-2 block h-[3px] w-full rounded-full bg-[linear-gradient(to_left,#d9c2f5,#8a3fe0_55%,rgba(138,63,224,0))]"
-              />
+              <BrushUnderline />
             </div>
           </div>
 
