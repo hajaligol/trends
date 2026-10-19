@@ -1,5 +1,6 @@
 "use client";
 
+import { Combobox } from "@/components/admin/ui/combobox";
 import { useRef, useState } from "react";
 import { AdminSubmitButton, FormAlert, useAdminAction } from "@/components/admin/ui/form";
 import { adminButton } from "@/components/admin/ui/layout";
@@ -116,11 +117,13 @@ export function ProductSizeChartEditor({
         <label htmlFor="size-chart-preset" className="text-[0.86rem] text-text-secondary">
           قالب بر اساس نوع محصول:
         </label>
-        <select
+        <Combobox
           id="size-chart-preset"
+          name="size-chart-preset"
           value={presetId}
           onChange={(event) => applyPreset(event.target.value)}
-          className="rounded-[var(--radius-md)] border border-line bg-white px-3 py-2 text-[0.86rem] text-ink outline-none focus:border-brand"
+          layout="inline"
+          minWidthClass="min-w-[240px]"
         >
           <option value="">انتخاب کنید…</option>
           {SIZE_CHART_PRESETS.map((preset) => (
@@ -128,7 +131,7 @@ export function ProductSizeChartEditor({
               {preset.label}
             </option>
           ))}
-        </select>
+        </Combobox>
       </div>
 
       {!hasGrid ? (

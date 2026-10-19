@@ -1,10 +1,12 @@
 "use client";
 
-import { useActionState, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
+import { useActionState, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes } from "react";
 import { useFormStatus } from "react-dom";
 import { useToast } from "@/components/feedback/ToastProvider";
 import { ADMIN_CONTROL, adminButton } from "@/components/admin/ui/layout";
 import { AlertTriangleIcon } from "@/components/admin/ui/icons";
+import { Combobox, type ComboboxChange } from "@/components/admin/ui/combobox";
+import { JalaliDatePicker, type JalaliPickerChange } from "@/components/admin/ui/jalali-picker";
 
 /* ------------------------------------------------------------------ */
 /* Action hook                                                         */
@@ -182,6 +184,10 @@ export function TextField({
   );
 }
 
+/**
+ * Searchable dropdown. Drop-in for the old native `<select>`: pass `<option>`
+ * children, `value`/`defaultValue` and `onChange={(e) => e.target.value}`.
+ */
 export function SelectField({
   label,
   name,
@@ -190,13 +196,77 @@ export function SelectField({
   className,
   required,
   children,
-  ...select
-}: CommonFieldProps & Omit<SelectHTMLAttributes<HTMLSelectElement>, "name" | "className">) {
+  value,
+  defaultValue,
+  onChange,
+  disabled,
+}: CommonFieldProps & {
+  children?: ReactNode;
+  value?: string;
+  defaultValue?: string;
+  required?: boolean;
+  disabled?: boolean;
+  onChange?: (event: ComboboxChange) => void;
+}) {
   return (
     <FieldShell label={label} htmlFor={name} hint={hint} optional={optional} required={required} className={className}>
-      <select id={name} name={name} required={required} aria-describedby={hint ? `${name}-hint` : undefined} {...select} className={ADMIN_CONTROL}>
+      <Combobox
+        id={name}
+        name={name}
+        value={value}
+        defaultValue={defaultValue}
+        onChange={onChange}
+        required={required}
+        disabled={disabled}
+        aria-describedby={hint ? `${name}-hint` : undefined}
+      >
         {children}
-      </select>
+      </Combobox>
+    </FieldShell>
+  );
+}
+
+/**
+ * Jalali (شمسی) date or date-time field. The submitted value is still the
+ * Gregorian `YYYY-MM-DD` / `YYYY-MM-DDTHH:mm` (Tehran wall clock) the server
+ * already expects — only what the operator sees is Jalali.
+ */
+export function DateField({
+  label,
+  name,
+  hint,
+  optional,
+  className,
+  required,
+  withTime,
+  value,
+  defaultValue,
+  onChange,
+  disabled,
+  placeholder,
+}: CommonFieldProps & {
+  withTime?: boolean;
+  value?: string;
+  defaultValue?: string;
+  required?: boolean;
+  disabled?: boolean;
+  placeholder?: string;
+  onChange?: (event: JalaliPickerChange) => void;
+}) {
+  return (
+    <FieldShell label={label} htmlFor={name} hint={hint} optional={optional} required={required} className={className}>
+      <JalaliDatePicker
+        id={name}
+        name={name}
+        withTime={withTime}
+        value={value}
+        defaultValue={defaultValue}
+        onChange={onChange}
+        required={required}
+        disabled={disabled}
+        placeholder={placeholder}
+        aria-describedby={hint ? `${name}-hint` : undefined}
+      />
     </FieldShell>
   );
 }

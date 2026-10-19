@@ -12,6 +12,7 @@ import {
   FormAlert,
   SelectField,
   SwitchField,
+  DateField,
   TextField,
   useAdminAction,
 } from "@/components/admin/ui/form";
@@ -96,8 +97,8 @@ export function CouponForm({ coupon }: { coupon?: Coupon }) {
       <Card title="زمان‌بندی و محدودیت‌ها" description="همه این موارد اختیاری‌اند؛ خالی گذاشتن یعنی «بدون محدودیت».">
         <div className="flex flex-col gap-4">
           <FieldGrid>
-            <TextField label="شروع اعتبار" name="startsAt" type="datetime-local" optional defaultValue={toDatetimeLocalValue(coupon?.startsAt ?? null)} />
-            <TextField label="پایان اعتبار" name="endsAt" type="datetime-local" optional defaultValue={toDatetimeLocalValue(coupon?.endsAt ?? null)} />
+            <DateField label="شروع اعتبار" name="startsAt" withTime optional defaultValue={toDatetimeLocalValue(coupon?.startsAt ?? null)} />
+            <DateField label="پایان اعتبار" name="endsAt" withTime optional defaultValue={toDatetimeLocalValue(coupon?.endsAt ?? null)} />
           </FieldGrid>
           <FieldGrid>
             <TextField

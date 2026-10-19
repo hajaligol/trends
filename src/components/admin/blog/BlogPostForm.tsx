@@ -7,7 +7,7 @@ import { ConfirmButton } from "@/components/admin/ConfirmButton";
 import { MarkdownEditor } from "@/components/admin/blog/MarkdownEditor";
 import { FaqEditor } from "@/components/admin/blog/FaqEditor";
 import { Card, adminButton } from "@/components/admin/ui/layout";
-import { AdminSubmitButton, FieldGrid, FormActionBar, FormAlert, SelectField, TextareaField, TextField, useAdminAction } from "@/components/admin/ui/form";
+import { AdminSubmitButton, DateField, FieldGrid, FormActionBar, FormAlert, SelectField, TextareaField, TextField, useAdminAction } from "@/components/admin/ui/form";
 import { createBlogPostAction, deleteBlogPostAction, updateBlogPostAction } from "@/domains/blog/admin-actions";
 import type { ActionResult } from "@/domains/auth/roles";
 import type { BlogCategory, BlogPost } from "@/lib/db/schema";
@@ -90,10 +90,10 @@ export function BlogPostForm({ post, categories }: { post?: BlogPost; categories
               <option value="draft">پیش‌نویس (نمایش داده نمی‌شود)</option>
               <option value="published">منتشر شده</option>
             </SelectField>
-            <TextField
+            <DateField
               label="زمان انتشار (به وقت تهران)"
               name="publishedAt"
-              type="datetime-local"
+              withTime
               defaultValue={dateToTehranInput(post?.publishedAt ?? null)}
               optional
               hint="خالی = همین الان (هنگام انتشار). تاریخ آینده، مقاله را زمان‌بندی می‌کند."

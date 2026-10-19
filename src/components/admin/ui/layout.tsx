@@ -1,6 +1,9 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { toPersianDigits } from "@/lib/utils/persian-digits";
+import { Combobox } from "@/components/admin/ui/combobox";
+import { JalaliDatePicker } from "@/components/admin/ui/jalali-picker";
+import { CONTROL, CONTROL_BASE } from "@/components/admin/ui/control-styles";
 import { ChevronLeftIcon, ChevronRightIcon, InboxIcon, SearchIcon } from "@/components/admin/ui/icons";
 
 /**
@@ -270,13 +273,6 @@ export function StatCard({
 /* Filters                                                             */
 /* ------------------------------------------------------------------ */
 
-const CONTROL_BASE =
-  "rounded-[var(--radius-md)] border border-line bg-white px-4 py-2.5 text-[0.88rem] text-ink outline-none transition-colors placeholder:text-text-secondary/70 hover:border-ink/25 focus:border-brand focus:outline-2 focus:outline-offset-1 focus:outline-brand/30";
-
-/** Full-width control for form fields; `CONTROL_BASE` (no width) lets the
- * inline filter controls size themselves — two width classes on one
- * element conflict, so the width is never baked into the shared base. */
-const CONTROL = `w-full ${CONTROL_BASE}`;
 export const ADMIN_CONTROL = CONTROL;
 /** Same look without a width, for inline filter controls. */
 export const ADMIN_CONTROL_INLINE = CONTROL_BASE;
@@ -339,19 +335,23 @@ export function SelectInput({
   children: ReactNode;
 }) {
   return (
-    <select name={name} defaultValue={defaultValue} aria-label={label} className={`${CONTROL_BASE} min-w-[170px]`}>
+    <Combobox name={name} defaultValue={defaultValue ?? ""} aria-label={label} layout="inline" minWidthClass="min-w-[170px]">
       {children}
-    </select>
+    </Combobox>
   );
 }
 
 /** A labelled filter control (the label sits above it, small and muted). */
 export function FilterField({ label, children, className = "" }: { label: string; children: ReactNode; className?: string }) {
   return (
-    <label className={`flex flex-col gap-1 ${className}`}>
-      <span className="text-[0.74rem] text-text-secondary">{label}</span>
+    // A <div>, not a <label>: a label would forward clicks inside the dropdown /
+    // calendar panels to the trigger button and re-toggle them.
+    <div role="group" aria-label={label} className={`flex flex-col gap-1 ${className}`}>
+      <span aria-hidden="true" className="text-[0.74rem] text-text-secondary">
+        {label}
+      </span>
       {children}
-    </label>
+    </div>
   );
 }
 
@@ -371,7 +371,7 @@ export function TextFilter({
 }) {
   return (
     <FilterField label={label} className={className}>
-      <input type="search" name={name} defaultValue={defaultValue} placeholder={placeholder} className={`w-full ${CONTROL_BASE}`} />
+      <input type="search" name={name} aria-label={label} defaultValue={defaultValue} placeholder={placeholder} className={`w-full ${CONTROL_BASE}`} />
     </FilterField>
   );
 }
@@ -381,10 +381,10 @@ export function DateRangeFields({ from, to }: { from?: string; to?: string }) {
   return (
     <>
       <FilterField label="از تاریخ">
-        <input type="date" name="from" defaultValue={from} className={CONTROL_BASE} />
+        <JalaliDatePicker name="from" defaultValue={from ?? ""} aria-label="از تاریخ" layout="inline" placeholder="همه" />
       </FilterField>
       <FilterField label="تا تاریخ">
-        <input type="date" name="to" defaultValue={to} className={CONTROL_BASE} />
+        <JalaliDatePicker name="to" defaultValue={to ?? ""} aria-label="تا تاریخ" layout="inline" placeholder="همه" />
       </FilterField>
     </>
   );
@@ -404,9 +404,9 @@ export function SelectFilter({
 }) {
   return (
     <FilterField label={label}>
-      <select name={name} defaultValue={defaultValue ?? ""} className={`${CONTROL_BASE} min-w-[150px]`}>
+      <Combobox name={name} defaultValue={defaultValue ?? ""} aria-label={label} layout="inline" minWidthClass="min-w-[150px]">
         {children}
-      </select>
+      </Combobox>
     </FilterField>
   );
 }

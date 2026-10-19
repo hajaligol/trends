@@ -9,7 +9,8 @@ import { parseCampaignConfig } from "@/domains/campaigns/config";
 import { describeDefinition, KIND_META } from "@/domains/campaigns/labels";
 import type { CampaignKind } from "@/lib/db/schema/campaigns";
 import { dateToTehranInput } from "@/lib/utils/tehran-time";
-import { FormAlert, SelectField, Spinner, TextField, TextareaField } from "@/components/admin/ui/form";
+import { DateField, FormAlert, SelectField, Spinner, TextField, TextareaField } from "@/components/admin/ui/form";
+import { formatPickerValue } from "@/lib/utils/jalali";
 import { ImagePicker } from "@/components/admin/ImagePicker";
 import { adminButton, Card } from "@/components/admin/ui/layout";
 import { ReviewRow, WizardFooter, WizardPanel, WizardStepper, useWizard } from "@/components/admin/ui/wizard";
@@ -185,7 +186,7 @@ export function CampaignForm({
 
   const placementLabel = { none: "بدون نمایش", hero: "اسلاید اصلی", banner: "بنر تبلیغاتی" }[homePlacement];
   const scopeCount = scope.brandIds.length + scope.categoryIds.length + scope.products.length;
-  const formatWhen = (value: string) => (value ? toPersianDigits(value.replace("T", " ")) : null);
+  const formatWhen = (value: string) => formatPickerValue(value || null);
   const saveLabel = campaign ? "ذخیره تغییرات" : "ایجاد کمپین";
   const saveButton = (
     <button type="button" onClick={save} disabled={isPending} aria-busy={isPending} className={adminButton("primary", "md")}>
@@ -245,8 +246,8 @@ export function CampaignForm({
             <>
               <div className="flex flex-col gap-4">
             <div className="grid gap-4 sm:grid-cols-2">
-              <TextField label="شروع" name="campaign-starts" type="datetime-local" optional value={startsAt} onChange={(e) => setStartsAt(e.target.value)} />
-              <TextField label="پایان" name="campaign-ends" type="datetime-local" optional value={endsAt} onChange={(e) => setEndsAt(e.target.value)} />
+              <DateField label="شروع" name="campaign-starts" withTime optional value={startsAt} onChange={(e) => setStartsAt(e.target.value)} />
+              <DateField label="پایان" name="campaign-ends" withTime optional value={endsAt} onChange={(e) => setEndsAt(e.target.value)} />
             </div>
             <Switch
               checked={showCountdown}

@@ -1,5 +1,21 @@
 # Trends Progress Report
 
+## Latest change: searchable dropdowns + Jalali date/time pickers in admin (user-requested)
+Status: COMPLETE WITH FOLLOW-UP. `tsc` ✔, `eslint src tests` ✔, 312 unit tests ✔ (7 new in `tests/unit/jalali.test.ts`, 3 in `combobox-search.test.ts`), `next build` compile ✔ (page-data step needs `DATABASE_URL`, unset in sandbox).
+**Not verified:** the components in a real browser (none in the sandbox) — open a wizard, a filter bar and the coupon form once; check dropdown search, keyboard (↑/↓/Enter/Esc), calendar on mobile width.
+**No DB/migration changes. No Server Action changes** — pickers still submit Gregorian `YYYY-MM-DD` / `YYYY-MM-DDTHH:mm` (Tehran wall clock), so `tehranInputToDate`, `tehranDayStart` etc. are untouched.
+
+- `ui/combobox.tsx` `Combobox`: custom listbox with a search box (ignores Persian/Arabic digit and ي/ك differences, ZWNJ, case; all words must match label/group/hidden text). Keyboard: ↑↓ Home End Enter Esc Tab; ARIA combobox/listbox. Submits via a hidden input (a transparent real input when `required`, so native validation still fires). Panel is `position: fixed` (not clipped by cards), flips above when short on space.
+- `SelectField`, `SelectFilter`, `SelectInput` now render `Combobox` and still take `<option>`/`<optgroup>` children, `value`/`defaultValue`, and `onChange={(e) => e.target.value}` — all ~25 call sites unchanged. Size-chart preset select converted too.
+- `ui/jalali-picker.tsx` `JalaliDatePicker` + `DateField` (form.tsx): Saturday-first Jalali month grid, Friday in red, month/year views, today highlight, «امروز/اکنون», «پاک کردن», hour/minute steppers (`withTime`), arrow/PageUp/PageDown keyboard navigation. «today» is computed in Tehran time.
+- `DateRangeFields` (reviews, support, newsletter filters) now Jalali; coupon start/end, campaign start/end, blog publish time use `DateField withTime`. Campaign review summary shows Jalali.
+- `lib/utils/jalali.ts`: Gregorian↔Jalali (33-year cycle), month lengths, leap years, parse/format helpers.
+- `FilterField` is now a `<div role="group">` (a `<label>` would forward clicks inside the popup to the trigger).
+- Shared styles moved to `ui/control-styles.ts` (avoids a layout↔client import cycle).
+
+**Not changed:** `ProductSpecificationsEditor` label suggestions still use a native `<datalist>` (free-text input with suggestions, not a select). Read-only dates in admin tables are still Gregorian-formatted elsewhere.
+
+---
 ## Latest change: server-side image optimizer + aspect-ratio hints on every upload (user-requested)
 Status: COMPLETE WITH FOLLOW-UP. `tsc` ✔, `eslint .` ✔, 302 unit tests ✔ (12 new in `tests/unit/optimize-image.test.ts`).
 **Not verified:** `next build` and the upload UI in a real browser (no Postgres/browser in the sandbox) — upload one JPG, one PNG and one GIF from `/admin/content` once.
