@@ -32,7 +32,7 @@ function PromoBannerForm({ banner, onDone, onCancel }: { banner?: PromoBanner; o
           <option value="blue">آبی</option>
         </SelectField>
       </FieldGrid>
-      <ImagePicker name="imageUrl" folder="banners" label="تصویر بنر" shape="wide" defaultValue={banner?.imageUrl} required />
+      <ImagePicker name="imageUrl" folder="banners" label="تصویر بنر" kind="banner" defaultValue={banner?.imageUrl} required />
       <TextField label="توضیحات" name="description" defaultValue={banner?.description} required />
       <FieldGrid>
         <TextField label="متن دکمه" name="ctaLabel" defaultValue={banner?.ctaLabel} required placeholder="مشاهده کالکشن" />

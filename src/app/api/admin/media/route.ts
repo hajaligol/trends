@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth/config";
 import { isStaffOrAdmin } from "@/domains/auth/roles";
 import { checkRateLimit, getClientIp } from "@/lib/security/rate-limit";
+import { detectImageType, ImageOptimizeError, optimizeImage, TARGET_MAX_BYTES } from "@/lib/media/optimize-image";
 
 /**
  * Admin image upload endpoint — lets `/admin/content`, `/admin/categories`
@@ -40,6 +41,11 @@ import { checkRateLimit, getClientIp } from "@/lib/security/rate-limit";
  * - `folder` must be one of a fixed allow-list (`ALLOWED_FOLDERS`) —
  *   never a caller-supplied path segment, which forecloses path
  *   traversal regardless of what a client sends.
+ * - **Image optimization** (`lib/media/optimize-image.ts`): every JPEG/PNG/
+ *   WebP/AVIF/TIFF upload is converted to WebP and shrunk to <= 50 KB
+ *   (quality search, then downscaling). GIFs (and animated WebP) are stored
+ *   as-is. The stored extension is therefore `webp` (or `gif`), never the
+ *   uploaded one.
  * - File content is sniffed by magic bytes (`detectImageType`), not
  *   trusted from the browser-supplied `File.type`/filename — a `.jpg`
  *   extension or `image/png` MIME claim proves nothing about what bytes
@@ -59,41 +65,10 @@ function isAllowedFolder(value: FormDataEntryValue | null): value is AllowedFold
   return typeof value === "string" && (ALLOWED_FOLDERS as readonly string[]).includes(value);
 }
 
-const MAX_FILE_BYTES = 5 * 1024 * 1024; // 5 MB — generous for web-optimized product/banner photography.
-
-type ImageSignature = { mime: string; ext: string; matches: (buffer: Buffer) => boolean };
-
-// Detected by magic bytes, not by trusting the browser's declared
-// `File.type` or the filename's extension — see header comment.
-const IMAGE_SIGNATURES: ImageSignature[] = [
-  {
-    mime: "image/jpeg",
-    ext: "jpg",
-    matches: (b) => b.length > 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff,
-  },
-  {
-    mime: "image/png",
-    ext: "png",
-    matches: (b) =>
-      b.length > 8 && b.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])),
-  },
-  {
-    mime: "image/webp",
-    ext: "webp",
-    matches: (b) =>
-      b.length > 12 && b.subarray(0, 4).toString("ascii") === "RIFF" && b.subarray(8, 12).toString("ascii") === "WEBP",
-  },
-  {
-    mime: "image/gif",
-    ext: "gif",
-    matches: (b) =>
-      b.length > 6 && ["GIF87a", "GIF89a"].includes(b.subarray(0, 6).toString("ascii")),
-  },
-];
-
-function detectImageType(buffer: Buffer): ImageSignature | null {
-  return IMAGE_SIGNATURES.find((signature) => signature.matches(buffer)) ?? null;
-}
+// Raw uploads are re-encoded server-side, so phone photos are fine as input.
+const MAX_FILE_BYTES = 12 * 1024 * 1024;
+// GIFs are stored untouched (never converted), so keep them small.
+const MAX_GIF_BYTES = 5 * 1024 * 1024;
 
 export async function POST(request: Request) {
   const session = await auth();
@@ -135,22 +110,44 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "فایل انتخاب‌شده خالی است" }, { status: 400 });
   }
   if (file.size > MAX_FILE_BYTES) {
-    return NextResponse.json({ error: "حجم فایل نباید بیش از ۵ مگابایت باشد" }, { status: 400 });
+    return NextResponse.json({ error: "حجم فایل نباید بیش از ۱۲ مگابایت باشد" }, { status: 400 });
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
-  const signature = detectImageType(buffer);
-  if (!signature) {
+  const detected = detectImageType(buffer);
+  if (!detected) {
     return NextResponse.json(
-      { error: "قالب فایل پشتیبانی نمی‌شود. فقط تصاویر JPG، PNG، WebP یا GIF مجاز است." },
+      { error: "قالب فایل پشتیبانی نمی‌شود. فقط تصاویر JPG، PNG، WebP، AVIF، TIFF یا GIF مجاز است." },
       { status: 400 },
     );
   }
+  if (detected.mime === "image/gif" && buffer.length > MAX_GIF_BYTES) {
+    return NextResponse.json({ error: "حجم فایل GIF نباید بیش از ۵ مگابایت باشد" }, { status: 400 });
+  }
 
-  const filename = `${randomUUID()}.${signature.ext}`;
+  let result;
+  try {
+    result = await optimizeImage(buffer, detected, TARGET_MAX_BYTES);
+  } catch (error) {
+    if (error instanceof ImageOptimizeError) {
+      return NextResponse.json({ error: error.message }, { status: 422 });
+    }
+    console.error("[admin/media] image optimization failed", error instanceof Error ? error.message : "unknown");
+    return NextResponse.json({ error: "پردازش تصویر با خطا مواجه شد" }, { status: 500 });
+  }
+
+  const filename = `${randomUUID()}.${result.ext}`;
   const uploadDir = path.join(process.cwd(), "public", "assets", folder);
   await mkdir(uploadDir, { recursive: true });
-  await writeFile(path.join(uploadDir, filename), buffer);
+  await writeFile(path.join(uploadDir, filename), result.buffer);
 
-  return NextResponse.json({ url: `/assets/${folder}/${filename}` }, { status: 201 });
+  return NextResponse.json(
+    {
+      url: `/assets/${folder}/${filename}`,
+      originalBytes: result.originalBytes,
+      finalBytes: result.finalBytes,
+      converted: result.converted,
+    },
+    { status: 201 },
+  );
 }

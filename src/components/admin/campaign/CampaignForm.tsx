@@ -305,11 +305,11 @@ export function CampaignForm({
                   name="campaign-home-image"
                   folder={homePlacement === "hero" ? "hero" : "banners"}
                   label={homePlacement === "hero" ? "تصویر اسلاید" : "تصویر بنر"}
-                  shape="wide"
+                  kind={homePlacement === "hero" ? "hero" : "banner"}
                   required
                   defaultValue={homeImageUrl}
                   onChange={setHomeImageUrl}
-                  hint={homePlacement === "hero" ? "پیشنهاد: تصویر عریض با نسبت حدود ۲۱ به ۸." : "تصویر کنار متن بنر نمایش داده می‌شود."}
+                  hint={homePlacement === "hero" ? "موضوع اصلی را در مرکز تصویر بگذارید؛ در موبایل لبه‌ها بریده می‌شود." : undefined}
                 />
                 {homePlacement === "banner" && (
                   <div className="flex flex-col gap-4">

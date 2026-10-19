@@ -1,5 +1,18 @@
 # Trends Progress Report
 
+## Latest change: server-side image optimizer + aspect-ratio hints on every upload (user-requested)
+Status: COMPLETE WITH FOLLOW-UP. `tsc` ✔, `eslint .` ✔, 302 unit tests ✔ (12 new in `tests/unit/optimize-image.test.ts`).
+**Not verified:** `next build` and the upload UI in a real browser (no Postgres/browser in the sandbox) — upload one JPG, one PNG and one GIF from `/admin/content` once.
+**No DB/migration changes.** New dependency: `sharp` (already a transitive optional dep of Next; now explicit).
+
+- `lib/media/optimize-image.ts`: JPEG/PNG/WebP/AVIF/TIFF → WebP, **≤ 50 KB** (`TARGET_MAX_BYTES`). Probe encode picks a starting width, then binary-searches quality (85→20); if still too big it downscales ×0.8 (floor 240px, never upscales, max side 1600). EXIF orientation applied, metadata stripped, alpha kept. **GIFs and animated WebP are stored untouched.** Corrupt files → `ImageOptimizeError` (HTTP 422).
+- `api/admin/media/route.ts`: runs the optimizer after the existing auth/rate-limit/magic-byte checks; stored name is `<uuid>.webp` (or `.gif`). Input cap raised 5→12 MB (raw phone photos); GIF cap stays 5 MB. Response now also returns `originalBytes`, `finalBytes`, `converted`.
+- `lib/media/image-specs.ts`: one source of truth for recommended ratios — product 4:5, hero 21:8, banner 11:5, category/tile 1:1, brand logo 1:1, blog cover 16:10, blog inline free. These mirror the storefront `aspect-*` boxes.
+- `ImagePicker`: `shape` prop replaced by required `kind` (preview tile follows the ratio); always shows «نسبت پیشنهادی…» + the 50 KB/WebP note; shows «X کیلوبایت ← Y کیلوبایت» after upload. All 9 call sites updated; blog `MarkdownEditor` inline-image button got the same note.
+- Existing images already in `public/assets/` are **not** re-encoded. Admin-typed URLs are untouched.
+- Ops note: needs the `sharp` native binary on the deploy target (standard `npm ci` on Linux/macOS/Windows works; Alpine needs musl build, which npm selects automatically).
+
+---
 ## Latest change: staged (wizard) flows for «محصول جدید» and «کمپین جدید» (user-requested)
 Status: COMPLETE WITH FOLLOW-UP. `tsc` ✔, `eslint .` ✔, 290 unit tests ✔ (16 new in `tests/unit/staged-forms.test.ts`), `next build` compile + TypeScript ✔.
 **Not verified:** `next build` page-data step and DB-backed tests (no Postgres in the sandbox, `DATABASE_URL` unset), and both flows in a real browser — walk through each once.

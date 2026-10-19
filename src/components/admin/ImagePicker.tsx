@@ -4,6 +4,8 @@ import { useId, useRef, useState } from "react";
 import Image from "next/image";
 import { ImageIcon } from "@/components/admin/ui/icons";
 import { Spinner } from "@/components/admin/ui/form";
+import { IMAGE_SPECS, imageSpecHint, type ImageSpecKind } from "@/lib/media/image-specs";
+import { toPersianDigits } from "@/lib/utils/persian-digits";
 
 type ImagePickerProps = {
   /** Form field name the resulting URL is submitted under (e.g. "url"
@@ -17,19 +19,28 @@ type ImagePickerProps = {
   label: string;
   defaultValue?: string | null;
   required?: boolean;
-  /** Preview shape: `square` (default), `wide` (hero/banners) or `portrait` (products). */
-  shape?: "square" | "wide" | "portrait";
+  /** Which storefront slot this image fills. Drives the preview tile's shape
+   * and the always-visible "recommended aspect ratio" hint
+   * (`lib/media/image-specs.ts`). */
+  kind: ImageSpecKind;
+  /** Extra guidance shown after the aspect-ratio hint. */
   hint?: string;
   /** Called with the new URL ("" when removed) whenever it changes — for
    * controlled forms that don't submit this field as a plain `<form>` value. */
   onChange?: (url: string) => void;
 };
 
-const SHAPES = {
-  square: "aspect-square w-28",
-  wide: "aspect-[16/9] w-44",
-  portrait: "aspect-[3/4] w-24",
-} as const;
+/** Preview tile width per orientation — the height follows from the spec's ratio. */
+function previewWidth(kind: ImageSpecKind): string {
+  const { width, height } = IMAGE_SPECS[kind];
+  if (width / height >= 1.5) return "11rem";
+  if (width / height <= 0.9) return "6.5rem";
+  return "7rem";
+}
+
+function formatKb(bytes: number): string {
+  return `${toPersianDigits(Math.max(1, Math.round(bytes / 1024)))} کیلوبایت`;
+}
 
 /**
  * Browse-for-a-file image picker: a visible preview tile (click to choose)
@@ -44,7 +55,7 @@ const SHAPES = {
  * without re-uploading it — the browse button is the primary path, not
  * the only path.
  */
-export function ImagePicker({ name, folder, label, defaultValue, required, shape = "square", hint, onChange }: ImagePickerProps) {
+export function ImagePicker({ name, folder, label, defaultValue, required, kind, hint, onChange }: ImagePickerProps) {
   const inputId = useId();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [url, setUrlState] = useState(defaultValue ?? "");
@@ -55,12 +66,15 @@ export function ImagePicker({ name, folder, label, defaultValue, required, shape
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showUrlFallback, setShowUrlFallback] = useState(false);
+  const [uploadInfo, setUploadInfo] = useState<string | null>(null);
+  const spec = IMAGE_SPECS[kind];
 
   async function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
 
     setError(null);
+    setUploadInfo(null);
     setIsUploading(true);
     try {
       const body = new FormData();
@@ -68,13 +82,24 @@ export function ImagePicker({ name, folder, label, defaultValue, required, shape
       body.set("folder", folder);
 
       const response = await fetch("/api/admin/media", { method: "POST", body });
-      const data = (await response.json().catch(() => null)) as { url?: string; error?: string } | null;
+      const data = (await response.json().catch(() => null)) as {
+        url?: string;
+        error?: string;
+        originalBytes?: number;
+        finalBytes?: number;
+        converted?: boolean;
+      } | null;
 
       if (!response.ok || !data?.url) {
         setError(data?.error ?? "آپلود تصویر با خطا مواجه شد");
         return;
       }
       setUrl(data.url);
+      if (data.converted && data.originalBytes && data.finalBytes) {
+        setUploadInfo(`به WebP تبدیل شد: ${formatKb(data.originalBytes)} ← ${formatKb(data.finalBytes)}`);
+      } else if (data.converted === false) {
+        setUploadInfo("فایل GIF بدون تغییر ذخیره شد.");
+      }
     } catch {
       setError("ارتباط با سرور برای آپلود تصویر برقرار نشد");
     } finally {
@@ -100,10 +125,11 @@ export function ImagePicker({ name, folder, label, defaultValue, required, shape
       <div className="flex flex-wrap items-center gap-4">
         <label
           htmlFor={inputId}
-          className={`relative grid shrink-0 cursor-pointer place-items-center overflow-hidden rounded-[var(--radius-md)] border border-dashed border-ink/25 bg-card-image transition-colors hover:border-brand has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-brand/50 ${SHAPES[shape]}`}
+          className={`relative grid shrink-0 cursor-pointer place-items-center overflow-hidden rounded-[var(--radius-md)] border border-dashed border-ink/25 bg-card-image transition-colors hover:border-brand has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-brand/50`}
+          style={{ width: previewWidth(kind), aspectRatio: `${spec.width} / ${spec.height}` }}
         >
           {url ? (
-            <Image src={url} alt="" fill sizes="176px" className="object-cover" />
+            <Image src={url} alt="" fill sizes="176px" className="object-cover" unoptimized={url.endsWith(".gif")} />
           ) : (
             <span className="flex flex-col items-center gap-1 px-2 text-center text-[0.72rem] text-text-secondary">
               <ImageIcon width={24} height={24} />
@@ -119,7 +145,7 @@ export function ImagePicker({ name, folder, label, defaultValue, required, shape
             id={inputId}
             ref={fileInputRef}
             type="file"
-            accept="image/jpeg,image/png,image/webp,image/gif"
+            accept="image/jpeg,image/png,image/webp,image/avif,image/tiff,image/gif"
             onChange={handleFileChange}
             disabled={isUploading}
             className="sr-only"
@@ -142,7 +168,15 @@ export function ImagePicker({ name, folder, label, defaultValue, required, shape
               حذف تصویر
             </button>
           )}
-          <p className="m-0 text-[0.74rem] leading-5 text-text-secondary">{hint ?? "JPG، PNG، WebP یا GIF"}</p>
+          <p className="m-0 max-w-[26rem] text-[0.74rem] font-medium leading-5 text-ink/80">{imageSpecHint(kind)}</p>
+          <p className="m-0 max-w-[26rem] text-[0.72rem] leading-5 text-text-secondary">
+            {hint ? `${hint} ` : ""}هر قالبی (JPG، PNG، WebP، AVIF…) قابل آپلود است؛ تصویر خودکار به WebP با حجم کمتر از ۵۰ کیلوبایت تبدیل می‌شود (GIF بدون تغییر می‌ماند).
+          </p>
+          {uploadInfo && (
+            <p role="status" className="m-0 text-[0.72rem] leading-5 text-emerald-700">
+              {uploadInfo}
+            </p>
+          )}
         </div>
       </div>
 

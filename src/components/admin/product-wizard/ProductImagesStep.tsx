@@ -103,7 +103,7 @@ export function ProductImagesStep({
       ) : (
         <div className="flex flex-col gap-4 rounded-[var(--radius-md)] border border-line bg-bg p-4 sm:p-5">
           <div className="grid gap-5 sm:grid-cols-[auto_minmax(0,1fr)]">
-            <ImagePicker key={pickerKey} name="draftImageUrl" folder="products" label="تصویر" shape="portrait" onChange={setUrl} />
+            <ImagePicker key={pickerKey} name="draftImageUrl" folder="products" label="تصویر" kind="product" onChange={setUrl} />
             <div className="flex flex-col gap-4">
               <TextField
                 label="متن جایگزین (alt)"

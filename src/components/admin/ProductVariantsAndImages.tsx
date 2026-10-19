@@ -305,7 +305,7 @@ function ImageAddForm({
       <FormAlert state={state} />
 
       <div className="grid gap-5 sm:grid-cols-[auto_minmax(0,1fr)]">
-        <ImagePicker name="url" folder="products" label="تصویر" shape="portrait" required />
+        <ImagePicker name="url" folder="products" label="تصویر" kind="product" required />
         <div className="flex flex-col gap-4">
           <TextField label="متن جایگزین (alt)" name="altText" required hint="توضیح کوتاه تصویر برای نابینایان و موتورهای جستجو؛ مثلاً «پیراهن آبی از روبه‌رو»." />
           <FieldGrid>

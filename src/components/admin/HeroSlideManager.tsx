@@ -29,10 +29,10 @@ function HeroSlideForm({ slide, onDone, onCancel }: { slide?: HeroSlide; onDone?
         name="imageUrl"
         folder="hero"
         label="تصویر اسلاید"
-        shape="wide"
+        kind="hero"
         defaultValue={slide?.imageUrl}
         required
-        hint="تصویر افقی (مثلاً ۱۶:۹) با کیفیت خوب پیشنهاد می‌شود."
+        hint="موضوع اصلی را در مرکز تصویر بگذارید؛ در موبایل لبه‌ها بریده می‌شود."
       />
       <TextField label="متن جایگزین (alt)" name="alt" defaultValue={slide?.alt} required hint="توضیح کوتاه تصویر برای نابینایان و موتورهای جستجو." />
       <FieldGrid>

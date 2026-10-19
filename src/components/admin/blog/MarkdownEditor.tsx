@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { MarkdownContent } from "@/components/blog/MarkdownContent";
+import { imageSpecHint } from "@/lib/media/image-specs";
 import { Spinner } from "@/components/admin/ui/form";
 import { ADMIN_CONTROL } from "@/components/admin/ui/layout";
 
@@ -112,7 +113,7 @@ export function MarkdownEditor({ name = "content", defaultValue = "", error }: {
             {uploading && <Spinner />}
             تصویر
           </button>
-          <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="sr-only" tabIndex={-1} onChange={handleFile} />
+          <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,image/avif,image/tiff,image/gif" className="sr-only" tabIndex={-1} onChange={handleFile} />
         </div>
 
         <textarea
@@ -129,7 +130,7 @@ export function MarkdownEditor({ name = "content", defaultValue = "", error }: {
           placeholder={"## عنوان بخش اول\n\nمتن مقاله را با Markdown بنویسید…"}
         />
         <p className="m-0 text-[0.76rem] leading-5 text-text-secondary">
-          عنوان‌های <bdi dir="ltr">##</bdi> و <bdi dir="ltr">###</bdi> به‌طور خودکار «فهرست مطالب» را می‌سازند. جدول و تصویر از دکمه‌های بالا اضافه می‌شوند؛ فقط تصاویر بارگذاری‌شده در سایت نمایش داده می‌شوند. HTML خام پشتیبانی نمی‌شود.
+          عنوان‌های <bdi dir="ltr">##</bdi> و <bdi dir="ltr">###</bdi> به‌طور خودکار «فهرست مطالب» را می‌سازند. جدول و تصویر از دکمه‌های بالا اضافه می‌شوند؛ فقط تصاویر بارگذاری‌شده در سایت نمایش داده می‌شوند (به‌صورت خودکار به WebP زیر ۵۰ کیلوبایت تبدیل می‌شوند). تصویر داخل مقاله — {imageSpecHint("blogInline")} HTML خام پشتیبانی نمی‌شود.
         </p>
         {uploadError && (
           <p role="alert" className="m-0 text-[0.8rem] text-red-700">

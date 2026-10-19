@@ -71,8 +71,9 @@ export function BrandForm({
         name="logoUrl"
         folder="brands"
         label="لوگوی برند (اختیاری)"
+        kind="logo"
         defaultValue={brand?.logoUrl}
-        hint="ترجیحاً تصویر مربعی یا افقی با پس‌زمینه شفاف."
+        hint="پس‌زمینه‌ی شفاف توصیه می‌شود."
       />
 
       <SwitchField

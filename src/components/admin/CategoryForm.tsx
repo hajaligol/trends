@@ -62,7 +62,7 @@ export function CategoryForm({
 
       <TextField label="توضیحات" name="description" defaultValue={category?.description ?? ""} optional />
 
-      <ImagePicker name="imageUrl" folder="categories" label="تصویر دسته (اختیاری)" defaultValue={category?.imageUrl} />
+      <ImagePicker name="imageUrl" folder="categories" label="تصویر دسته (اختیاری)" kind="square" defaultValue={category?.imageUrl} />
 
       <SwitchField name="isActive" label="فعال" description="دسته غیرفعال در فروشگاه نمایش داده نمی‌شود." defaultChecked={category?.isActive ?? true} />
 

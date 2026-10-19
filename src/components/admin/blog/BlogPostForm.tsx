@@ -67,7 +67,7 @@ export function BlogPostForm({ post, categories }: { post?: BlogPost; categories
 
       <Card title="تصویر شاخص و دسته‌بندی">
         <div className="flex flex-col gap-4">
-          <ImagePicker name="coverImageUrl" folder="blog" label="تصویر شاخص" shape="wide" defaultValue={post?.coverImageUrl} hint="ترجیحاً افقی (۱۶:۹) و سبک؛ در لیست، صفحه‌ی مقاله و اشتراک‌گذاری نمایش داده می‌شود." />
+          <ImagePicker name="coverImageUrl" folder="blog" label="تصویر شاخص" kind="blogCover" defaultValue={post?.coverImageUrl} hint="در لیست، صفحه‌ی مقاله و اشتراک‌گذاری نمایش داده می‌شود." />
           <TextField label="متن جایگزین تصویر شاخص (alt)" name="coverImageAlt" defaultValue={post?.coverImageAlt ?? ""} optional hint="توصیفی کوتاه از تصویر؛ برای دسترسی‌پذیری و سئوی تصاویر. با انتخاب تصویر الزامی است." />
           <FieldGrid>
             <SelectField label="دسته‌بندی" name="categoryId" defaultValue={post?.categoryId ?? ""} optional>

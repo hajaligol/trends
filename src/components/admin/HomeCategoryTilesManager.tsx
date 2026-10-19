@@ -18,7 +18,7 @@ function TileForm({ tile }: { tile: HomeCategoryTile }) {
       <input type="hidden" name="tileKey" value={tile.key} />
       <h3 className="m-0 text-[0.95rem] font-bold text-ink">{tile.label}</h3>
       <FormAlert state={state} />
-      <ImagePicker name="imageUrl" folder="categories" label="تصویر" shape="square" defaultValue={tile.imageUrl} hint="تصویر مربع" />
+      <ImagePicker name="imageUrl" folder="categories" label="تصویر" kind="square" defaultValue={tile.imageUrl} />
       <AdminSubmitButton size="sm" className="w-fit">
         ذخیره
       </AdminSubmitButton>
