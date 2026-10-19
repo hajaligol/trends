@@ -1,5 +1,12 @@
 # Trends Progress Report
 
+## Latest change: black/purple hero on campaign pages (user-requested)
+Status: COMPLETE WITH FOLLOW-UP. `tsc` ✔, `eslint` ✔. **Not verified in a browser.** No DB changes, no new animation, no glow/shadow.
+- `app/sale/[slug]/page.tsx` hero `<header>`: 135° gradient `#0b0712 → #170c2b → #2f1160`, hairline `white/10` border, 3px flat brand-purple rule on the top edge, white title, lavender eyebrow + summary pill, `white/75` description, `white/15` divider.
+- `CampaignCountdown` got a `tone="light" | "dark"` prop (default light, so `CampaignNotice` is unchanged); the hero uses `dark`.
+- The «ended» state and other pages are untouched.
+
+---
 ## Latest change: searchable dropdowns + Jalali date/time pickers in admin (user-requested)
 Status: COMPLETE WITH FOLLOW-UP. `tsc` ✔, `eslint src tests` ✔, 312 unit tests ✔ (7 new in `tests/unit/jalali.test.ts`, 3 in `combobox-search.test.ts`), `next build` compile ✔ (page-data step needs `DATABASE_URL`, unset in sandbox).
 **Not verified:** the components in a real browser (none in the sandbox) — open a wizard, a filter bar and the coupon form once; check dropdown search, keyboard (↑/↓/Enter/Esc), calendar on mobile width.

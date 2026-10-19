@@ -34,7 +34,16 @@ const getServerSnapshot = () => null;
 const pad = (n: number) => String(n).padStart(2, "0");
 
 /** Live countdown to `endsAt` (ISO). Display only — the server decides when a campaign ends. */
-export function CampaignCountdown({ endsAt, variant = "inline" }: { endsAt: string; variant?: "inline" | "blocks" }) {
+export function CampaignCountdown({
+  endsAt,
+  variant = "inline",
+  tone = "light",
+}: {
+  endsAt: string;
+  variant?: "inline" | "blocks";
+  /** `dark` for use on the black/purple campaign hero. */
+  tone?: "light" | "dark";
+}) {
   const current = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
   if (current === null || current === 0) return null;
   const remaining = new Date(endsAt).getTime() - current;
@@ -54,10 +63,14 @@ export function CampaignCountdown({ endsAt, variant = "inline" }: { endsAt: stri
       <div role="timer" aria-label="زمان باقی‌مانده تا پایان کمپین" className="flex items-start gap-2">
         {units.map((unit) => (
           <div key={unit.label} className="flex min-w-[3.4rem] flex-col items-center gap-1">
-            <span className="flex h-12 w-full items-center justify-center rounded-[var(--radius-sm)] border border-line bg-bg text-[1.25rem] font-bold tabular-nums text-ink">
+            <span
+              className={`flex h-12 w-full items-center justify-center rounded-[var(--radius-sm)] border text-[1.25rem] font-bold tabular-nums ${
+                tone === "dark" ? "border-white/15 bg-white/[0.07] text-white" : "border-line bg-bg text-ink"
+              }`}
+            >
               {toPersianDigits(pad(unit.value))}
             </span>
-            <span className="text-[0.72rem] text-text-secondary">{unit.label}</span>
+            <span className={`text-[0.72rem] ${tone === "dark" ? "text-white/60" : "text-text-secondary"}`}>{unit.label}</span>
           </div>
         ))}
       </div>

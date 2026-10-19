@@ -90,26 +90,28 @@ export default async function SalePage(props: SalePageProps) {
       <Container>
         <Breadcrumbs items={[{ label: "صفحه اصلی", href: "/" }, { label: landing.name }]} />
 
-        <header className="mb-10 overflow-hidden rounded-[var(--radius-lg)] border border-line bg-hero-beige">
-          <div className="grid gap-8 px-[clamp(22px,4vw,48px)] py-[clamp(26px,4vw,44px)] md:grid-cols-[1fr_auto] md:items-center md:gap-14">
+        <header className="relative mb-10 overflow-hidden rounded-[var(--radius-lg)] border border-white/10 bg-[linear-gradient(135deg,#0b0712_0%,#170c2b_50%,#2f1160_100%)] text-white">
+          {/* Thin brand-purple rule along the top edge: flat gradient, no glow. */}
+          <div aria-hidden="true" className="absolute inset-x-0 top-0 h-[3px] bg-[linear-gradient(270deg,#7b2cc4_0%,#5b0fa5_45%,transparent_100%)]" />
+          <div className="relative grid gap-8 px-[clamp(22px,4vw,48px)] py-[clamp(30px,4.5vw,52px)] md:grid-cols-[1fr_auto] md:items-center md:gap-14">
             <div className="flex flex-col items-start gap-4">
-              <span className="text-[0.78rem] font-semibold tracking-wide text-text-secondary">کمپین ویژه ترندز</span>
-              <h1 className="m-0 text-[clamp(1.7rem,3.4vw,2.6rem)] font-extrabold leading-[1.25] text-ink">{landing.name}</h1>
-              <span className="inline-flex items-center rounded-[var(--radius-pill)] bg-ink px-4 py-1.5 text-[0.9rem] font-semibold text-bg">{landing.summary}</span>
-              {landing.description && <p className="m-0 max-w-[58ch] text-[0.95rem] leading-8 text-ink/75">{landing.description}</p>}
+              <span className="text-[0.78rem] font-semibold tracking-wide text-lavender/80">کمپین ویژه ترندز</span>
+              <h1 className="m-0 text-[clamp(1.7rem,3.4vw,2.6rem)] font-extrabold leading-[1.25] text-white">{landing.name}</h1>
+              <span className="inline-flex items-center rounded-[var(--radius-pill)] bg-lavender px-4 py-1.5 text-[0.9rem] font-semibold text-[#1d0c3a]">{landing.summary}</span>
+              {landing.description && <p className="m-0 max-w-[58ch] text-[0.95rem] leading-8 text-white/75">{landing.description}</p>}
             </div>
 
             {(landing.countdownEndsAt || landing.total > 0) && (
-              <div className="flex flex-col gap-5 border-t border-line pt-6 md:min-w-[17rem] md:border-t-0 md:border-s md:ps-12 md:pt-0">
+              <div className="flex flex-col gap-5 border-t border-white/15 pt-6 md:min-w-[17rem] md:border-t-0 md:border-s md:ps-12 md:pt-0">
                 {landing.countdownEndsAt && (
                   <div className="flex flex-col gap-3">
-                    <span className="text-[0.82rem] font-semibold text-text-secondary">زمان باقی‌مانده تا پایان کمپین</span>
-                    <CampaignCountdown endsAt={landing.countdownEndsAt} variant="blocks" />
+                    <span className="text-[0.82rem] font-semibold text-white/65">زمان باقی‌مانده تا پایان کمپین</span>
+                    <CampaignCountdown endsAt={landing.countdownEndsAt} variant="blocks" tone="dark" />
                   </div>
                 )}
                 {landing.total > 0 && (
-                  <p className="m-0 text-[0.88rem] text-text-secondary">
-                    <span className="text-[1.15rem] font-bold text-ink">{toPersianDigits(landing.total)}</span> محصول مشمول این کمپین
+                  <p className="m-0 text-[0.88rem] text-white/65">
+                    <span className="text-[1.15rem] font-bold text-white">{toPersianDigits(landing.total)}</span> محصول مشمول این کمپین
                   </p>
                 )}
               </div>
