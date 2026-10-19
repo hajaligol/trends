@@ -155,6 +155,13 @@
       "when": 1792328850543,
       "tag": "0021_review_admin_reply",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1792434296883,
+      "tag": "0022_campaign_hero_image",
+      "breakpoints": true
     }
   ]
 }

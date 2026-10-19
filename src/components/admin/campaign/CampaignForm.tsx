@@ -72,6 +72,7 @@ export function CampaignForm({
   const [isActive, setIsActive] = useState(campaign?.row.isActive ?? true);
   const [homePlacement, setHomePlacement] = useState<"none" | "hero" | "banner">(campaign?.row.homePlacement ?? "none");
   const [homeImageUrl, setHomeImageUrl] = useState(campaign?.row.homeImageUrl ?? "");
+  const [heroImageUrl, setHeroImageUrl] = useState(campaign?.row.heroImageUrl ?? "");
   const [homeBannerTone, setHomeBannerTone] = useState<"pink" | "blue">(campaign?.row.homeBannerTone ?? "pink");
   const [homeTitle, setHomeTitle] = useState(campaign?.row.homeTitle ?? "");
   const [homeDescription, setHomeDescription] = useState(campaign?.row.homeDescription ?? "");
@@ -148,6 +149,7 @@ export function CampaignForm({
       isActive,
       homePlacement,
       homeImageUrl: homePlacement === "none" ? null : homeImageUrl || null,
+      heroImageUrl: heroImageUrl || null,
       homeBannerTone,
       homeTitle: homeTitle.trim() || null,
       homeDescription: homeDescription.trim() || null,
@@ -234,6 +236,22 @@ export function CampaignForm({
               onChange={(e) => setDescription(e.target.value)}
             />
               <KindPicker value={kind} onChange={setKind} />
+              <div className="flex flex-col gap-3 rounded-[var(--radius-md)] border border-line bg-header-bg/40 p-4">
+                <ImagePicker
+                  name="campaign-hero-image"
+                  folder="banners"
+                  label="تصویر هدر صفحه کمپین"
+                  kind="saleHero"
+                  defaultValue={heroImageUrl}
+                  onChange={setHeroImageUrl}
+                  hint="اختیاری."
+                />
+                <p className="m-0 text-[0.78rem] leading-6 text-text-secondary">
+                  {heroImageUrl
+                    ? "هدر صفحه کمپین فقط همین تصویر را نشان می‌دهد؛ نام، نوع و توضیح کمپین نمایش داده نمی‌شوند. شمارش معکوس (در صورت روشن بودن) روی تصویر می‌ماند."
+                    : "بدون تصویر، هدر صفحه کمپین نام، نوع تخفیف و توضیح کوتاه را نشان می‌دهد."}
+                </p>
+              </div>
             </>,
           )}
           {panel(1, "تنظیمات تخفیف", KIND_META[kind].description, <><ConfigFields kind={kind} draft={draft} onChange={(patch) => setDraft((current) => ({ ...current, ...patch }))} />
@@ -369,6 +387,7 @@ export function CampaignForm({
             <dl className="m-0 flex flex-col">
               <ReviewRow label="نام">{name.trim() || "—"}</ReviewRow>
               <ReviewRow label="نوع">{KIND_META[kind].title}</ReviewRow>
+              <ReviewRow label="هدر صفحه کمپین">{heroImageUrl ? "فقط تصویر" : "نام، نوع و توضیح"}</ReviewRow>
               <ReviewRow label="تخفیف">{summary ?? "—"}</ReviewRow>
               <ReviewRow label="دامنه">
                 {scope.appliesToAll

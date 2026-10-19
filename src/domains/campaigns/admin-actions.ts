@@ -86,6 +86,7 @@ export async function saveCampaignAction(payload: string, id: string | null): Pr
     // Homepage advertising: the image only matters while a placement is chosen.
     homePlacement: input.homePlacement,
     homeImageUrl: input.homePlacement === "none" ? null : input.homeImageUrl,
+    heroImageUrl: input.heroImageUrl,
     homeBannerTone: input.homeBannerTone,
     homeTitle: input.homePlacement === "banner" ? input.homeTitle : null,
     homeDescription: input.homePlacement === "banner" ? input.homeDescription : null,
@@ -176,6 +177,7 @@ export async function duplicateCampaignAction(id: string): Promise<ActionResult<
           isActive: false,
           homePlacement: source.homePlacement,
           homeImageUrl: source.homeImageUrl,
+          heroImageUrl: source.heroImageUrl,
           homeBannerTone: source.homeBannerTone,
           homeTitle: source.homeTitle,
           homeDescription: source.homeDescription,

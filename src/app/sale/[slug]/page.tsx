@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Container } from "@/components/ui/Container";
@@ -90,6 +91,27 @@ export default async function SalePage(props: SalePageProps) {
       <Container>
         <Breadcrumbs items={[{ label: "صفحه اصلی", href: "/" }, { label: landing.name }]} />
 
+        {landing.heroImageUrl ? (
+          /* Image hero: only the uploaded image (+ countdown). The box has the same fixed
+             3:1 ratio as the recommended upload (IMAGE_SPECS.saleHero), so nothing is cropped. */
+          <header className="relative mb-10 aspect-[3/1] overflow-hidden rounded-[var(--radius-lg)] bg-card-image">
+            <h1 className="sr-only">{landing.name}</h1>
+            <Image
+              src={landing.heroImageUrl}
+              alt=""
+              fill
+              priority
+              sizes="(min-width: 1304px) 1240px, 100vw"
+              className="object-cover"
+              unoptimized={landing.heroImageUrl.endsWith(".gif")}
+            />
+            {landing.countdownEndsAt && (
+              <div className="absolute bottom-2 end-2 rounded-[var(--radius-md)] bg-[#0b0712]/70 p-2 backdrop-blur-sm sm:bottom-4 sm:end-4 sm:p-3">
+                <CampaignCountdown endsAt={landing.countdownEndsAt} variant="blocks" tone="dark" size="sm" />
+              </div>
+            )}
+          </header>
+        ) : (
         <header className="relative mb-10 overflow-hidden rounded-[var(--radius-lg)] border border-white/10 bg-[linear-gradient(135deg,#0b0712_0%,#170c2b_50%,#2f1160_100%)] text-white">
           {/* Thin brand-purple rule along the top edge: flat gradient, no glow. */}
           <div aria-hidden="true" className="absolute inset-x-0 top-0 h-[3px] bg-[linear-gradient(270deg,#7b2cc4_0%,#5b0fa5_45%,transparent_100%)]" />
@@ -118,6 +140,7 @@ export default async function SalePage(props: SalePageProps) {
             )}
           </div>
         </header>
+        )}
 
         {showFilterBar && (
           <ListingFilterBar basePath={basePath} filters={filters} defaultSort={DEFAULT_PRODUCT_SORT} facets={landing.facets} />

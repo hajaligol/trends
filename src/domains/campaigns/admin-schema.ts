@@ -66,6 +66,13 @@ export const campaignInputSchema = z
       .nullable()
       .default(null)
       .transform((value) => value || null),
+    // Optional image for the sale page's own hero; empty ⇒ the text hero is used.
+    heroImageUrl: z
+      .string()
+      .trim()
+      .nullable()
+      .default(null)
+      .transform((value) => value || null),
     homeBannerTone: z.enum(["pink", "blue"]).default("pink"),
     homeTitle: optionalText(120, "عنوان بنر").default(null),
     homeDescription: optionalText(400, "توضیح بنر").default(null),
@@ -98,6 +105,9 @@ export const campaignInputSchema = z
       } else if (!isValidHomeImagePath(input.homeImageUrl)) {
         ctx.addIssue({ code: "custom", message: "تصویر باید از طریق «انتخاب فایل» بارگذاری شده باشد", path: ["homeImageUrl"] });
       }
+    }
+    if (input.heroImageUrl && !isValidHomeImagePath(input.heroImageUrl)) {
+      ctx.addIssue({ code: "custom", message: "تصویر باید از طریق «انتخاب فایل» بارگذاری شده باشد", path: ["heroImageUrl"] });
     }
     const includeCount = input.brandIds.length + input.categoryIds.length + input.productIds.length;
     if (!input.appliesToAll && includeCount === 0) {

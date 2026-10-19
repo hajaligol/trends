@@ -38,11 +38,14 @@ export function CampaignCountdown({
   endsAt,
   variant = "inline",
   tone = "light",
+  size = "md",
 }: {
   endsAt: string;
   variant?: "inline" | "blocks";
   /** `dark` for use on the black/purple campaign hero. */
   tone?: "light" | "dark";
+  /** `sm` is the compact version laid over the sale page's hero image. */
+  size?: "md" | "sm";
 }) {
   const current = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
   if (current === null || current === 0) return null;
@@ -59,18 +62,21 @@ export function CampaignCountdown({
       { value: minutes, label: "دقیقه" },
       { value: seconds, label: "ثانیه" },
     ];
+    const small = size === "sm";
     return (
-      <div role="timer" aria-label="زمان باقی‌مانده تا پایان کمپین" className="flex items-start gap-2">
+      <div role="timer" aria-label="زمان باقی‌مانده تا پایان کمپین" className={`flex items-start ${small ? "gap-1.5" : "gap-2"}`}>
         {units.map((unit) => (
-          <div key={unit.label} className="flex min-w-[3.4rem] flex-col items-center gap-1">
+          <div key={unit.label} className={`flex flex-col items-center gap-1 ${small ? "min-w-[2.3rem] sm:min-w-[2.9rem]" : "min-w-[3.4rem]"}`}>
             <span
-              className={`flex h-12 w-full items-center justify-center rounded-[var(--radius-sm)] border text-[1.25rem] font-bold tabular-nums ${
+              className={`flex w-full items-center justify-center rounded-[var(--radius-sm)] border font-bold tabular-nums ${
+                small ? "h-8 text-[0.95rem] sm:h-10 sm:text-[1.1rem]" : "h-12 text-[1.25rem]"
+              } ${
                 tone === "dark" ? "border-white/15 bg-white/[0.07] text-white" : "border-line bg-bg text-ink"
               }`}
             >
               {toPersianDigits(pad(unit.value))}
             </span>
-            <span className={`text-[0.72rem] ${tone === "dark" ? "text-white/60" : "text-text-secondary"}`}>{unit.label}</span>
+            <span className={`${small ? "text-[0.62rem] sm:text-[0.7rem]" : "text-[0.72rem]"} ${tone === "dark" ? "text-white/60" : "text-text-secondary"}`}>{unit.label}</span>
           </div>
         ))}
       </div>

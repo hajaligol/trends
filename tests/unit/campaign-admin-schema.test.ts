@@ -46,6 +46,15 @@ describe("campaign admin input", () => {
     expect(campaignInputSchema.safeParse({ ...base, showCountdown: true, endsAt: "2026-10-20T10:00" }).success).toBe(true);
   });
 
+  it("accepts an optional uploaded hero image and rejects anything else", () => {
+    expect(campaignInputSchema.safeParse(base).success).toBe(true); // omitted ⇒ text hero
+    const ok = campaignInputSchema.safeParse({ ...base, heroImageUrl: "/assets/banners/sale-hero.webp" });
+    expect(ok.success && ok.data.heroImageUrl).toBe("/assets/banners/sale-hero.webp");
+    const empty = campaignInputSchema.safeParse({ ...base, heroImageUrl: "  " });
+    expect(empty.success && empty.data.heroImageUrl).toBeNull();
+    expect(campaignInputSchema.safeParse({ ...base, heroImageUrl: "https://evil.example/x.png" }).success).toBe(false);
+  });
+
   it("rejects non-uuid ids and over-long names", () => {
     expect(campaignInputSchema.safeParse({ ...base, brandIds: ["nope"] }).success).toBe(false);
     expect(campaignInputSchema.safeParse({ ...base, name: "ا".repeat(61) }).success).toBe(false);

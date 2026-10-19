@@ -5,6 +5,7 @@ import { EMPTY_LISTING_FILTERS, type ListingFilters } from "@/domains/catalog/li
 import { LISTING_PAGE_SIZE, type ListingFacets } from "@/domains/catalog/listing-engine";
 import { finishListing, loadListingCandidates, type CatalogProductSummary } from "@/domains/catalog/queries";
 import { campaignCoversProduct } from "./engine";
+import { isValidHomeImagePath } from "./home-image";
 import { describeDefinition } from "./labels";
 import { toEngineCampaign } from "./queries";
 import { campaignStatus } from "./status";
@@ -19,6 +20,8 @@ export type CampaignLanding =
       description: string | null;
       summary: string;
       countdownEndsAt: string | null;
+      /** Uploaded hero image; when present the page shows only it (plus the countdown). */
+      heroImageUrl: string | null;
       products: CatalogProductSummary[];
       total: number;
       page: number;
@@ -79,6 +82,7 @@ export async function getCampaignLanding(
     slug: row.slug,
     description: row.description,
     summary: describeDefinition(campaign),
+    heroImageUrl: row.heroImageUrl && isValidHomeImagePath(row.heroImageUrl) ? row.heroImageUrl : null,
     countdownEndsAt: row.showCountdown && row.endsAt ? row.endsAt.toISOString() : null,
     products: result.products,
     total: result.total,

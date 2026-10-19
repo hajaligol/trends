@@ -1,5 +1,17 @@
 # Trends Progress Report
 
+## Latest change: optional image hero on campaign (sale) pages (user-requested)
+Status: COMPLETE WITH FOLLOW-UP. `tsc` ✔, `eslint` ✔, `npm test` 313/313 ✔, `npm run test:integration` 114/114 ✔ (3 new tests), `next build` ✔, fresh-DB `db:migrate` + `db:seed` ✔, HTTP render check of both modes ✔. **Not verified in a real browser** (countdown renders client-side after hydration; layout/overlay not eyeballed).
+- **DB:** migration `0022_campaign_hero_image` adds nullable `campaigns.hero_image_url` (no constraint; empty = text hero).
+- **Admin:** campaign form, step 1 «نام و نوع»: new optional `ImagePicker` «تصویر هدر صفحه کمپین» (folder `banners`, spec `saleHero` = 3:1, e.g. 1800×600). Helper text switches between the two modes; review step shows «هدر صفحه کمپین». Save/duplicate carry `heroImageUrl`.
+- **Validation:** `campaignInputSchema.heroImageUrl` (optional, blank→null) must match the uploaded-asset path pattern (`isValidHomeImagePath`); `getCampaignLanding` re-checks it when reading.
+- **Sale page (`app/sale/[slug]/page.tsx`):** no image → unchanged text hero. Image → header is a fixed `aspect-[3/1]` box (same ratio on every screen, so the upload is never cropped when it has that ratio), image fills it (`priority`), title/type/description/product count are NOT rendered visually. An `sr-only` `<h1>` keeps the campaign name for accessibility/SEO. The countdown stays as a compact glass pill (bottom-end corner) when «نمایش شمارش معکوس» is on and an end time exists (same rule as before).
+- `CampaignCountdown` got `size="sm"` (compact blocks) for the overlay.
+- `IMAGE_SPECS.saleHero` added. Meta description still uses the campaign description (not visible on page).
+- Follow-up: on very narrow phones the 3:1 box is short (~130px), so the overlay countdown covers part of the image — keep important content away from the bottom-end corner. If a different ratio is wanted, change `aspect-[3/1]` and `IMAGE_SPECS.saleHero` together.
+- Files: `lib/db/schema/campaigns.ts`, `drizzle/migrations/0022_*`, `domains/campaigns/{admin-schema,admin-actions,landing}.ts`, `components/admin/campaign/CampaignForm.tsx`, `components/catalog/CampaignCountdown.tsx`, `lib/media/image-specs.ts`, `app/sale/[slug]/page.tsx`, tests (`campaign-admin-schema`, `sale-campaigns`).
+
+---
 ## Latest change: black/purple hero on campaign pages (user-requested)
 Status: COMPLETE WITH FOLLOW-UP. `tsc` ✔, `eslint` ✔. **Not verified in a browser.** No DB changes, no new animation, no glow/shadow.
 - `app/sale/[slug]/page.tsx` hero `<header>`: 135° gradient `#0b0712 → #170c2b → #2f1160`, hairline `white/10` border, 3px flat brand-purple rule on the top edge, white title, lavender eyebrow + summary pill, `white/75` description, `white/15` divider.

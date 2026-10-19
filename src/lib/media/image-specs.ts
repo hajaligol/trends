@@ -11,6 +11,8 @@ export const IMAGE_SPECS = {
   hero: { ratio: "21:8", width: 21, height: 8, label: "بسیار عریض", example: "۲۱۰۰×۸۰۰" },
   /** PromoBanners: `aspect-[2.2/1]` on desktop (16:9 on phones, centre-cropped). */
   banner: { ratio: "11:5", width: 11, height: 5, label: "عریض", example: "۱۶۵۰×۷۵۰" },
+  /** `/sale/<slug>` hero when it is an image: fixed `aspect-[3/1]` box, same on every screen. */
+  saleHero: { ratio: "3:1", width: 3, height: 1, label: "بسیار عریض", example: "۱۸۰۰×۶۰۰" },
   /** CategoryTiles / CategoryNav circles. */
   square: { ratio: "1:1", width: 1, height: 1, label: "مربع", example: "۸۰۰×۸۰۰" },
   /** Brand logo in the header menu. */

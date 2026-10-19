@@ -423,3 +423,52 @@ describe("homepage placement and campaign page", () => {
     expect(product.id).toBeTruthy();
   });
 });
+
+describe("sale page hero image", () => {
+  async function liveCampaign(over: Partial<typeof campaigns.$inferInsert> = {}) {
+    const [row] = await db
+      .insert(campaigns)
+      .values({
+        name: "کمپین هدر",
+        slug: `hero-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+        kind: "percent_off",
+        config: { percent: 10, maxDiscountToman: null },
+        appliesToAll: true,
+        showCountdown: true,
+        endsAt: new Date(Date.now() + 86_400_000),
+        ...over,
+      })
+      .returning();
+    campaignIds.push(row!.id);
+    return row!;
+  }
+
+  it("without an image the landing keeps the text hero data", async () => {
+    const { getCampaignLanding } = await import("@/domains/campaigns/landing");
+    const row = await liveCampaign();
+    const landing = await getCampaignLanding(row.slug, 1);
+    expect(landing?.state).toBe("live");
+    if (landing?.state === "live") {
+      expect(landing.heroImageUrl).toBeNull();
+      expect(landing.name).toBe("کمپین هدر");
+      expect(landing.countdownEndsAt).not.toBeNull();
+    }
+  });
+
+  it("with an image the landing exposes it and still carries the countdown", async () => {
+    const { getCampaignLanding } = await import("@/domains/campaigns/landing");
+    const row = await liveCampaign({ heroImageUrl: "/assets/banners/sale-hero.webp" });
+    const landing = await getCampaignLanding(row.slug, 1);
+    if (landing?.state !== "live") throw new Error("expected a live landing");
+    expect(landing.heroImageUrl).toBe("/assets/banners/sale-hero.webp");
+    expect(landing.countdownEndsAt).toBe(row.endsAt!.toISOString());
+  });
+
+  it("ignores a stored URL that is not an uploaded asset path", async () => {
+    const { getCampaignLanding } = await import("@/domains/campaigns/landing");
+    const row = await liveCampaign({ heroImageUrl: "https://evil.example/x.png" });
+    const landing = await getCampaignLanding(row.slug, 1);
+    if (landing?.state !== "live") throw new Error("expected a live landing");
+    expect(landing.heroImageUrl).toBeNull();
+  });
+});
