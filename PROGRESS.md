@@ -1,5 +1,19 @@
 # Trends Progress Report
 
+## Latest change: hero carousel slide direction now matches the dots (user-requested)
+Status: COMPLETE WITH FOLLOW-UP. `tsc` / `eslint` ✔. **Not verified in a browser.** No DB changes.
+- Cause: the dots row follows the page's RTL (dot 1 at the right, "next" dot to the left) but the slide track was forced `direction: ltr`, so "next" pushed the content left — the opposite way.
+- `components/home/HeroCarousel.tsx`: track is now `direction: rtl` with `translateX(+position × 100%)` — slide 1 at the right edge, later slides continue leftwards, so "next" enters from the LEFT, same direction as the active dot moves. Swipe: drag right = next, drag left = previous (the natural RTL gesture). Loop clones/snap logic unchanged.
+- If the opposite look is preferred (slides move left on "next"), mirror the dots row instead (`dir="ltr"` on the dots container) and revert the track to ltr/negative translate.
+
+---
+## Latest change: hero carousel is now a true infinite loop (user-requested)
+Status: COMPLETE WITH FOLLOW-UP. `tsc` ✔, `eslint` ✔. **Not verified in a real browser** (none in the sandbox) — watch autoplay across the last→first and first→last seams, drag at both ends, and dot clicks once. No DB changes.
+- Problem: going from the last slide to the first rewound the whole track backwards (one long reverse slide).
+- `components/home/HeroCarousel.tsx`: track is `[clone of last, ...slides, clone of first]`; state is a track `position` (real slides at 1..n). Autoplay/swipe/step move ±1 with the transition; landing on a clone triggers an un-animated jump to its real twin (on `transitionend`, with a timeout fallback for hidden tabs / reduced motion). The picture is identical, so slides read as endless back-to-back. Dots show `(position-1) mod n`. Grabbing the track on a clone snaps first. Clones are `aria-hidden` with `tabIndex=-1` links. Single slide: no clones, no loop.
+- Transition now 500 ms `cubic-bezier(0.4,0,0.2,1)` (was 320 ms ease). Non-first slide images are `loading="eager"` (first keeps `priority`) so adjacent slides are decoded before they slide in.
+
+---
 ## Latest change: ALL active campaigns on cards and product page (user reversed the "best only" decision)
 Status: COMPLETE WITH FOLLOW-UP. `tsc` ✔, `eslint` (touched files) ✔. Not verified against a DB/browser. No DB changes.
 - `domains/catalog/queries.ts`: all summary builders and the product page use `campaignsFor` → `campaignInfosFor` (every live campaign covering the product, price-level first).

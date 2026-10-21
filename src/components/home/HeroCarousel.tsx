@@ -16,6 +16,7 @@ type HeroSlideLike = { id: string; alt: string; imageUrl: string | null; ctaHref
 
 const AUTOPLAY_DELAY_MS = 5000;
 const SWIPE_THRESHOLD_RATIO = 0.15;
+const TRANSITION_MS = 500;
 
 /**
  * Image-only hero banner carousel: autoplay, dots, and
@@ -28,12 +29,22 @@ const SWIPE_THRESHOLD_RATIO = 0.15;
  */
 export function HeroCarousel({ slides }: { slides: HeroSlideLike[] }) {
   const slideCount = slides.length;
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const looping = slideCount > 1;
+  // Infinite loop via clones: the track is [clone of last, ...slides, clone
+  // of first]. Real slides sit at positions 1..n. Moving past either end
+  // slides onto a clone (looks like the neighbouring slide), then — once that
+  // transition is over — the track is moved to the matching real slide with
+  // no animation. The picture is identical, so the jump is invisible and the
+  // slides read as endless back-to-back frames.
+  const [position, setPosition] = useState(looping ? 1 : 0);
+  const [animate, setAnimate] = useState(true);
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffsetPercent, setDragOffsetPercent] = useState(0);
 
   const wrapRef = useRef<HTMLDivElement>(null);
   const autoplayTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const snapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const positionRef = useRef(position);
   const draggingRef = useRef(false);
   const startXRef = useRef(0);
   const deltaXRef = useRef(0);
@@ -41,11 +52,68 @@ export function HeroCarousel({ slides }: { slides: HeroSlideLike[] }) {
   // also follow the slide's link.
   const swipedRef = useRef(false);
 
+  const commitPosition = useCallback((next: number) => {
+    positionRef.current = next;
+    setPosition(next);
+  }, []);
+
+  /** If the track rests on a clone, jump (no animation) to its real twin. */
+  const snapIfOnClone = useCallback(() => {
+    if (snapTimer.current !== null) {
+      clearTimeout(snapTimer.current);
+      snapTimer.current = null;
+    }
+    if (!looping) return;
+    const current = positionRef.current;
+    if (current === slideCount + 1 || current === 0) {
+      setAnimate(false);
+      commitPosition(current === 0 ? slideCount : 1);
+    }
+  }, [commitPosition, looping, slideCount]);
+
+  /** Re-enable the transition one frame after an un-animated jump. */
+  useEffect(() => {
+    if (animate) return undefined;
+    let inner = 0;
+    const outer = requestAnimationFrame(() => {
+      inner = requestAnimationFrame(() => setAnimate(true));
+    });
+    return () => {
+      cancelAnimationFrame(outer);
+      cancelAnimationFrame(inner);
+    };
+  }, [animate]);
+
+  /** Safety net: `transitionend` never fires when the tab is hidden or motion is reduced. */
+  useEffect(() => {
+    if (!looping || isDragging) return undefined;
+    if (position !== 0 && position !== slideCount + 1) return undefined;
+    snapTimer.current = setTimeout(snapIfOnClone, TRANSITION_MS + 200);
+    return () => {
+      if (snapTimer.current !== null) {
+        clearTimeout(snapTimer.current);
+        snapTimer.current = null;
+      }
+    };
+  }, [isDragging, looping, position, slideCount, snapIfOnClone]);
+
+  const step = useCallback(
+    (direction: 1 | -1) => {
+      snapIfOnClone();
+      const next = positionRef.current + direction;
+      // Stay inside the cloned track even if clicks arrive faster than the snap.
+      commitPosition(Math.min(Math.max(next, 0), slideCount + 1));
+    },
+    [commitPosition, slideCount, snapIfOnClone],
+  );
+
+  /** Dot click: go straight to a real slide. */
   const goTo = useCallback(
     (index: number) => {
-      setCurrentIndex(((index % slideCount) + slideCount) % slideCount);
+      setAnimate(true);
+      commitPosition(index + 1);
     },
-    [slideCount],
+    [commitPosition],
   );
 
   const stopAutoplay = useCallback(() => {
@@ -59,10 +127,8 @@ export function HeroCarousel({ slides }: { slides: HeroSlideLike[] }) {
     stopAutoplay();
     if (slideCount < 2) return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    autoplayTimer.current = setInterval(() => {
-      setCurrentIndex((index) => (index + 1) % slideCount);
-    }, AUTOPLAY_DELAY_MS);
-  }, [slideCount, stopAutoplay]);
+    autoplayTimer.current = setInterval(() => step(1), AUTOPLAY_DELAY_MS);
+  }, [slideCount, step, stopAutoplay]);
 
   useEffect(() => {
     startAutoplay();
@@ -83,6 +149,8 @@ export function HeroCarousel({ slides }: { slides: HeroSlideLike[] }) {
 
     function onDown(event: MouseEvent | TouchEvent) {
       swipedRef.current = false;
+      // Grabbing the track while it rests on a clone: move to the twin first.
+      snapIfOnClone();
       draggingRef.current = true;
       startXRef.current = clientXOf(event);
       deltaXRef.current = 0;
@@ -103,10 +171,11 @@ export function HeroCarousel({ slides }: { slides: HeroSlideLike[] }) {
       setIsDragging(false);
       setDragOffsetPercent(0);
       const threshold = wrap.offsetWidth * SWIPE_THRESHOLD_RATIO;
+      // RTL track: dragging right pulls in the NEXT slide (from the left).
       if (deltaXRef.current > threshold) {
-        goTo(currentIndex - 1);
+        step(1);
       } else if (deltaXRef.current < -threshold) {
-        goTo(currentIndex + 1);
+        step(-1);
       }
       startAutoplay();
     }
@@ -126,11 +195,23 @@ export function HeroCarousel({ slides }: { slides: HeroSlideLike[] }) {
       wrap.removeEventListener("touchmove", onMove);
       wrap.removeEventListener("touchend", onUp);
     };
-  }, [currentIndex, goTo, slideCount, startAutoplay, stopAutoplay]);
+  }, [slideCount, snapIfOnClone, startAutoplay, step, stopAutoplay]);
 
   if (slideCount === 0) return null;
 
-  const translatePercent = -currentIndex * 100 + dragOffsetPercent;
+  // RTL track: slide 1 sits at the right edge and later slides continue to the
+  // LEFT, exactly like the dots below (dot 1 at the right). "Next" therefore
+  // pans the view leftwards, i.e. the content moves RIGHT (positive translate).
+  const translatePercent = position * 100 + dragOffsetPercent;
+  const activeIndex = looping ? (position - 1 + slideCount) % slideCount : 0;
+  // Clones are visual only: hidden from assistive tech and the tab order.
+  const track = looping
+    ? [
+        { slide: slides[slideCount - 1]!, key: "clone-last", index: slideCount - 1, clone: true },
+        ...slides.map((slide, index) => ({ slide, key: slide.id, index, clone: false })),
+        { slide: slides[0]!, key: "clone-first", index: 0, clone: true },
+      ]
+    : slides.map((slide, index) => ({ slide, key: slide.id, index, clone: false }));
 
   return (
     <div
@@ -149,18 +230,22 @@ export function HeroCarousel({ slides }: { slides: HeroSlideLike[] }) {
     >
       <div
         style={{
-          direction: "ltr",
+          direction: "rtl",
           transform: `translateX(${translatePercent}%)`,
-          transition: isDragging ? "none" : "transform 320ms ease",
+          transition: isDragging || !animate ? "none" : `transform ${TRANSITION_MS}ms cubic-bezier(0.4, 0, 0.2, 1)`,
           willChange: "transform",
+        }}
+        onTransitionEnd={(event) => {
+          if (event.target === event.currentTarget) snapIfOnClone();
         }}
         className="flex h-full w-full"
       >
-        {slides.map((slide, index) => (
+        {track.map(({ slide, key, index, clone }) => (
           <div
-            key={slide.id}
+            key={key}
             role="group"
             aria-roledescription="اسلاید"
+            aria-hidden={clone || undefined}
             aria-label={`${toPersianDigits(index + 1)} از ${toPersianDigits(slideCount)}`}
             className="relative h-full w-full shrink-0 basis-full"
           >
@@ -169,7 +254,8 @@ export function HeroCarousel({ slides }: { slides: HeroSlideLike[] }) {
                 src={slide.imageUrl}
                 alt={slide.alt}
                 fill
-                priority={index === 0}
+                priority={index === 0 && !clone}
+                loading={index === 0 && !clone ? undefined : "eager"}
                 sizes="100vw"
                 draggable={false}
                 className="pointer-events-none object-cover"
@@ -182,6 +268,7 @@ export function HeroCarousel({ slides }: { slides: HeroSlideLike[] }) {
                 href={safeHref(slide.ctaHref)!}
                 aria-label={slide.alt}
                 draggable={false}
+                tabIndex={clone ? -1 : undefined}
                 onClick={(event) => {
                   if (swipedRef.current) {
                     event.preventDefault();
@@ -208,7 +295,7 @@ export function HeroCarousel({ slides }: { slides: HeroSlideLike[] }) {
                   startAutoplay();
                 }}
                 className={
-                  index === currentIndex
+                  index === activeIndex
                     ? "h-2 w-[22px] rounded border-[1.5px] border-ink bg-white transition-[width,background-color,border-radius] duration-200"
                     : "h-2 w-2 rounded-full border-[1.5px] border-ink bg-bg/60 transition-[width,background-color,border-radius] duration-200"
                 }
