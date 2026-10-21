@@ -1,4 +1,4 @@
-import { bestPriceCampaign, campaignCoversProduct, type EngineCampaign, type ProductRef } from "./engine";
+import { bestCampaignForProduct, bestPriceCampaign, campaignCoversProduct, type EngineCampaign, type ProductRef } from "./engine";
 import { isPriceLevelKind } from "./config";
 import { describeDefinition } from "./labels";
 import { getActiveCampaignsForRequest } from "./queries";
@@ -47,19 +47,37 @@ export function priceVariantForCatalog(
   return { priceToman: best.priceToman, compareAtPriceToman: variant.priceToman };
 }
 
+function toCampaignInfo(campaign: EngineCampaign): CatalogCampaignInfo {
+  return {
+    id: campaign.id,
+    name: campaign.name,
+    slug: campaign.slug,
+    kind: campaign.kind,
+    summary: describeDefinition(campaign),
+    description: campaign.description,
+    changesPrice: isPriceLevelKind(campaign.kind),
+    countdownEndsAt: campaign.showCountdown && campaign.endsAt ? campaign.endsAt.toISOString() : null,
+  };
+}
+
 /** Live campaigns covering a product, best-known first (price-level first). */
 export function campaignInfosFor(pricing: CatalogPricing, ref: ProductRef): CatalogCampaignInfo[] {
   return pricing.campaigns
     .filter((campaign) => campaignCoversProduct(campaign.scope, ref))
-    .map((campaign) => ({
-      id: campaign.id,
-      name: campaign.name,
-      slug: campaign.slug,
-      kind: campaign.kind,
-      summary: describeDefinition(campaign),
-      description: campaign.description,
-      changesPrice: isPriceLevelKind(campaign.kind),
-      countdownEndsAt: campaign.showCountdown && campaign.endsAt ? campaign.endsAt.toISOString() : null,
-    }))
+    .map(toCampaignInfo)
     .sort((a, b) => Number(b.changesPrice) - Number(a.changesPrice));
+}
+
+/**
+ * Product page: only the ONE campaign that saves the customer the most
+ * (judged on `referencePriceToman`, the product's regular starting price).
+ * Returns an array so callers keep the `campaigns` shape; it holds 0 or 1.
+ */
+export function bestCampaignInfoFor(
+  pricing: CatalogPricing,
+  ref: ProductRef,
+  referencePriceToman: number,
+): CatalogCampaignInfo[] {
+  const best = bestCampaignForProduct(pricing.campaigns, ref, referencePriceToman);
+  return best ? [toCampaignInfo(best)] : [];
 }

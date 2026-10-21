@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   allocateProportionally,
+  bestCampaignForProduct,
+  campaignUnitBenefit,
   evaluateCart,
   type CampaignScope,
   type EngineCampaign,
@@ -261,5 +263,54 @@ describe("invariants over random carts", () => {
       // Deterministic: same input, same output (order of campaigns irrelevant).
       expect(evaluateCart(lines, [...campaigns].reverse())).toEqual(r);
     }
+  });
+});
+
+describe("best campaign for the product page", () => {
+  const ref = { productId: "p1", brandId: "b1", categoryId: "cat1" };
+  const pct = (percent: number, over: Partial<EngineCampaign> = {}) =>
+    campaign({ kind: "percent_off", config: { percent, maxDiscountToman: null } }, over);
+
+  it("returns null when nothing covers the product", () => {
+    const other = pct(30, { scope: scope({ productIds: new Set(["other"]) }) });
+    expect(bestCampaignForProduct([other], ref, 1_000_000)).toBeNull();
+    expect(bestCampaignForProduct([], ref, 1_000_000)).toBeNull();
+  });
+
+  it("picks the campaign that saves more, whatever the order", () => {
+    const small = pct(10);
+    const big = pct(25);
+    expect(bestCampaignForProduct([small, big], ref, 1_000_000)).toBe(big);
+    expect(bestCampaignForProduct([big, small], ref, 1_000_000)).toBe(big);
+  });
+
+  it("compares different kinds by per-unit saving", () => {
+    const tenPercent = pct(10); // 100k on a 1M product
+    const buy1get1 = campaign({ kind: "buy_x_get_y_free", config: { buyQty: 1, getQty: 1 } }); // 500k per unit
+    const amountOff = campaign({ kind: "amount_off", config: { amountToman: 200_000 } });
+    expect(bestCampaignForProduct([tenPercent, amountOff, buy1get1], ref, 1_000_000)).toBe(buy1get1);
+    expect(bestCampaignForProduct([tenPercent, amountOff], ref, 1_000_000)).toBe(amountOff);
+  });
+
+  it("respects the percent cap and the price floor of price-level offers", () => {
+    const capped = campaign({ kind: "percent_off", config: { percent: 50, maxDiscountToman: 100_000 } });
+    const flat = campaign({ kind: "amount_off", config: { amountToman: 150_000 } });
+    expect(bestCampaignForProduct([capped, flat], ref, 1_000_000)).toBe(flat);
+    expect(campaignUnitBenefit(flat, 100_000)).toEqual({ num: 100_000, den: 1 });
+  });
+
+  it("ranks free shipping last and ties go to price-level, then the older campaign", () => {
+    const ship = campaign({ kind: "free_shipping", config: { minSpendToman: 0, includeExpress: false } });
+    const sale = pct(5);
+    expect(bestCampaignForProduct([ship, sale], ref, 1_000_000)).toBe(sale);
+    expect(bestCampaignForProduct([ship], ref, 1_000_000)).toBe(ship);
+
+    const older = pct(20, { createdAt: new Date(2020, 0, 1) });
+    const newer = pct(20, { createdAt: new Date(2021, 0, 1) });
+    expect(bestCampaignForProduct([newer, older], ref, 1_000_000)).toBe(older);
+
+    const bundle = campaign({ kind: "bundle_price", config: { qty: 2, priceToman: 1_600_000 } }); // 200k per unit
+    const twentyPct = pct(20); // 200k per unit
+    expect(bestCampaignForProduct([bundle, twentyPct], ref, 1_000_000)).toBe(twentyPct);
   });
 });

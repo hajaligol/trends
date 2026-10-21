@@ -105,7 +105,7 @@ export function campaignCoversProduct(scope: CampaignScope, ref: ProductRef): bo
   );
 }
 
-const byAge = (a: { createdAt: Date; id: string }, b: { createdAt: Date; id: string }) =>
+export const byAge = (a: { createdAt: Date; id: string }, b: { createdAt: Date; id: string }) =>
   a.createdAt.getTime() - b.createdAt.getTime() || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 
 // ---------------------------------------------------------------------
@@ -176,6 +176,88 @@ export function bestPriceCampaign(
     }
   }
   return best;
+}
+
+// ---------------------------------------------------------------------
+// Product-page ranking — "which campaign is best for the customer?"
+// ---------------------------------------------------------------------
+
+/** Exact per-unit saving as a fraction (`num / den` Toman), no floats. */
+export type UnitBenefit = { num: number; den: number };
+
+/**
+ * What one unit of a product at `unitPriceToman` saves under a campaign
+ * once the customer meets its conditions (buy-Y-get-X in full groups, the
+ * bundle completed, the top tier / basket minimum reached). DISPLAY ONLY —
+ * used to pick which single campaign the product page shows; the cart and
+ * orders still use `evaluateCart`. Per-cart caps (`maxDiscountToman`) are
+ * ignored because a cap applies to a whole basket, not to one unit.
+ * Free-shipping campaigns save nothing on the item itself, so they rank
+ * last.
+ */
+export function campaignUnitBenefit(campaign: EngineCampaign, unitPriceToman: number): UnitBenefit {
+  const none: UnitBenefit = { num: 0, den: 1 };
+  const price = Math.max(0, unitPriceToman);
+  if (price === 0) return none;
+  const positive = (num: number, den: number): UnitBenefit => (num > 0 && den > 0 ? { num, den } : none);
+  switch (campaign.kind) {
+    case "percent_off":
+    case "amount_off":
+    case "fixed_price":
+      return positive(price - priceAfterPriceCampaign(campaign, price), 1);
+    case "buy_x_get_y_free":
+      return positive(campaign.config.getQty * price, campaign.config.buyQty + campaign.config.getQty);
+    case "buy_x_get_y_percent":
+      return positive(
+        campaign.config.getQty * percentOf(price, campaign.config.percent),
+        campaign.config.buyQty + campaign.config.getQty,
+      );
+    case "bundle_price":
+      return positive(campaign.config.qty * price - campaign.config.priceToman, campaign.config.qty);
+    case "tiered_discount": {
+      const top = campaign.config.tiers[campaign.config.tiers.length - 1]!;
+      return positive(percentOf(price, top.percent), 1);
+    }
+    case "basket_discount": {
+      if (campaign.config.type === "percent") return positive(percentOf(price, campaign.config.value), 1);
+      // A fixed amount is shared by the units needed to reach the minimum.
+      const units = Math.max(1, Math.ceil(campaign.config.minSpendToman / price));
+      return positive(Math.min(campaign.config.value, price * units), units);
+    }
+    case "free_shipping":
+      return none;
+  }
+}
+
+/**
+ * The single campaign with the biggest per-unit saving for this product, or
+ * `null` when none covers it. Ties: an unconditional price-level campaign
+ * beats a cart-level one, then the older campaign wins (same tie-break as
+ * `bestPriceCampaign`).
+ */
+export function bestCampaignForProduct(
+  campaigns: readonly EngineCampaign[],
+  ref: ProductRef,
+  unitPriceToman: number,
+): EngineCampaign | null {
+  let best: { campaign: EngineCampaign; benefit: UnitBenefit } | null = null;
+  for (const campaign of campaigns) {
+    if (!campaignCoversProduct(campaign.scope, ref)) continue;
+    const benefit = campaignUnitBenefit(campaign, unitPriceToman);
+    if (!best) {
+      best = { campaign, benefit };
+      continue;
+    }
+    // Cross-multiplied fraction compare (values stay far below 2^53).
+    const diff = benefit.num * best.benefit.den - best.benefit.num * benefit.den;
+    const better =
+      diff > 0 ||
+      (diff === 0 &&
+        (Number(isPriceLevelKind(campaign.kind)) > Number(isPriceLevelKind(best.campaign.kind)) ||
+          (isPriceLevelKind(campaign.kind) === isPriceLevelKind(best.campaign.kind) && byAge(campaign, best.campaign) < 0)));
+    if (better) best = { campaign, benefit };
+  }
+  return best?.campaign ?? null;
 }
 
 // ---------------------------------------------------------------------

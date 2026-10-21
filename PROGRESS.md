@@ -1,5 +1,16 @@
 # Trends Progress Report
 
+## Latest change: product page shows ONE best campaign, as a tag (user-requested)
+Status: COMPLETE WITH FOLLOW-UP. `tsc` ✔, `eslint` (touched files) ✔, `vitest tests/unit` 318/318 ✔ (5 new in `campaign-engine.test.ts`). **Not verified:** `next build` / DB-backed tests / real browser (no Postgres or browser in the sandbox) — open a product covered by two campaigns once. **No DB/migration changes.**
+- **Selection:** `engine.ts` got `campaignUnitBenefit` (exact per-unit saving as an integer fraction, no floats) and `bestCampaignForProduct`. Benefit = saving per unit once the offer's conditions are met: price-level exact; buy-X-get-Y = share of the free/discounted units; bundle = (qty×price − bundle price)/qty; tiered = top tier %; basket = % or amount spread over the units needed to reach the minimum; free shipping = 0 (ranks last, shown only if it is the only one). Per-cart caps (`maxDiscountToman`) on cart-level kinds are ignored. Ties: price-level (unconditional) beats cart-level, then the older campaign (`byAge`, now exported).
+- **Reference price:** the product's lowest regular variant price (`getProductBySlug` in `domains/catalog/queries.ts`), so the pick is stable across variants/colours.
+- **`pricing.ts`:** new `bestCampaignInfoFor`; `campaignInfosFor` unchanged (listing cards / ProductCard still use it); shared `toCampaignInfo`.
+- **UI:** `CampaignNotice` is now a small pill-shaped tag (campaign name; offer summary in `title`) linking to `/sale/<slug>`. No description, countdown or "view all" text on the product page.
+- Cart/checkout/order pricing untouched (`evaluateCart` still decides the real discount).
+- Follow-up: if the operator wants the offer summary visible in the tag (e.g. «نام · ۲۰٪ تخفیف»), render `campaign.summary` inside `CampaignNotice`.
+- Files: `domains/campaigns/{engine,pricing}.ts`, `domains/catalog/queries.ts`, `components/catalog/CampaignNotice.tsx`, `tests/unit/campaign-engine.test.ts`.
+
+---
 ## Latest change: optional image hero on campaign (sale) pages (user-requested)
 Status: COMPLETE WITH FOLLOW-UP. `tsc` ✔, `eslint` ✔, `npm test` 313/313 ✔, `npm run test:integration` 114/114 ✔ (3 new tests), `next build` ✔, fresh-DB `db:migrate` + `db:seed` ✔, HTTP render check of both modes ✔. **Not verified in a real browser** (countdown renders client-side after hydration; layout/overlay not eyeballed).
 - **DB:** migration `0022_campaign_hero_image` adds nullable `campaigns.hero_image_url` (no constraint; empty = text hero).

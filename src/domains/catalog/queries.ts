@@ -25,6 +25,7 @@ import {
 import type { ProductSort } from "./presentation";
 import { normalizeSlugParam } from "./slug";
 import {
+  bestCampaignInfoFor,
   campaignInfosFor,
   getCatalogPricing,
   priceVariantForCatalog,
@@ -692,7 +693,10 @@ export async function getProductDetailBySlug(rawSlug: string): Promise<CatalogPr
   const pricing = await getCatalogPricing();
   const variants = variantRows.map((variant) => toVariant(variant, pricing, refOf(row)));
   const galleryImages = imageRows.map(toColoredImage);
-  const summary = buildSummary(row, variants, galleryImages, campaignInfosFor(pricing, refOf(row)));
+  // Product page shows a single tag: the campaign with the most benefit,
+  // judged on the regular (pre-campaign) starting price of the product.
+  const referencePrice = variantRows.length > 0 ? Math.min(...variantRows.map((variant) => variant.priceToman)) : 0;
+  const summary = buildSummary(row, variants, galleryImages, bestCampaignInfoFor(pricing, refOf(row), referencePrice));
 
   return {
     ...summary,
