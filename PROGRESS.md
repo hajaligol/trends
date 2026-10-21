@@ -1,5 +1,29 @@
 # Trends Progress Report
 
+## Latest change: kids category icon = user-supplied baby romper (stroke matched)
+Status: COMPLETE. `tsc` / `eslint` ✔. Checked in a standalone SVG render with the t-shirt and dress (same weight), not in the real header. No DB changes.
+- `components/ui/icons.tsx` `BabyIcon` now draws the supplied `baby-clothes-illustrations` SVG (7 sub-paths merged into one `KIDS_PATH`; filled outline ≈23.2 units thick, glyph box x 3.75–508, y 0–511.75). Scaled to a 20-unit-tall glyph on the 24 grid, centred, with a same-colour stroke added so total line weight equals the `strokeWidth` prop (default 1.6; header menu passes 2) — same approach as `DressIcon`. The old Lucide "baby" face was removed. `HeaderNav.tsx` is unchanged (`kids: BabyIcon`).
+- At weight 2 the gap between the romper's feet narrows to a thin slit; still readable at 22px.
+
+---
+## Latest change: women's category icon replaced again (user-supplied, stroke matched)
+Status: COMPLETE. `tsc` / `eslint` ✔. Checked in a standalone SVG render next to the t-shirt (same weight), not in the real header. No DB changes.
+- `components/ui/icons.tsx` `DressIcon` now draws the newer user-supplied SVG (filled outline, ≈4.22 units thick in an 82.07×122.88 box; the previous dress path was removed). It is scaled to a 20-unit-tall glyph on the 24 grid, centred, and a same-colour stroke is added so total line weight equals the `strokeWidth` prop (default 1.6; the header menu passes 2) — same as `ShirtIcon`. Uses `currentColor`.
+- Use: `HeaderNav.tsx` `AUDIENCE_ICONS.women = DressIcon` (unchanged).
+
+---
+## Latest change: user-supplied dress icon with matched stroke weight
+Status: COMPLETE WITH FOLLOW-UP. `tsc` / `eslint` ✔. Checked in a standalone SVG render only, not in the real header. No DB changes.
+- `components/ui/icons.tsx` `DressIcon`: now the user's SVG (a FILLED outline, ~8.35 units thick in a 334×512 box), scaled to a 20-unit-tall glyph on the 24 grid and centred. A same-colour stroke is added so the total line weight equals the icon's `strokeWidth` prop (default 1.6; the header menu passes 2), i.e. the same weight as `ShirtIcon` and the other stroked icons. Uses `currentColor`, so hover/active colours still work.
+- Follow-up: at weight 2 the fine inner skirt lines sit close together and merge into heavy bands (still reads as a dress at 22px). If it looks too dense, pass a lower `strokeWidth` for that icon only, or thin out the inner pleat lines in `DRESS_PATH`.
+
+---
+## Latest change: t-shirt / dress icons in the header categories menu (user-requested)
+Status: COMPLETE WITH FOLLOW-UP. `tsc` / `eslint` ✔. Not verified in a browser (check the dress glyph at 20px). No DB changes.
+- `components/ui/icons.tsx`: removed `MarsIcon` / `VenusIcon`; added `ShirtIcon` (Lucide "shirt") and `DressIcon` (hand-drawn in the same 24px stroke style: scoop-neck straps, waist line, flared skirt).
+- `components/layout/HeaderNav.tsx`: `AUDIENCE_ICONS` → men: `ShirtIcon`, women: `DressIcon`; kids keeps `BabyIcon`. The mobile category menu never used these icons.
+
+---
 ## Latest change: hero carousel slide direction now matches the dots (user-requested)
 Status: COMPLETE WITH FOLLOW-UP. `tsc` / `eslint` ✔. **Not verified in a browser.** No DB changes.
 - Cause: the dots row follows the page's RTL (dot 1 at the right, "next" dot to the left) but the slide track was forced `direction: ltr`, so "next" pushed the content left — the opposite way.

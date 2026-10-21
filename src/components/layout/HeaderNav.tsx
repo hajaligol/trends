@@ -4,7 +4,7 @@ import { useRef, useState, type ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Container } from "@/components/ui/Container";
-import { BabyIcon, ListSortDescendingIcon, MarsIcon, NewspaperIcon, TagIcon, VenusIcon } from "@/components/ui/icons";
+import { BabyIcon, DressIcon, ListSortDescendingIcon, NewspaperIcon, ShirtIcon, TagIcon } from "@/components/ui/icons";
 import type { NavCategory } from "@/domains/categories/tree";
 import type { NavBrand } from "@/domains/brands/queries";
 import { navLinkClass } from "@/components/layout/nav-styles";
@@ -42,7 +42,7 @@ import { useDimPage } from "@/components/overlays/UIOverlayProvider";
 type MenuId = "categories" | "brands";
 
 /** Icon per audience slug (the three level-1 slugs are fixed by the taxonomy); unknown slugs get none. */
-const AUDIENCE_ICONS: Record<string, typeof MarsIcon> = { men: MarsIcon, women: VenusIcon, kids: BabyIcon };
+const AUDIENCE_ICONS: Record<string, typeof ShirtIcon> = { men: ShirtIcon, women: DressIcon, kids: BabyIcon };
 
 const TRIGGER_ICON = "h-[20px] w-[20px] shrink-0";
 const TRIGGER_LAYOUT = "inline-flex items-center gap-1.5";
