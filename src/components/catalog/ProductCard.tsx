@@ -27,10 +27,12 @@ export function ProductCard({
   showOptions?: boolean;
 }) {
   const colorSwatches = product.colorHexes.slice(0, 4);
-  // One short campaign tag: the campaign's name when it changed the price
+  // One short tag per active campaign: its name when it changed the price
   // (the % badge already says how much), otherwise what the offer is.
-  const highlighted = product.campaigns.find((c) => c.kind !== "free_shipping");
-  const promo = highlighted ? (highlighted.changesPrice ? highlighted.name : highlighted.summary) : null;
+  const promos = product.campaigns.map((campaign) => ({
+    id: campaign.id,
+    label: campaign.changesPrice ? campaign.name : campaign.summary,
+  }));
 
   return (
     <article className="flex flex-col gap-2.5">
@@ -53,8 +55,17 @@ export function ProductCard({
         <p className="mb-1.5 text-[0.9rem] text-text-secondary">
           {product.fromPriceToman !== null ? formatToman(product.fromPriceToman) : "—"}
         </p>
-        {promo && (
-          <p className="mb-1.5 w-fit rounded-full bg-lavender/60 px-2.5 py-0.5 text-[0.72rem] font-semibold text-brand-dark">{promo}</p>
+        {promos.length > 0 && (
+          <ul className="mb-1.5 flex list-none flex-wrap gap-1.5 p-0">
+            {promos.map((promo) => (
+              <li
+                key={promo.id}
+                className="rounded-full bg-lavender/60 px-2.5 py-0.5 text-[0.72rem] font-semibold text-brand-dark"
+              >
+                {promo.label}
+              </li>
+            ))}
+          </ul>
         )}
         {colorSwatches.length > 0 && (
           <div className="mb-1.5 flex gap-1.5">

@@ -1,5 +1,20 @@
 # Trends Progress Report
 
+## Latest change: ALL active campaigns on cards and product page (user reversed the "best only" decision)
+Status: COMPLETE WITH FOLLOW-UP. `tsc` ✔, `eslint` (touched files) ✔. Not verified against a DB/browser. No DB changes.
+- `domains/catalog/queries.ts`: all summary builders and the product page use `campaignsFor` → `campaignInfosFor` (every live campaign covering the product, price-level first).
+- `components/catalog/CampaignNotice.tsx` (product page): one tag per campaign (name, offer summary in tooltip), each linking to `/sale/<slug>`; wraps on small screens.
+- `components/catalog/ProductCard.tsx`: one small tag per campaign (name for price-level, summary otherwise). Free-shipping campaigns are now tagged on cards too.
+- `bestCampaignForProduct` / `campaignUnitBenefit` / `bestCampaignInfoFor` (+ tests) are now unused but kept in case the "best only" rule returns.
+
+---
+## Latest change: product cards show the single most beneficial campaign (user-requested)
+Status: COMPLETE WITH FOLLOW-UP. `tsc` ✔, `eslint` (touched files) ✔. Not verified against a DB/browser. No DB changes.
+- `domains/catalog/queries.ts`: new `bestCampaignsFor(pricing, row, rawVariants)` (uses `bestCampaignInfoFor`, same benefit ranking as the product page, reference = lowest regular variant price). All card/listing summary builders (`toSummaries`, listing candidates, collection/campaign pages) and the product page now use it, so `summary.campaigns` holds 0–1 entries everywhere.
+- `components/catalog/ProductCard.tsx`: tag uses `campaigns[0]` (before: first non-free-shipping, price-level first, which ignored benefit). Free-shipping-only products still get no tag on cards.
+- `campaignInfosFor` is no longer used by queries (kept exported).
+
+---
 ## Latest change: brand capsule bigger + links to the brand's products (user-requested)
 Status: COMPLETE WITH FOLLOW-UP. `tsc` / `eslint` on the page: see below. Not verified in a browser. No DB changes.
 - `app/product/[slug]/page.tsx`: capsule enlarged (text 0.95rem, logo chip h-8, more padding) and now a `<Link>` to `/search?q=<brand name>&brand=<brand slug>` — same `?q=<name>` convention as `/brands` and the header dropdown, plus the `brand` filter so only that brand's products show. There is no dedicated `/brands/[slug]` page.

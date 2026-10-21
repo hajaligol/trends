@@ -25,7 +25,6 @@ import {
 import type { ProductSort } from "./presentation";
 import { normalizeSlugParam } from "./slug";
 import {
-  bestCampaignInfoFor,
   campaignInfosFor,
   getCatalogPricing,
   priceVariantForCatalog,
@@ -260,6 +259,12 @@ export type CatalogProductSummary = {
 type ProductRow = { id: string; slug: string; title: string; categorySlug: string; brandId: string | null; categoryId: string };
 const refOf = (row: ProductRow): ProductRef => ({ productId: row.id, brandId: row.brandId, categoryId: row.categoryId });
 
+/** Every live campaign covering a product (price-level first), for cards
+ * and the product page. */
+function campaignsFor(pricing: CatalogPricing, row: ProductRow): CatalogCampaignInfo[] {
+  return campaignInfosFor(pricing, refOf(row));
+}
+
 function buildSummary(
   product: { id: string; slug: string; title: string; categorySlug: string },
   variants: CatalogProductVariant[],
@@ -376,7 +381,7 @@ async function loadProductSummaries(
       row,
       (variantsByProduct.get(row.id) ?? []).map((variant) => toVariant(variant, pricing, refOf(row))),
       (imagesByProduct.get(row.id) ?? []).map(toColoredImage),
-      campaignInfosFor(pricing, refOf(row)),
+      campaignsFor(pricing, row),
     ),
   );
 }
@@ -464,7 +469,7 @@ async function assembleCandidates(rows: CandidateRow[]): Promise<ListingCandidat
         row,
         variants,
         (imagesByProduct.get(row.id) ?? []).map(toColoredImage),
-        campaignInfosFor(pricing, refOf(row)),
+        campaignsFor(pricing, row),
       ),
       createdAt: row.createdAt,
       brand: row.brandSlug && row.brandName ? { slug: row.brandSlug, name: row.brandName, nameEn: row.brandNameEn } : null,
@@ -693,10 +698,7 @@ export async function getProductDetailBySlug(rawSlug: string): Promise<CatalogPr
   const pricing = await getCatalogPricing();
   const variants = variantRows.map((variant) => toVariant(variant, pricing, refOf(row)));
   const galleryImages = imageRows.map(toColoredImage);
-  // Product page shows a single tag: the campaign with the most benefit,
-  // judged on the regular (pre-campaign) starting price of the product.
-  const referencePrice = variantRows.length > 0 ? Math.min(...variantRows.map((variant) => variant.priceToman)) : 0;
-  const summary = buildSummary(row, variants, galleryImages, bestCampaignInfoFor(pricing, refOf(row), referencePrice));
+  const summary = buildSummary(row, variants, galleryImages, campaignsFor(pricing, row));
 
   return {
     ...summary,
@@ -791,7 +793,7 @@ export async function getRelatedProducts(
       row,
       (variantsByProduct.get(row.id) ?? []).map((variant) => toVariant(variant, pricing, refOf(row))),
       (imagesByProduct.get(row.id) ?? []).map(toColoredImage),
-      campaignInfosFor(pricing, refOf(row)),
+      campaignsFor(pricing, row),
     ),
   );
 }
