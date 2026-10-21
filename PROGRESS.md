@@ -1,5 +1,17 @@
 # Trends Progress Report
 
+## Latest change: brand capsule bigger + links to the brand's products (user-requested)
+Status: COMPLETE WITH FOLLOW-UP. `tsc` / `eslint` on the page: see below. Not verified in a browser. No DB changes.
+- `app/product/[slug]/page.tsx`: capsule enlarged (text 0.95rem, logo chip h-8, more padding) and now a `<Link>` to `/search?q=<brand name>&brand=<brand slug>` — same `?q=<name>` convention as `/brands` and the header dropdown, plus the `brand` filter so only that brand's products show. There is no dedicated `/brands/[slug]` page.
+- Follow-up: a real brand page (`/brands/[slug]`, indexable, with logo/description) would be a cleaner target if wanted.
+
+---
+## Latest change: brand in a small black capsule on the product page (user-requested)
+Status: COMPLETE WITH FOLLOW-UP. `tsc` ✔, `eslint` (page) ✔. Not verified in a browser. No DB changes.
+- `app/product/[slug]/page.tsx`: brand name + logo now sit in a small `bg-black` pill (white text). The logo is placed on a tiny white rounded chip inside the pill so dark logos stay visible on black. Not a link (as before).
+- Follow-up: if all brand logos are white/transparent-light, the white chip can be dropped.
+
+---
 ## Latest change: product page shows ONE best campaign, as a tag (user-requested)
 Status: COMPLETE WITH FOLLOW-UP. `tsc` ✔, `eslint` (touched files) ✔, `vitest tests/unit` 318/318 ✔ (5 new in `campaign-engine.test.ts`). **Not verified:** `next build` / DB-backed tests / real browser (no Postgres or browser in the sandbox) — open a product covered by two campaigns once. **No DB/migration changes.**
 - **Selection:** `engine.ts` got `campaignUnitBenefit` (exact per-unit saving as an integer fraction, no floats) and `bestCampaignForProduct`. Benefit = saving per unit once the offer's conditions are met: price-level exact; buy-X-get-Y = share of the free/discounted units; bundle = (qty×price − bundle price)/qty; tiered = top tier %; basket = % or amount spread over the units needed to reach the minimum; free shipping = 0 (ranks last, shown only if it is the only one). Per-cart caps (`maxDiscountToman`) on cart-level kinds are ignored. Ties: price-level (unconditional) beats cart-level, then the older campaign (`byAge`, now exported).

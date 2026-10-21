@@ -148,18 +148,24 @@ export default async function ProductPage({ params, searchParams }: ProductPageP
             <div className="flex flex-col gap-6 lg:py-2">
               <div className="flex flex-col gap-2">
                 {product.brand && (
-                  <p className="m-0 flex items-center gap-2 text-[0.88rem] text-text-secondary">
+                  <Link
+                    href={`/search?q=${encodeURIComponent(product.brand.name)}&brand=${encodeURIComponent(product.brand.slug)}`}
+                    aria-label={`مشاهده محصولات برند ${product.brand.name}`}
+                    className="m-0 inline-flex w-fit max-w-full items-center gap-2.5 rounded-full bg-black py-1.5 ps-1.5 pe-5 text-[0.95rem] font-semibold text-white transition-colors hover:bg-black/80"
+                  >
                     {product.brand.logoUrl && (
-                      <Image
-                        src={product.brand.logoUrl}
-                        alt=""
-                        width={56}
-                        height={24}
-                        className="h-6 w-auto max-w-14 object-contain"
-                      />
+                      <span className="flex h-8 shrink-0 items-center rounded-full bg-white px-3">
+                        <Image
+                          src={product.brand.logoUrl}
+                          alt=""
+                          width={72}
+                          height={32}
+                          className="h-5 w-auto max-w-16 object-contain"
+                        />
+                      </span>
                     )}
-                    <span>{product.brand.name}</span>
-                  </p>
+                    <span className="truncate">{product.brand.name}</span>
+                  </Link>
                 )}
                 <h1 className="m-0 text-[clamp(1.5rem,3vw,2.1rem)] leading-snug font-bold">{product.title}</h1>
                 <p className="m-0 text-[0.82rem] text-text-secondary">کد کالا: {toPersianDigits(product.productCode)}</p>
