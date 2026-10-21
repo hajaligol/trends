@@ -1,5 +1,12 @@
 # Trends Progress Report
 
+## Latest change: category-type list is a one-row slideable strip with arrows (user-requested)
+Status: COMPLETE WITH FOLLOW-UP. `tsc` / `eslint` (touched files) pass. **Not verified in a browser.** No DB changes.
+- `components/catalog/SubcategoryNav.tsx`: the pill list (group page = its types, type page = sibling types) no longer wraps; it renders inside `SwipeRow` as a single row. The audience-page tile grid is unchanged.
+- `components/home/SwipeRow.tsx`: new optional props `arrowClassName` (arrow position/size; default unchanged for product rows) and `initialFocusSelector` (centres the `aria-current="page"` pill on mount). Arrows appear only when there is overflow in that direction, `sm` and up; on touch the row swipes natively, mouse can drag.
+- Follow-up: check RTL arrow direction and the current-pill centring on a long list (e.g. a men's clothing type page).
+
+---
 ## Latest change: kids category icon = user-supplied baby romper (stroke matched)
 Status: COMPLETE. `tsc` / `eslint` ✔. Checked in a standalone SVG render with the t-shirt and dress (same weight), not in the real header. No DB changes.
 - `components/ui/icons.tsx` `BabyIcon` now draws the supplied `baby-clothes-illustrations` SVG (7 sub-paths merged into one `KIDS_PATH`; filled outline ≈23.2 units thick, glyph box x 3.75–508, y 0–511.75). Scaled to a 20-unit-tall glyph on the 24 grid, centred, with a same-colour stroke added so total line weight equals the `strokeWidth` prop (default 1.6; header menu passes 2) — same approach as `DressIcon`. The old Lucide "baby" face was removed. `HeaderNav.tsx` is unchanged (`kids: BabyIcon`).

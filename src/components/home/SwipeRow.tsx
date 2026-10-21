@@ -24,6 +24,12 @@ type SwipeRowProps = {
   /** Eased scroll on arrow clicks and transitions on the arrows. Pass
    * `false` for a row that must have no animation at all. */
   animated?: boolean;
+  /** Overrides the arrows' vertical position / size classes (default suits
+   * tall product cards). */
+  arrowClassName?: string;
+  /** Selector of an item (e.g. the current page's pill) to centre in the
+   * row once on mount. */
+  initialFocusSelector?: string;
   /** Items are server-rendered by the caller and passed through as
    * children, so only the scrolling behaviour ships as client JS. */
   children: ReactNode;
@@ -39,7 +45,16 @@ type SwipeRowProps = {
  * use `Math.abs(scrollLeft)` and the scroll direction is read from the
  * computed `direction` instead of being assumed.
  */
-export function SwipeRow({ label, showArrows, itemClassName, gapClassName, animated = true, children }: SwipeRowProps) {
+export function SwipeRow({
+  label,
+  showArrows,
+  itemClassName,
+  gapClassName,
+  animated = true,
+  arrowClassName,
+  initialFocusSelector,
+  children,
+}: SwipeRowProps) {
   const scrollerRef = useRef<HTMLUListElement>(null);
   const [canGoPrev, setCanGoPrev] = useState(false);
   const [canGoNext, setCanGoNext] = useState(false);
@@ -61,6 +76,19 @@ export function SwipeRow({ label, showArrows, itemClassName, gapClassName, anima
     observer.observe(el);
     return () => observer.disconnect();
   }, [showArrows, updateEdges]);
+
+  // Bring the highlighted item into view on first render. Adding to
+  // scrollLeft moves content left in both LTR and RTL, so the same delta works.
+  useEffect(() => {
+    const el = scrollerRef.current;
+    if (!el || !initialFocusSelector) return;
+    const target = el.querySelector<HTMLElement>(initialFocusSelector);
+    if (!target) return;
+    const box = el.getBoundingClientRect();
+    const r = target.getBoundingClientRect();
+    el.scrollLeft += r.left + r.width / 2 - (box.left + box.width / 2);
+    updateEdges();
+  }, [initialFocusSelector, updateEdges]);
 
   // Mouse drag-to-scroll. Touch already scrolls natively; a mouse can't,
   // so without this the arrows would be the only way to move a row.
@@ -190,7 +218,7 @@ export function SwipeRow({ label, showArrows, itemClassName, gapClassName, anima
   }
 
   const arrowClass =
-    `absolute top-[34%] z-10 hidden h-10 w-10 items-center justify-center rounded-full bg-white text-ink shadow-[0_6px_20px_-6px_rgba(24,38,48,0.45)] ring-1 ring-ink/10 ${animated ? "transition duration-200" : ""} hover:bg-brand hover:text-white sm:flex lg:h-11 lg:w-11`;
+    `absolute z-10 hidden items-center justify-center rounded-full bg-white text-ink shadow-[0_6px_20px_-6px_rgba(24,38,48,0.45)] ring-1 ring-ink/10 ${animated ? "transition duration-200" : ""} hover:bg-brand hover:text-white sm:flex ${arrowClassName ?? "top-[34%] h-10 w-10 lg:h-11 lg:w-11"}`;
 
   // The scroller has 8px of inline padding (cancelled by -mx-2, so item
   // positions don't move). Without it the first/last item sits exactly on

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SwipeRow } from "@/components/home/SwipeRow";
 import { SWATCH_BG_CLASS, swatchForCategorySlug } from "@/domains/catalog/presentation";
 import type { CatalogCategoryDetail } from "@/domains/catalog/queries";
 
@@ -44,24 +45,30 @@ export function SubcategoryNav({ category }: { category: CatalogCategoryDetail }
 
   return (
     <nav aria-label={isChildren ? "دسته‌های زیرمجموعه" : "دسته‌های مرتبط"} className="mb-7">
-      <ul className="m-0 flex list-none flex-wrap gap-2 p-0">
+      <SwipeRow
+        label={isChildren ? "دسته‌های زیرمجموعه" : "دسته‌های مرتبط"}
+        showArrows
+        itemClassName="w-auto"
+        gapClassName="gap-2"
+        arrowClassName="top-1/2 h-8 w-8 -translate-y-1/2"
+        initialFocusSelector='[aria-current="page"]'
+      >
         {items.map((item) => {
           const isCurrent = item.id === category.id;
           return (
-            <li key={item.id}>
-              <Link
-                href={`/category/${item.slug}`}
-                aria-current={isCurrent ? "page" : undefined}
-                className={`block rounded-full border px-3.5 py-1.5 text-[0.85rem] ${
-                  isCurrent ? "border-ink bg-ink text-white" : "border-line text-text-secondary hover:border-ink hover:text-ink"
-                }`}
-              >
-                {item.name}
-              </Link>
-            </li>
+            <Link
+              key={item.id}
+              href={`/category/${item.slug}`}
+              aria-current={isCurrent ? "page" : undefined}
+              className={`block whitespace-nowrap rounded-full border px-3.5 py-1.5 text-[0.85rem] ${
+                isCurrent ? "border-ink bg-ink text-white" : "border-line text-text-secondary hover:border-ink hover:text-ink"
+              }`}
+            >
+              {item.name}
+            </Link>
           );
         })}
-      </ul>
+      </SwipeRow>
     </nav>
   );
 }
