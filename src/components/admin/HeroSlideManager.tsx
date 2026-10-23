@@ -32,15 +32,16 @@ function HeroSlideForm({ slide, onDone, onCancel }: { slide?: HeroSlide; onDone?
         kind="hero"
         defaultValue={slide?.imageUrl}
         required
-        hint="در کامپیوتر و تبلت نمایش داده می‌شود. اگر تصویر موبایل نگذارید، در موبایل همین تصویر کامل (کوتاه‌تر) دیده می‌شود."
+        hint="در کامپیوتر و تبلت نمایش داده می‌شود؛ برای موبایل تصویر جداگانه‌ای در پایین انتخاب کنید."
       />
       <ImagePicker
         name="mobileImageUrl"
         folder="hero"
-        label="تصویر موبایل (اختیاری)"
+        label="تصویر موبایل"
         kind="heroMobile"
+        required
         defaultValue={slide?.mobileImageUrl}
-        hint="بنر بلندتر و بدون برش در موبایل؛ فقط وقتی برای همه‌ی اسلایدها گذاشته شود فعال می‌شود."
+        hint="در موبایل به‌جای تصویر بالا نمایش داده می‌شود (بنر بلندتر و بدون برش)."
       />
       <TextField label="متن جایگزین (alt)" name="alt" defaultValue={slide?.alt} required hint="توضیح کوتاه تصویر برای نابینایان و موتورهای جستجو." />
       <FieldGrid>

@@ -25,6 +25,7 @@ export type CampaignStepValues = {
   showCountdown: boolean;
   homePlacement: "none" | "hero" | "banner";
   homeImageUrl: string;
+  homeMobileImageUrl: string;
 };
 
 export function validateCampaignStep(step: CampaignStepId, v: CampaignStepValues): string | null {
@@ -44,7 +45,9 @@ export function validateCampaignStep(step: CampaignStepId, v: CampaignStepValues
       if (v.showCountdown && !v.endsAt) return "برای نمایش شمارش معکوس، زمان پایان را مشخص کنید.";
       return null;
     case "home":
-      return v.homePlacement !== "none" && !v.homeImageUrl ? "برای نمایش در صفحه اصلی یک تصویر انتخاب کنید." : null;
+      if (v.homePlacement !== "none" && !v.homeImageUrl) return "برای نمایش در صفحه اصلی یک تصویر انتخاب کنید.";
+      if (v.homePlacement === "hero" && !v.homeMobileImageUrl) return "برای اسلاید صفحه اصلی، تصویر موبایل را هم انتخاب کنید.";
+      return null;
     case "review":
       return null;
   }

@@ -91,13 +91,17 @@ describe("homepage placement input", () => {
   it("hero and banner require an uploaded image", () => {
     expect(campaignInputSchema.safeParse({ ...withHome, homePlacement: "hero" }).success).toBe(false);
     expect(campaignInputSchema.safeParse({ ...withHome, homePlacement: "banner" }).success).toBe(false);
-    expect(campaignInputSchema.safeParse({ ...withHome, homePlacement: "hero", homeImageUrl: "/assets/hero/sale-1.webp" }).success).toBe(true);
+    const hero = { ...withHome, homePlacement: "hero", homeImageUrl: "/assets/hero/sale-1.webp" };
+    // A hero slide also needs its phone image (hosted upload); a banner does not.
+    expect(campaignInputSchema.safeParse(hero).success).toBe(false);
+    expect(campaignInputSchema.safeParse({ ...hero, homeMobileImageUrl: "https://evil.example/m.png" }).success).toBe(false);
+    expect(campaignInputSchema.safeParse({ ...hero, homeMobileImageUrl: "/assets/hero/sale-1-m.webp" }).success).toBe(true);
     expect(campaignInputSchema.safeParse({ ...withHome, homePlacement: "banner", homeImageUrl: "/assets/banners/sale-1.webp", homeTitle: "عنوان" }).success).toBe(true);
   });
 
   it("rejects images that would break next/image (external, traversal, wrong folder)", () => {
     for (const bad of ["https://evil.example/x.png", "//evil.example/x.png", "/assets/hero/../../etc/passwd", "/assets/other/x.png", "/x.png", "javascript:alert(1)"]) {
-      expect(campaignInputSchema.safeParse({ ...withHome, homePlacement: "hero", homeImageUrl: bad }).success, bad).toBe(false);
+      expect(campaignInputSchema.safeParse({ ...withHome, homePlacement: "hero", homeImageUrl: bad, homeMobileImageUrl: "/assets/hero/m.webp" }).success, bad).toBe(false);
     }
   });
 

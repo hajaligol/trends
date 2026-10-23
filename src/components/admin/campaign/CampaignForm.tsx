@@ -110,6 +110,7 @@ export function CampaignForm({
     showCountdown,
     homePlacement,
     homeImageUrl,
+    homeMobileImageUrl,
   };
 
   function goNext() {
@@ -330,17 +331,18 @@ export function CampaignForm({
                   required
                   defaultValue={homeImageUrl}
                   onChange={setHomeImageUrl}
-                  hint={homePlacement === "hero" ? "در کامپیوتر و تبلت نمایش داده می‌شود. اگر تصویر موبایل نگذارید، در موبایل همین تصویر کامل (کوتاه‌تر) دیده می‌شود." : undefined}
+                  hint={homePlacement === "hero" ? "در کامپیوتر و تبلت نمایش داده می‌شود؛ برای موبایل تصویر جداگانه‌ای در پایین انتخاب کنید." : undefined}
                 />
                 {homePlacement === "hero" && (
                   <ImagePicker
                     name="campaign-home-mobile-image"
                     folder="hero"
-                    label="تصویر موبایل (اختیاری)"
+                    label="تصویر موبایل"
                     kind="heroMobile"
+                    required
                     defaultValue={homeMobileImageUrl}
                     onChange={setHomeMobileImageUrl}
-                    hint="بنر بلندتر و بدون برش در موبایل؛ فقط وقتی برای همه‌ی اسلایدها گذاشته شود فعال می‌شود."
+                    hint="در موبایل به‌جای تصویر بالا نمایش داده می‌شود (بنر بلندتر و بدون برش)."
                   />
                 )}
                 {homePlacement === "banner" && (

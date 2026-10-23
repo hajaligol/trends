@@ -66,7 +66,7 @@ export const campaignInputSchema = z
       .nullable()
       .default(null)
       .transform((value) => value || null),
-    // Optional phone version of the homepage hero slide (hero placement only).
+    // Phone version of the homepage hero slide: required when the placement is `hero`.
     homeMobileImageUrl: z
       .string()
       .trim()
@@ -113,8 +113,12 @@ export const campaignInputSchema = z
         ctx.addIssue({ code: "custom", message: "تصویر باید از طریق «انتخاب فایل» بارگذاری شده باشد", path: ["homeImageUrl"] });
       }
     }
-    if (input.homeMobileImageUrl && !isValidHomeImagePath(input.homeMobileImageUrl)) {
-      ctx.addIssue({ code: "custom", message: "تصویر باید از طریق «انتخاب فایل» بارگذاری شده باشد", path: ["homeMobileImageUrl"] });
+    if (input.homePlacement === "hero") {
+      if (!input.homeMobileImageUrl) {
+        ctx.addIssue({ code: "custom", message: "برای اسلاید صفحه اصلی، تصویر موبایل را هم انتخاب کنید", path: ["homeMobileImageUrl"] });
+      } else if (!isValidHomeImagePath(input.homeMobileImageUrl)) {
+        ctx.addIssue({ code: "custom", message: "تصویر باید از طریق «انتخاب فایل» بارگذاری شده باشد", path: ["homeMobileImageUrl"] });
+      }
     }
     if (input.heroImageUrl && !isValidHomeImagePath(input.heroImageUrl)) {
       ctx.addIssue({ code: "custom", message: "تصویر باید از طریق «انتخاب فایل» بارگذاری شده باشد", path: ["heroImageUrl"] });

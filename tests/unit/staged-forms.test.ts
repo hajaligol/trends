@@ -127,6 +127,7 @@ const goodCampaign: CampaignStepValues = {
   showCountdown: false,
   homePlacement: "none",
   homeImageUrl: "",
+  homeMobileImageUrl: "",
 };
 
 describe("campaign wizard step validation", () => {
@@ -139,7 +140,10 @@ describe("campaign wizard step validation", () => {
     expect(validateCampaignStep("discount", { ...goodCampaign, configError: "درصد لازم است" })).toMatch(/درصد/);
     expect(validateCampaignStep("scope", { ...goodCampaign, hasTargets: false })).toMatch(/کل فروشگاه/);
     expect(validateCampaignStep("home", { ...goodCampaign, homePlacement: "hero" })).toMatch(/تصویر/);
-    expect(validateCampaignStep("home", { ...goodCampaign, homePlacement: "hero", homeImageUrl: "/h.webp" })).toBeNull();
+    // A hero slide also needs its phone image; a banner does not.
+    expect(validateCampaignStep("home", { ...goodCampaign, homePlacement: "hero", homeImageUrl: "/h.webp" })).toMatch(/موبایل/);
+    expect(validateCampaignStep("home", { ...goodCampaign, homePlacement: "hero", homeImageUrl: "/h.webp", homeMobileImageUrl: "/m.webp" })).toBeNull();
+    expect(validateCampaignStep("home", { ...goodCampaign, homePlacement: "banner", homeImageUrl: "/b.webp" })).toBeNull();
   });
 
   it("checks schedule order and countdown needing an end time", () => {

@@ -18,8 +18,12 @@ describe("admin content schemas", () => {
     expect(heroSlideSchema.safeParse({ ...base, imageUrl: "https://evil.test/a.png" }).success).toBe(false);
     expect(heroSlideSchema.safeParse({ ...base, imageUrl: "/assets/hero/a.webp", ctaHref: "javascript:alert(1)" }).success).toBe(false);
     expect(heroSlideSchema.safeParse({ ...base, imageUrl: "/assets/hero/a.webp", ctaHref: "//evil.test" }).success).toBe(false);
-    const ok = heroSlideSchema.safeParse({ ...base, imageUrl: "/assets/hero/a.webp", ctaHref: "/category/women" });
-    expect(ok.success).toBe(true);
+    const withImages = { ...base, imageUrl: "/assets/hero/a.webp", mobileImageUrl: "/assets/hero/a-m.webp", ctaHref: "/category/women" };
+    expect(heroSlideSchema.safeParse(withImages).success).toBe(true);
+    // The phone image is mandatory and must be a hosted upload too.
+    expect(heroSlideSchema.safeParse({ ...withImages, mobileImageUrl: "" }).success).toBe(false);
+    expect(heroSlideSchema.safeParse({ ...withImages, mobileImageUrl: undefined }).success).toBe(false);
+    expect(heroSlideSchema.safeParse({ ...withImages, mobileImageUrl: "https://evil.test/a.png" }).success).toBe(false);
     expect(
       promoBannerSchema.safeParse({
         tone: "pink", title: "t", description: "d", ctaLabel: "c", imageUrl: "data:image/png;base64,AAAA",
