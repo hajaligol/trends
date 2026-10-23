@@ -12,7 +12,14 @@ import { safeHref } from "@/lib/utils/safe-href";
  * `imageUrl`; whether the caller sourced that from `hero_slides` (Phase
  * 11, the real path) or a future different content source doesn't
  * matter to this component. */
-type HeroSlideLike = { id: string; alt: string; imageUrl: string | null; ctaHref?: string | null };
+type HeroSlideLike = {
+  id: string;
+  alt: string;
+  imageUrl: string | null;
+  /** Optional phone image (about 1:1). */
+  mobileImageUrl?: string | null;
+  ctaHref?: string | null;
+};
 
 const AUTOPLAY_DELAY_MS = 5000;
 const SWIPE_THRESHOLD_RATIO = 0.15;
@@ -30,6 +37,9 @@ const TRANSITION_MS = 500;
 export function HeroCarousel({ slides }: { slides: HeroSlideLike[] }) {
   const slideCount = slides.length;
   const looping = slideCount > 1;
+  // Phones get a tall square box only when EVERY slide has a phone image, so
+  // nothing is ever cropped: otherwise the wide 21:8 box (whole desktop image) is kept.
+  const tallOnPhones = slideCount > 0 && slides.every((slide) => slide.imageUrl && slide.mobileImageUrl);
   // Infinite loop via clones: the track is [clone of last, ...slides, clone
   // of first]. Real slides sit at positions 1..n. Moving past either end
   // slides onto a clone (looks like the neighbouring slide), then — once that
@@ -226,7 +236,9 @@ export function HeroCarousel({ slides }: { slides: HeroSlideLike[] }) {
       // which otherwise hijacks a mouse swipe and drags the picture itself.
       onDragStart={(event) => event.preventDefault()}
       style={{ touchAction: "pan-y" }}
-      className="relative aspect-[21/8] w-full cursor-grab select-none overflow-hidden rounded-[22px] bg-gradient-to-br from-[#E7DFD2] to-[#DED4C4] active:cursor-grabbing max-[640px]:aspect-[4/3.4]"
+      className={`relative aspect-[21/8] w-full cursor-grab select-none overflow-hidden rounded-[22px] bg-gradient-to-br from-[#E7DFD2] to-[#DED4C4] active:cursor-grabbing ${
+        tallOnPhones ? "max-sm:aspect-square" : ""
+      }`}
     >
       <div
         style={{
@@ -250,16 +262,40 @@ export function HeroCarousel({ slides }: { slides: HeroSlideLike[] }) {
             className="relative h-full w-full shrink-0 basis-full"
           >
             {slide.imageUrl ? (
-              <Image
-                src={slide.imageUrl}
-                alt={slide.alt}
-                fill
-                priority={index === 0 && !clone}
-                loading={index === 0 && !clone ? undefined : "eager"}
-                sizes="100vw"
-                draggable={false}
-                className="pointer-events-none object-cover"
-              />
+              tallOnPhones && slide.mobileImageUrl ? (
+                // Two pictures, swapped by CSS at `sm` (640px). Both are lazy: the
+                // one hidden by `display: none` is never downloaded.
+                <>
+                  <Image
+                    src={slide.mobileImageUrl}
+                    alt={slide.alt}
+                    fill
+                    sizes="100vw"
+                    draggable={false}
+                    className="pointer-events-none object-cover sm:hidden"
+                  />
+                  <Image
+                    src={slide.imageUrl}
+                    alt=""
+                    aria-hidden="true"
+                    fill
+                    sizes="100vw"
+                    draggable={false}
+                    className="pointer-events-none hidden object-cover sm:block"
+                  />
+                </>
+              ) : (
+                <Image
+                  src={slide.imageUrl}
+                  alt={slide.alt}
+                  fill
+                  priority={index === 0 && !clone}
+                  loading={index === 0 && !clone ? undefined : "eager"}
+                  sizes="100vw"
+                  draggable={false}
+                  className="pointer-events-none object-cover"
+                />
+              )
             ) : (
               <AssetSlot label={slide.alt} tone="banner" rounded="none" className="h-full w-full" />
             )}
@@ -284,7 +320,7 @@ export function HeroCarousel({ slides }: { slides: HeroSlideLike[] }) {
 
       {slideCount > 1 && (
         <>
-          <div className="absolute bottom-4 left-1/2 z-[2] flex -translate-x-1/2 items-center gap-1.5">
+          <div className="absolute bottom-2 left-1/2 z-[2] sm:bottom-4 flex -translate-x-1/2 items-center gap-1.5">
             {slides.map((slide, index) => (
               <button
                 key={slide.id}

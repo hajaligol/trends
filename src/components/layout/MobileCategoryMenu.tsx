@@ -44,14 +44,14 @@ export function MobileCategoryMenu({
   return (
     <div className="flex flex-col">
       <details className="group/cats border-b border-line/60">
-        <summary className={`${SUMMARY_CLASS} py-2.5 text-[0.95rem] font-semibold`}>
+        <summary className={`${SUMMARY_CLASS} py-3.5 text-[1rem] font-semibold`}>
           دسته‌بندی‌ها
           <Chevron className="transition-transform group-open/cats:rotate-180" />
         </summary>
         <div className="flex flex-col pb-2 ps-3">
       {categories.map((root) => (
         <details key={root.slug} className="group border-b border-line/60">
-          <summary className={`${SUMMARY_CLASS} py-2.5 text-[0.95rem] font-semibold`}>
+          <summary className={`${SUMMARY_CLASS} py-3.5 text-[1rem] font-semibold`}>
             {root.name}
             <Chevron className="transition-transform group-open:rotate-180" />
           </summary>
@@ -60,14 +60,14 @@ export function MobileCategoryMenu({
             <Link
               href={`/category/${root.slug}`}
               onClick={onNavigate}
-              className="rounded-md px-2 py-2 text-[0.88rem] text-ink underline underline-offset-4"
+              className="rounded-md px-2 py-3 text-[0.92rem] text-ink underline underline-offset-4"
             >
               همه‌ی محصولات {root.name}
             </Link>
 
             {root.children.map((group) => (
               <details key={group.slug} className="group/sub">
-                <summary className={`${SUMMARY_CLASS} py-2 text-[0.9rem]`}>
+                <summary className={`${SUMMARY_CLASS} py-3 text-[0.95rem]`}>
                   {group.name}
                   <Chevron className="transition-transform group-open/sub:rotate-180" />
                 </summary>
@@ -76,7 +76,7 @@ export function MobileCategoryMenu({
                     <Link
                       href={`/category/${group.slug}`}
                       onClick={onNavigate}
-                      className="block rounded-md px-2 py-1.5 text-[0.85rem] text-ink underline underline-offset-4"
+                      className="block rounded-md px-2 py-2.5 text-[0.9rem] text-ink underline underline-offset-4"
                     >
                       همه‌ی {group.name}
                     </Link>
@@ -86,7 +86,7 @@ export function MobileCategoryMenu({
                       <Link
                         href={`/category/${type.slug}`}
                         onClick={onNavigate}
-                        className="block rounded-md px-2 py-1.5 text-[0.85rem] text-text-secondary hover:bg-ink/5 hover:text-ink"
+                        className="block rounded-md px-2 py-2.5 text-[0.9rem] text-text-secondary hover:bg-ink/5 hover:text-ink"
                       >
                         {type.name}
                       </Link>
@@ -104,7 +104,7 @@ export function MobileCategoryMenu({
       <Link
         href="/brands"
         onClick={onNavigate}
-        className="rounded-md px-2 py-2.5 text-[0.95rem] font-semibold text-ink hover:bg-ink/5"
+        className="rounded-md px-2 py-3.5 text-[1rem] font-semibold text-ink hover:bg-ink/5"
       >
         برندها
       </Link>
@@ -112,7 +112,7 @@ export function MobileCategoryMenu({
       <Link
         href="/tmag"
         onClick={onNavigate}
-        className="flex items-center gap-2 rounded-md px-2 py-2.5 text-[0.95rem] font-semibold text-ink hover:bg-ink/5"
+        className="flex items-center gap-2 rounded-md px-2 py-3.5 text-[1rem] font-semibold text-ink hover:bg-ink/5"
       >
         <NewspaperIcon aria-hidden="true" strokeWidth={2} className="h-[20px] w-[20px] shrink-0" />
         تی‌مگ

@@ -6,6 +6,8 @@ import { findUserById } from "@/domains/auth/queries";
 import { getAddressesForUser } from "@/domains/addresses/queries";
 import { getOrderItemPreviews, listOrdersForUser } from "@/domains/orders/queries";
 import { getWishlistedProductIds } from "@/domains/wishlist/queries";
+import { AccountDetailsCard } from "@/components/account/AccountDetailsCard";
+import { MobileAccountHome } from "@/components/account/MobileAccountHome";
 import { AccountPageHeader } from "@/components/account/AccountPageHeader";
 import { EmptyState } from "@/components/account/EmptyState";
 import { OrderStatusBadge } from "@/components/account/OrderStatusBadge";
@@ -18,7 +20,6 @@ import {
   DashboardWishlistIcon,
 } from "@/components/ui/dashboard-icons";
 import { formatToman } from "@/lib/utils/money";
-import { formatIranianMobileForDisplay } from "@/lib/utils/phone";
 import { toPersianDigits } from "@/lib/utils/persian-digits";
 
 export const metadata: Metadata = {
@@ -94,22 +95,19 @@ export default async function AccountPage() {
   // Ids come from the user-scoped read above, so previews are ownership-safe.
   const itemsByOrder = await getOrderItemPreviews(recentOrders.map((order) => order.id));
 
-  const details: Array<{ label: string; value: ReactNode }> = [
-    { label: "نام", value: user.fullName ?? "—" },
-    {
-      label: "شماره موبایل",
-      value: (
-        <span dir="ltr" className="inline-block">
-          {toPersianDigits(formatIranianMobileForDisplay(user.mobile))}
-        </span>
-      ),
-    },
-    { label: "ایمیل", value: user.email ?? "—" },
-    { label: "عضویت از", value: formatPersianDate(user.createdAt) },
-  ];
+  const returnCount = orders.filter((order) => order.status === "refunded").length;
 
   return (
-    <div className="flex flex-col gap-6">
+    <>
+    <MobileAccountHome
+      fullName={user.fullName}
+      mobile={user.mobile}
+      orderCount={orders.length}
+      returnCount={returnCount}
+      wishlistCount={wishlistIds.length}
+    />
+    {/* The desktop dashboard; phones get `MobileAccountHome` above instead. */}
+    <div className="flex flex-col gap-6 max-lg:hidden">
       <AccountPageHeader
         icon={<DashboardUserIcon className="h-6 w-6" />}
         title="حساب کاربری"
@@ -229,22 +227,9 @@ export default async function AccountPage() {
           )}
         </section>
 
-        {/* Account details */}
-        <section className={`${CARD} p-5`}>
-          <h2 className="m-0 mb-4 flex items-center gap-2.5 text-[1.05rem] font-bold">
-            <DashboardUserIcon className="h-6 w-6 text-ink" aria-hidden="true" />
-            اطلاعات حساب
-          </h2>
-          <dl className="m-0 flex flex-col divide-y divide-line">
-            {details.map((item) => (
-              <div key={item.label} className="flex flex-col gap-1 py-3 first:pt-0 last:pb-0">
-                <dt className="text-[0.78rem] text-text-secondary">{item.label}</dt>
-                <dd className="m-0 break-words text-[0.92rem] font-medium">{item.value}</dd>
-              </div>
-            ))}
-          </dl>
-        </section>
+        <AccountDetailsCard user={user} />
       </div>
     </div>
+    </>
   );
 }

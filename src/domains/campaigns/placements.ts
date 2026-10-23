@@ -7,7 +7,13 @@ import { describeDefinition } from "./labels";
 import { campaignHref } from "./slug";
 
 /** What the homepage needs to draw a campaign slide / banner card. */
-export type HomeHeroSlideData = { id: string; alt: string; imageUrl: string; ctaHref: string };
+export type HomeHeroSlideData = {
+  id: string;
+  alt: string;
+  imageUrl: string;
+  mobileImageUrl: string | null;
+  ctaHref: string;
+};
 export type HomePromoBannerData = {
   id: string;
   tone: "pink" | "blue";
@@ -52,7 +58,14 @@ export async function getLiveHomePlacements(now: Date = new Date()): Promise<{
     const summary = describeDefinition(parsed.definition);
     const href = campaignHref(row.slug);
     if (row.homePlacement === "hero") {
-      hero.push({ id: `campaign-${row.id}`, alt: `${row.name} — ${summary}`, imageUrl: row.homeImageUrl, ctaHref: href });
+      hero.push({
+        id: `campaign-${row.id}`,
+        alt: `${row.name} — ${summary}`,
+        imageUrl: row.homeImageUrl,
+        mobileImageUrl:
+          row.homeMobileImageUrl && isValidHomeImagePath(row.homeMobileImageUrl) ? row.homeMobileImageUrl : null,
+        ctaHref: href,
+      });
     } else if (row.homePlacement === "banner") {
       banners.push({
         id: `campaign-${row.id}`,

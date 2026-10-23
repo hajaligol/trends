@@ -78,6 +78,8 @@ export const campaigns = pgTable(
      * the text fields are optional overrides of name/description/«مشاهده محصولات». */
     homePlacement: campaignHomePlacementEnum("home_placement").notNull().default("none"),
     homeImageUrl: text("home_image_url"),
+    /** Optional phone image (about 1:1) for the `hero` placement; see `hero_slides.mobile_image_url`. */
+    homeMobileImageUrl: text("home_mobile_image_url"),
     /** Optional full-bleed image for the `/sale/<slug>` hero. When set, the hero shows only
      * this image (+ the countdown) instead of the name / summary / description. */
     heroImageUrl: text("hero_image_url"),

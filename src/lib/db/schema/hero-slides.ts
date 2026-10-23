@@ -19,6 +19,8 @@ export const heroSlides = pgTable("hero_slides", {
   id: uuid("id").defaultRandom().primaryKey(),
   alt: text("alt").notNull(),
   imageUrl: text("image_url"),
+  /** Optional phone version (about 1:1). When every live slide has one the carousel is a tall square on phones, uncropped; otherwise phones show `imageUrl` in the wide 21:8 box. */
+  mobileImageUrl: text("mobile_image_url"),
   ctaHref: text("cta_href"),
   displayOrder: integer("display_order").notNull().default(0),
   isActive: boolean("is_active").notNull().default(true),

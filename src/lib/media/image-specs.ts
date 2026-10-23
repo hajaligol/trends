@@ -7,8 +7,10 @@
 export const IMAGE_SPECS = {
   /** ProductCardMedia / ProductGallery use `aspect-[4/5]`. */
   product: { ratio: "4:5", width: 4, height: 5, label: "عمودی", example: "۱۰۸۰×۱۳۵۰" },
-  /** HeroCarousel: `aspect-[21/8]` on desktop (4:3.4 on phones, centre-cropped). */
+  /** HeroCarousel: `aspect-[21/8]` (also on phones unless every slide has a phone image). */
   hero: { ratio: "21:8", width: 21, height: 8, label: "بسیار عریض", example: "۲۱۰۰×۸۰۰" },
+  /** HeroCarousel phone image: `aspect-square` box on phones, shown whole. */
+  heroMobile: { ratio: "1:1", width: 1, height: 1, label: "مربع", example: "۱۰۸۰×۱۰۸۰" },
   /** PromoBanners: `aspect-[2.2/1]` on desktop (16:9 on phones, centre-cropped). */
   banner: { ratio: "11:5", width: 11, height: 5, label: "عریض", example: "۱۶۵۰×۷۵۰" },
   /** `/sale/<slug>` hero when it is an image: fixed `aspect-[3/1]` box, same on every screen. */

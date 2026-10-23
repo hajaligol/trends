@@ -1,5 +1,32 @@
 # Trends Progress Report
 
+## Latest change: taller, uncropped hero banner on phones (user-requested)
+Status: COMPLETE WITH FOLLOW-UP. `tsc` ✔, `eslint src` ✔, `vitest tests/unit` 321/321 ✔. **Not run:** migrations against a real DB, browser checks. **DB:** `0023_hero_slide_mobile_image` adds nullable `hero_slides.mobile_image_url` (run `npm run db:migrate`).
+- Admin (`/admin/content` → hero slide form): new optional picker «تصویر موبایل» (recommended 1:1, e.g. 1080×1080; `IMAGE_SPECS.heroMobile`). Validated like other hosted images (`heroSlideSchema.mobileImageUrl`).
+- `HeroCarousel`: if EVERY slide has a phone image, phones (<640px) get a square box showing that image whole; `sm`+ keeps the 21:8 desktop image. Two `<Image>`s per slide swapped by CSS (default lazy, so the hidden one is not downloaded; slides with a phone image are no longer `priority`, small LCP trade-off). If any slide lacks a phone image, phones keep the 21:8 box with the whole desktop image (never cropped).
+- **Campaign hero slides now have a phone image too** (user-requested): migration `0024_campaign_home_mobile_image` adds nullable `campaigns.home_mobile_image_url`. Campaign form (home placement = hero) has the same optional «تصویر موبایل» picker; saved only for the hero placement, validated with `isValidHomeImagePath`, copied by "duplicate campaign", passed through `getLiveHomePlacements` to the carousel. The tall phone box needs a phone image on EVERY slide, campaign slides included; otherwise phones keep the 21:8 fallback. Run `npm run db:migrate` (0023 + 0024).
+
+---
+---
+## Latest change: mobile experience — bottom nav, home-only header, categories tab, account hero, sheets (user-requested)
+Status: COMPLETE WITH FOLLOW-UP. `tsc` ✔, `eslint src` ✔, `vitest tests/unit` 321/321 ✔, `next build` compile + TypeScript ✔ (prerender needs Postgres, absent in sandbox). **Not run:** browser/device checks, integration tests. **No DB/migration changes.** Desktop (`lg`+) markup/classes are unchanged (see "Desktop safety").
+
+### What changed (all below `lg` = 1024px)
+- **Bottom nav** `components/layout/MobileBottomNav.tsx` (mounted in `app/layout.tsx` inside `StoreChrome`, so not on `/admin`). RTL order right→left: home `/`, categories `/categories`, cart `/checkout` (count badge), profile (`/account` when signed in, `/login` otherwise). Active tab in brand purple. Includes a bottom spacer + safe-area padding. New `LayoutGridIcon` in `ui/icons.tsx`.
+- **Header** (`Header.tsx`): below `lg` it renders only on `/` — logo on the left, search + wishlist on the right (wishlist links to `/account/wishlist`; guests are redirected to login by the account layout). Cart / account / hamburger / category accordion removed from the mobile bar (the desktop actions block is the same, just `max-lg:hidden`).
+- **Categories tab** `app/categories/page.tsx` (noindex) + `MobileCategoriesView`: pinned search bar searching products, brands and categories (live, same `/api/search/suggest`); while idle it shows the category accordion (`MobileCategoryMenu`, touch targets enlarged) with the brands and تی‌مگ links that used to live in the hamburger menu.
+- **Search**: `components/search/MobileSearch.tsx` (new; own copy of the history/suggest logic, shares the `trends:search-history` key; `HeaderSearch` untouched). `SearchOverlay` is now a full-screen panel (`100dvh`, 16px input so iOS doesn't zoom, internal scroll, live results, trending/recent).
+- **Account**: `MobileAccountHome` (shown `lg:hidden` on `/account`): hero with full name, mobile, orders / returns / wishlist counts, then list: پروفایل, آدرس‌ها, سفارش‌های من, علاقه‌مندی‌ها, خروج. Desktop dashboard is the same block, `max-lg:hidden`. Sidebar `hidden lg:block`; sub-pages get `MobileAccountBack`. New `/account/profile` page (read-only details) and shared `AccountDetailsCard` (also used by the desktop dashboard, identical markup).
+- **Modals / toast**: AddedToCart, RemoveFromCart, SizePicker, SizeChart become bottom sheets below `sm` (`items-end`, rounded top only, safe-area padding, slide-up via `.modal-sheet-in` in `globals.css`; reduced-motion respected). Filter sheet raised above the nav (`max-sm:z-[46]`, backdrop `z-[45]`). Toast sits above the nav (`ToastProvider`, not in admin).
+
+### Assumptions / follow-ups
+- **«مرجوعی‌ها» = number of orders with status `refunded`.** There is no product-return model yet (see `orders/lifecycle.ts`). Replace the count when a returns flow exists (`app/account/page.tsx`, `returnCount`).
+- No profile editing exists, so `/account/profile` only displays data.
+- Search logic is duplicated between `HeaderSearch` (desktop) and `MobileSearch` on purpose (desktop untouched). Merge later if desired.
+- Pages other than home have no top bar on phones by request; no per-page back button except in the account area.
+- Check in a real browser/device: RTL tab order, safe-area padding on iPhone, keyboard + sticky search on `/categories`, sheet animation, toast over nav.
+
+---
 ## Latest change: full-project audit — bugs, duplicates, dead code, vulnerabilities (user-requested)
 Status: COMPLETE WITH FOLLOW-UP. `tsc` ✔, `eslint .` ✔, `vitest tests/unit` 321/321 ✔ (3 new tests in `tests/unit/hardening.test.ts`), `next build` compile + TypeScript ✔ (prerender needs Postgres, absent in sandbox). **Not run:** integration tests (no Postgres), browser checks. **No DB/migration changes.**
 

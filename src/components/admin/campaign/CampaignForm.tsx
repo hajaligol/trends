@@ -72,6 +72,7 @@ export function CampaignForm({
   const [isActive, setIsActive] = useState(campaign?.row.isActive ?? true);
   const [homePlacement, setHomePlacement] = useState<"none" | "hero" | "banner">(campaign?.row.homePlacement ?? "none");
   const [homeImageUrl, setHomeImageUrl] = useState(campaign?.row.homeImageUrl ?? "");
+  const [homeMobileImageUrl, setHomeMobileImageUrl] = useState(campaign?.row.homeMobileImageUrl ?? "");
   const [heroImageUrl, setHeroImageUrl] = useState(campaign?.row.heroImageUrl ?? "");
   const [homeBannerTone, setHomeBannerTone] = useState<"pink" | "blue">(campaign?.row.homeBannerTone ?? "pink");
   const [homeTitle, setHomeTitle] = useState(campaign?.row.homeTitle ?? "");
@@ -149,6 +150,7 @@ export function CampaignForm({
       isActive,
       homePlacement,
       homeImageUrl: homePlacement === "none" ? null : homeImageUrl || null,
+      homeMobileImageUrl: homePlacement === "hero" ? homeMobileImageUrl || null : null,
       heroImageUrl: heroImageUrl || null,
       homeBannerTone,
       homeTitle: homeTitle.trim() || null,
@@ -328,8 +330,19 @@ export function CampaignForm({
                   required
                   defaultValue={homeImageUrl}
                   onChange={setHomeImageUrl}
-                  hint={homePlacement === "hero" ? "موضوع اصلی را در مرکز تصویر بگذارید؛ در موبایل لبه‌ها بریده می‌شود." : undefined}
+                  hint={homePlacement === "hero" ? "در کامپیوتر و تبلت نمایش داده می‌شود. اگر تصویر موبایل نگذارید، در موبایل همین تصویر کامل (کوتاه‌تر) دیده می‌شود." : undefined}
                 />
+                {homePlacement === "hero" && (
+                  <ImagePicker
+                    name="campaign-home-mobile-image"
+                    folder="hero"
+                    label="تصویر موبایل (اختیاری)"
+                    kind="heroMobile"
+                    defaultValue={homeMobileImageUrl}
+                    onChange={setHomeMobileImageUrl}
+                    hint="بنر بلندتر و بدون برش در موبایل؛ فقط وقتی برای همه‌ی اسلایدها گذاشته شود فعال می‌شود."
+                  />
+                )}
                 {homePlacement === "banner" && (
                   <div className="flex flex-col gap-4">
                     <SelectField label="رنگ بنر" name="campaign-home-tone" value={homeBannerTone} onChange={(e) => setHomeBannerTone(e.target.value as "pink" | "blue")}>

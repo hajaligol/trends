@@ -2,25 +2,26 @@
 
 import { useRef } from "react";
 import { useUIOverlay } from "@/components/overlays/UIOverlayProvider";
+import { MobileSearch } from "@/components/search/MobileSearch";
 import { useDialogA11y } from "@/lib/hooks/useDialogA11y";
 
 /**
- * Mirrors #searchOverlay in the prototype: focuses the input on open,
- * closes on Escape or backdrop click. Submits as a plain GET form to
- * `/search?q=...` (Phase 5) — no client-side fetch/state needed, the
- * `/search` page itself is what's database-backed and URL-driven.
+ * Full-screen search panel, opened by the search button of the mobile
+ * header (the desktop header has its own inline search, `HeaderSearch`, so
+ * this overlay is only reachable below `lg`). It fills the screen so the
+ * on-screen keyboard has room, shows live product / brand / category
+ * results and the trending and recent searches inside it, and scrolls its
+ * own content. Submitting goes to `/search?q=...` (database-backed, URL
+ * driven).
  *
- * Uses the same `useDialogA11y` focus-trap hook as the former cart drawer (Phase
- * 14 accessibility pass) — previously had Escape-to-close and initial
- * input focus but no Tab trap and no focus restored to the search
- * trigger button on close.
+ * Dialog behaviour (focus trap, Escape, focus restore) comes from
+ * `useDialogA11y`; the input is focused by `MobileSearch` on open.
  */
 export function SearchOverlay() {
   const { isSearchOpen, closeSearch } = useUIOverlay();
   const containerRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
 
-  useDialogA11y(isSearchOpen, closeSearch, containerRef, inputRef);
+  useDialogA11y(isSearchOpen, closeSearch, containerRef);
 
   if (!isSearchOpen) return null;
 
@@ -29,41 +30,34 @@ export function SearchOverlay() {
       onClick={(event) => {
         if (event.target === event.currentTarget) closeSearch();
       }}
-      className="fixed inset-0 z-[100] flex justify-center bg-ink/35 pt-[min(12vh,120px)]"
+      className="fixed inset-0 z-[100] bg-ink/35"
     >
       <div
         ref={containerRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="searchTitle"
-        className="w-[min(560px,90vw)] rounded-[22px] bg-bg p-[26px]"
+        className="modal-panel-in mx-auto flex h-dvh w-full max-w-[640px] flex-col bg-bg pt-[env(safe-area-inset-top,0px)] sm:h-auto sm:max-h-[90dvh] sm:mt-[5dvh] sm:rounded-[22px]"
       >
-        <div className="mb-4 flex items-center justify-between">
-          <h3 id="searchTitle" className="m-0 text-base">
+        <div className="flex items-center justify-between px-[var(--gutter)] pt-4 pb-3">
+          <h2 id="searchTitle" className="m-0 text-base font-bold">
             جستجو در ترندز
-          </h3>
+          </h2>
           <button
             type="button"
             aria-label="بستن جستجو"
             onClick={closeSearch}
-            className="flex h-8 w-8 items-center justify-center rounded-full border-0 bg-ink/[0.06] text-base text-ink"
+            className="flex h-11 w-11 items-center justify-center rounded-full border-0 bg-ink/[0.06] text-ink"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
           </button>
         </div>
-        <form action="/search" method="get" onSubmit={closeSearch}>
-          <input
-            ref={inputRef}
-            type="text"
-            name="q"
-            required
-            placeholder="نام محصول یا برند را جستجو کنید..."
-            className="w-full rounded-full border border-line bg-white px-[18px] py-3.5 text-[0.95rem] focus:outline-2 focus:outline-ink focus:outline-offset-2"
-          />
-        </form>
-        <p className="mt-3.5 text-[0.8rem] text-text-secondary">
-          مثال: هودی، کتانی، پالتو، اکسسوری
-        </p>
+        <MobileSearch
+          inputId="overlay-search"
+          autoFocus
+          onNavigate={closeSearch}
+          className="flex-1 overflow-y-auto overscroll-contain px-[var(--gutter)] pb-[calc(24px+env(safe-area-inset-bottom,0px))]"
+        />
       </div>
     </div>
   );

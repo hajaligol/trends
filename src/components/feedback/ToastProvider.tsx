@@ -10,6 +10,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { usePathname } from "next/navigation";
 import { CheckIcon } from "@/components/ui/icons";
 
 /** Total on-screen time, including the enter and exit animations. */
@@ -34,6 +35,9 @@ const ToastContext = createContext<ToastContextValue | null>(null);
  */
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toast, setToast] = useState<Toast | null>(null);
+  // On the storefront below `lg` the bottom navigation bar (60px) sits at the
+  // screen edge, so the toast is lifted above it. The admin has no such bar.
+  const inAdmin = usePathname().startsWith("/admin");
   const nextId = useRef(0);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
@@ -65,12 +69,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       <div
         role="status"
         aria-live="polite"
-        className="pointer-events-none fixed inset-x-0 bottom-0 z-[120] flex justify-center px-4 pb-[calc(24px+env(safe-area-inset-bottom,0px))]"
+        className={`pointer-events-none fixed inset-x-0 bottom-0 z-[120] flex justify-center px-4 ${inAdmin ? "pb-[calc(24px+env(safe-area-inset-bottom,0px))]" : "pb-[calc(84px+env(safe-area-inset-bottom,0px))] lg:pb-[calc(24px+env(safe-area-inset-bottom,0px))]"}`}
       >
         {toast ? (
           <div
             key={toast.id}
-            className={`flex max-w-full items-center gap-3 rounded-full bg-ink py-2.5 ps-2.5 pe-6 text-[0.92rem] text-white shadow-[0_12px_32px_-10px_rgba(24,38,48,0.55)] ${
+            className={`flex max-w-full items-center gap-3 rounded-full max-sm:rounded-3xl bg-ink py-2.5 ps-2.5 pe-6 text-[0.92rem] text-white shadow-[0_12px_32px_-10px_rgba(24,38,48,0.55)] ${
               toast.leaving ? "toast-out" : "toast-in"
             }`}
           >

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import { Container } from "@/components/ui/Container";
 import {
@@ -18,7 +19,6 @@ import { useUIOverlay } from "@/components/overlays/UIOverlayProvider";
 import { useCart } from "@/components/cart/CartProvider";
 import { HeaderSearch } from "@/components/layout/HeaderSearch";
 import { HeaderNav } from "@/components/layout/HeaderNav";
-import { MobileCategoryMenu } from "@/components/layout/MobileCategoryMenu";
 import type { NavCategory } from "@/domains/categories/tree";
 import type { NavBrand } from "@/domains/brands/queries";
 import { toPersianDigits } from "@/lib/utils/persian-digits";
@@ -53,7 +53,6 @@ const ICON_BUTTON =
 const ICON = "h-[28px] w-[28px] text-ink lg:h-[36px] lg:w-[36px]";
 
 export function Header({ categories, brands }: { categories: NavCategory[]; brands: NavBrand[] }) {
-  const [menuOpen, setMenuOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const { openSearch, isHeaderDimmed } = useUIOverlay();
   const { cart } = useCart();
@@ -67,7 +66,9 @@ export function Header({ categories, brands }: { categories: NavCategory[]; bran
   // neutral word if the account has no name.
   const greetingName = session?.user?.name?.trim().split(/\s+/)[0] || "کاربر";
 
-  const closeMenu = () => setMenuOpen(false);
+  // Below `lg` the header is a home-page-only bar (logo + search + wishlist);
+  // every other page navigates with the bottom bar (`MobileBottomNav`).
+  const isHome = usePathname() === "/";
 
   // `relative` on the <header> is required, not cosmetic: the category menu
   // panels (HeaderNav) is `absolute inset-x-0 top-full` and anchors to
@@ -77,7 +78,7 @@ export function Header({ categories, brands }: { categories: NavCategory[]; bran
   // `sticky top-0` in place of `relative` (also positioned, so the menu
   // keeps working).
   return (
-    <header className="relative z-40 border-b border-line bg-header-bg">
+    <header className={`relative z-40 border-b border-line bg-header-bg ${isHome ? "" : "max-lg:hidden"}`}>
       {/* Dims the header bar while the search dropdown is open (the page
           below is dimmed by PageDim). z-[45] sits above the header's own
           content but below the search box (z-[51]) and dropdown (z-50), and
@@ -95,7 +96,7 @@ export function Header({ categories, brands }: { categories: NavCategory[]; bran
         <Link
           href="/"
           aria-label="ترندز — صفحه اصلی"
-          className="shrink-0 lg:col-start-3 lg:row-start-1 lg:justify-self-end"
+          className="shrink-0 max-lg:order-2 lg:col-start-3 lg:row-start-1 lg:justify-self-end"
         >
           <Image
             src="/assets/brand/logo.webp"
@@ -123,8 +124,19 @@ export function Header({ categories, brands }: { categories: NavCategory[]; bran
           </nav>
         </div>
 
+        {/* Mobile/tablet actions (below lg): search + wishlist on the right
+            (first in the RTL flow), the logo stays on the left. */}
+        <div className="flex items-center gap-1 max-lg:order-1 lg:hidden">
+          <button type="button" aria-label="جستجو" aria-haspopup="true" onClick={openSearch} className={ICON_BUTTON}>
+            <SearchIcon className={ICON} />
+          </button>
+          <Link href="/account/wishlist" aria-label="علاقه‌مندی‌ها" className={ICON_BUTTON}>
+            <HeartIcon className={ICON} />
+          </Link>
+        </div>
+
         {/* Actions — right column on desktop. */}
-        <div className="flex items-center gap-2 lg:col-start-1 lg:row-start-1 lg:justify-self-start lg:gap-3">
+        <div className="flex items-center gap-2 max-lg:hidden lg:col-start-1 lg:row-start-1 lg:justify-self-start lg:gap-3">
           <Link href="/checkout" aria-label="سبد خرید" className={ICON_BUTTON}>
             <CartIcon className={ICON} />
             {cartCount > 0 && (
@@ -240,50 +252,9 @@ export function Header({ categories, brands }: { categories: NavCategory[]; bran
               ورود / ثبت‌نام
             </Link>
           )}
-          <button
-            type="button"
-            aria-label="جستجو"
-            aria-haspopup="true"
-            onClick={openSearch}
-            className={`${ICON_BUTTON} lg:hidden`}
-          >
-            <SearchIcon className={ICON} />
-          </button>
-          <button
-            type="button"
-            aria-label={menuOpen ? "بستن منو" : "باز کردن منو"}
-            aria-expanded={menuOpen}
-            onClick={() => setMenuOpen((open) => !open)}
-            className="flex h-[38px] w-[38px] flex-col items-center justify-center gap-1 rounded-full bg-transparent lg:hidden"
-          >
-            <span
-              className={`h-0.5 w-[18px] rounded-sm bg-ink transition-transform duration-200 ${
-                menuOpen ? "translate-y-[6px] rotate-45" : ""
-              }`}
-            />
-            <span
-              className={`h-0.5 w-[18px] rounded-sm bg-ink transition-opacity duration-200 ${
-                menuOpen ? "opacity-0" : ""
-              }`}
-            />
-            <span
-              className={`h-0.5 w-[18px] rounded-sm bg-ink transition-transform duration-200 ${
-                menuOpen ? "-translate-y-[6px] -rotate-45" : ""
-              }`}
-            />
-          </button>
         </div>
       </Container>
 
-      {/* Mobile/tablet category accordion (categories only). */}
-      {menuOpen && (
-        <nav
-          aria-label="ناوبری موبایل"
-          className="flex max-h-[calc(100vh-68px)] flex-col overflow-y-auto border-t border-line bg-header-bg px-(--gutter) py-2 lg:hidden"
-        >
-          <MobileCategoryMenu categories={categories} onNavigate={closeMenu} />
-        </nav>
-      )}
     </header>
   );
 }

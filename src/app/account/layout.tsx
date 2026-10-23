@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { Container } from "@/components/ui/Container";
+import { MobileAccountBack } from "@/components/account/MobileAccountBack";
 import { AccountNav } from "@/components/account/AccountNav";
 import { DashboardLogoutIcon, DashboardUserIcon } from "@/components/ui/dashboard-icons";
 import { getCurrentUser, logoutAction } from "@/domains/auth/actions";
@@ -29,7 +30,8 @@ export default async function AccountLayout({ children }: { children: ReactNode 
   return (
     <main className="py-[clamp(28px,5vw,64px)]">
       <Container className="flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-8">
-        <aside className="shrink-0 lg:sticky lg:top-6 lg:w-[290px]">
+        <MobileAccountBack />
+        <aside className="hidden shrink-0 lg:sticky lg:block lg:top-6 lg:w-[290px]">
           <div className="overflow-hidden rounded-[var(--radius-lg)] border border-line bg-white shadow-[0_18px_40px_-26px_rgba(24,38,48,0.35)]">
             <div className="flex items-center gap-3.5 border-b border-line bg-gradient-to-br from-[#f7f0fc] to-[#ede1f7] p-4 lg:p-5">
               <span

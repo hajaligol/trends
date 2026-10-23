@@ -1,0 +1,1 @@
+ALTER TABLE "campaigns" ADD COLUMN "home_mobile_image_url" text;

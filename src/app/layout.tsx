@@ -5,6 +5,7 @@ import { Footer } from "@/components/layout/Footer";
 import { UIOverlayProvider } from "@/components/overlays/UIOverlayProvider";
 import { SearchOverlay } from "@/components/overlays/SearchOverlay";
 import { PageDim } from "@/components/overlays/PageDim";
+import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import { StoreChrome } from "@/components/layout/StoreChrome";
 import { SITE_NAME, SITE_URL } from "@/lib/site-config";
 import { AuthSessionProvider } from "@/components/auth/AuthSessionProvider";
@@ -55,6 +56,7 @@ export default async function RootLayout({
                   {children}
                   <StoreChrome>
                     <Footer categories={navCategories} />
+                    <MobileBottomNav />
                     <PageDim />
                     <SearchOverlay />
                   </StoreChrome>

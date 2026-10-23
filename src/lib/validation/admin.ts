@@ -465,6 +465,10 @@ export const couponSchema = z
 export const heroSlideSchema = z.object({
   alt: z.string().trim().min(1, "متن جایگزین (alt) را وارد کنید").max(300),
   imageUrl: hostedImagePath,
+  mobileImageUrl: z
+    .union([hostedImagePath, z.literal("")])
+    .optional()
+    .transform((value) => (value ? value : null)),
   ctaHref: linkHref,
   displayOrder: z.coerce.number().int().default(0),
   isActive: checkbox,

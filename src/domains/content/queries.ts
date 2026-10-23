@@ -49,7 +49,13 @@ export async function getHomeCategoryTiles(): Promise<HomeCategoryTile[]> {
  * manually managed `hero_slides` / `promo_banners`. Both link somewhere:
  * campaigns to their `/sale/<slug>` page, manual rows to their `ctaHref`.
  */
-export type HomeHeroSlide = { id: string; alt: string; imageUrl: string | null; ctaHref: string | null };
+export type HomeHeroSlide = {
+  id: string;
+  alt: string;
+  imageUrl: string | null;
+  mobileImageUrl?: string | null;
+  ctaHref: string | null;
+};
 export type HomePromoBanner = {
   id: string;
   tone: "pink" | "blue";
@@ -64,7 +70,7 @@ export async function getHomepageHeroSlides(): Promise<HomeHeroSlide[]> {
   const [campaignSlides, manual] = await Promise.all([getLiveHomePlacements(), getActiveHeroSlides()]);
   return [
     ...campaignSlides.hero,
-    ...manual.map((slide) => ({ id: slide.id, alt: slide.alt, imageUrl: slide.imageUrl, ctaHref: slide.ctaHref })),
+    ...manual.map((slide) => ({ id: slide.id, alt: slide.alt, imageUrl: slide.imageUrl, mobileImageUrl: slide.mobileImageUrl, ctaHref: slide.ctaHref })),
   ];
 }
 

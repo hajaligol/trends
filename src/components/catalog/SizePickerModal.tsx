@@ -40,14 +40,14 @@ export function SizePickerModal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[110] flex items-end justify-center p-0 sm:items-center sm:p-4">
       <div aria-hidden="true" onClick={onClose} className="modal-backdrop-in absolute inset-0 bg-ink/40" />
       <div
         ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="size-picker-title"
-        className="modal-panel-in relative w-full max-w-[400px] rounded-[var(--radius-lg)] bg-bg p-6 text-center shadow-[0_24px_60px_-20px_rgba(24,38,48,0.45)] sm:p-8"
+        className="modal-panel-in relative w-full max-w-[400px] max-sm:max-w-none max-sm:rounded-b-none max-sm:max-h-[92dvh] max-sm:overflow-y-auto max-sm:pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] rounded-[var(--radius-lg)] bg-bg p-6 text-center shadow-[0_24px_60px_-20px_rgba(24,38,48,0.45)] sm:p-8"
       >
         <button
           type="button"

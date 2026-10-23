@@ -66,6 +66,13 @@ export const campaignInputSchema = z
       .nullable()
       .default(null)
       .transform((value) => value || null),
+    // Optional phone version of the homepage hero slide (hero placement only).
+    homeMobileImageUrl: z
+      .string()
+      .trim()
+      .nullable()
+      .default(null)
+      .transform((value) => value || null),
     // Optional image for the sale page's own hero; empty ⇒ the text hero is used.
     heroImageUrl: z
       .string()
@@ -105,6 +112,9 @@ export const campaignInputSchema = z
       } else if (!isValidHomeImagePath(input.homeImageUrl)) {
         ctx.addIssue({ code: "custom", message: "تصویر باید از طریق «انتخاب فایل» بارگذاری شده باشد", path: ["homeImageUrl"] });
       }
+    }
+    if (input.homeMobileImageUrl && !isValidHomeImagePath(input.homeMobileImageUrl)) {
+      ctx.addIssue({ code: "custom", message: "تصویر باید از طریق «انتخاب فایل» بارگذاری شده باشد", path: ["homeMobileImageUrl"] });
     }
     if (input.heroImageUrl && !isValidHomeImagePath(input.heroImageUrl)) {
       ctx.addIssue({ code: "custom", message: "تصویر باید از طریق «انتخاب فایل» بارگذاری شده باشد", path: ["heroImageUrl"] });
