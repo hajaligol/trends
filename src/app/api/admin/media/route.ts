@@ -90,6 +90,12 @@ export async function POST(request: Request) {
     );
   }
 
+  // Reject oversized bodies before buffering them (`formData()` reads it all).
+  const declaredLength = Number(request.headers.get("content-length") ?? "0");
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_FILE_BYTES + 64 * 1024) {
+    return NextResponse.json({ error: "حجم فایل نباید بیش از ۱۲ مگابایت باشد" }, { status: 413 });
+  }
+
   let formData: FormData;
   try {
     formData = await request.formData();

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
+import { isValidHomeImagePath } from "@/domains/campaigns/home-image";
 import { auth } from "@/lib/auth/config";
 import { db } from "@/lib/db/client";
 import { heroSlides, homeCategoryTiles, promoBanners } from "@/lib/db/schema";
@@ -127,7 +128,10 @@ export async function saveHomeCategoryTileAction(_prev: ActionResult, formData: 
   const tileKey = String(formData.get("tileKey") ?? "");
   if (!isHomeCategoryTileKey(tileKey)) return { ok: false, error: "دسته‌بندی یافت نشد" };
 
-  const imageUrl = String(formData.get("imageUrl") ?? "").trim().slice(0, 2000) || null;
+  const imageUrl = String(formData.get("imageUrl") ?? "").trim() || null;
+  if (imageUrl !== null && !isValidHomeImagePath(imageUrl)) {
+    return { ok: false, error: "تصویر باید با دکمه‌ی بارگذاری تصویر انتخاب شود" };
+  }
 
   await db
     .insert(homeCategoryTiles)

@@ -1,3 +1,4 @@
+import { isHostedAssetPath } from "@/lib/utils/asset-path";
 import GithubSlugger from "github-slugger";
 
 /**
@@ -82,9 +83,7 @@ export function readingMinutes(markdown: string): number {
  * anything else, so the renderer drops other images rather than ship a broken
  * one. Mirrors the admin validation for uploaded paths.
  */
-export function isLocalAssetPath(src: string | undefined | null): src is string {
-  return typeof src === "string" && /^\/assets\/[A-Za-z0-9._\-/]+$/.test(src) && !src.includes("..");
-}
+export const isLocalAssetPath = isHostedAssetPath;
 
 /** Adds the running h2 number (1, 2, 3…) to each heading; h3 items carry their parent's number. */
 export function numberHeadings(headings: TocHeading[]): (TocHeading & { number: number })[] {

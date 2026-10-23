@@ -145,30 +145,6 @@ export async function listCategoryOptions(): Promise<CategoryOption[]> {
   });
 }
 
-/**
- * The categories a product may be filed under: **leaves only** (no
- * sub-categories), in tree order, labelled with their full path and
- * grouped by parent. Inactive leaves are listed too (marked) so an
- * existing product in a switched-off category still shows its current
- * value in the form.
- */
-export async function listLeafCategoryOptions(): Promise<CategoryOption[]> {
-  const rows = await loadAllRowsForAdmin();
-  const parentIds = new Set(rows.map((row) => row.parentId).filter((id): id is string => id !== null));
-  const flat = flattenCategoryTree(buildCategoryTree(rows));
-  return flat
-    .filter((node) => !parentIds.has(node.id))
-    .map((node) => {
-      const trail = getCategoryTrail(rows, node.id);
-      return {
-        id: node.id,
-        name: categoryPathLabel(trail) + (node.isActive ? "" : " (غیرفعال)"),
-        parentId: node.parentId,
-        depth: node.depth,
-        group: trail.length > 1 ? categoryPathLabel(trail.slice(0, -1)) : null,
-      };
-    });
-}
 
 export type CategoryPickerNode = {
   id: string;
@@ -224,10 +200,6 @@ export async function loadCategoryRowsForValidation(): Promise<CategoryRow[]> {
   return loadAllRowsForAdmin();
 }
 
-export async function getCategoryByIdForAdmin(id: string) {
-  const [row] = await db.select().from(categories).where(eq(categories.id, id)).limit(1);
-  return row ?? null;
-}
 
 export async function isCategorySlugTaken(slug: string, excludeId?: string): Promise<boolean> {
   const rows = await db
@@ -249,10 +221,3 @@ export async function categoryHasChildrenOrProducts(id: string): Promise<boolean
   return Boolean(product);
 }
 
-export async function listRootCategoryCount(): Promise<number> {
-  // A real `COUNT(*)` (Phase 13 query-review fix) — the previous
-  // `SELECT id ... ; rows.length` shape transferred every matching row's
-  // id just to count them, which scales with table size for no reason.
-  const [row] = await db.select({ total: count() }).from(categories).where(isNull(categories.parentId));
-  return row?.total ?? 0;
-}

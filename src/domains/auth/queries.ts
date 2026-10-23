@@ -43,6 +43,12 @@ export async function findUserById(id: string): Promise<User | null> {
   return row ?? null;
 }
 
+/** Lean lookup (no password hash) used to re-validate a session's role. */
+export async function findUserRoleById(id: string): Promise<User["role"] | null> {
+  const [row] = await db.select({ role: users.role }).from(users).where(eq(users.id, id)).limit(1);
+  return row?.role ?? null;
+}
+
 export type CreateUserInput = {
   mobile: string;
   fullName: string;

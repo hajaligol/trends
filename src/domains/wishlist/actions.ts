@@ -27,6 +27,11 @@ export async function toggleWishlistAction(
     return { ok: false, error: "برای افزودن به علاقه‌مندی‌ها ابتدا وارد شوید" };
   }
 
+  // A malformed id would reach SQL as a uuid cast error (unhandled 500).
+  if (typeof productId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(productId)) {
+    return { ok: false, error: "محصول یافت نشد" };
+  }
+
   if (shouldBeActive) {
     await addToWishlist(session.user.id, productId);
   } else {

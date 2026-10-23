@@ -21,10 +21,6 @@ export async function listHeroSlidesForAdmin(): Promise<HeroSlide[]> {
   return db.select().from(heroSlides).orderBy(asc(heroSlides.displayOrder));
 }
 
-export async function getHeroSlideForAdmin(id: string): Promise<HeroSlide | null> {
-  const [row] = await db.select().from(heroSlides).where(eq(heroSlides.id, id)).limit(1);
-  return row ?? null;
-}
 
 export async function getActivePromoBanners(): Promise<PromoBanner[]> {
   return db.select().from(promoBanners).where(eq(promoBanners.isActive, true)).orderBy(asc(promoBanners.displayOrder));
@@ -34,10 +30,6 @@ export async function listPromoBannersForAdmin(): Promise<PromoBanner[]> {
   return db.select().from(promoBanners).orderBy(asc(promoBanners.displayOrder));
 }
 
-export async function getPromoBannerForAdmin(id: string): Promise<PromoBanner | null> {
-  const [row] = await db.select().from(promoBanners).where(eq(promoBanners.id, id)).limit(1);
-  return row ?? null;
-}
 
 /**
  * The six homepage category squares, in display order, with the admin's

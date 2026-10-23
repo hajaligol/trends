@@ -11,11 +11,7 @@ import {
   resetPasswordSchema,
 } from "@/lib/validation/auth";
 import { createUser, findUserByMobile, MobileAlreadyRegisteredError, updateUserPassword } from "@/domains/auth/queries";
-import {
-  consumePasswordResetToken,
-  issuePasswordResetToken,
-  verifyPasswordResetToken,
-} from "@/domains/auth/reset-tokens";
+import { consumePasswordResetToken, issuePasswordResetToken } from "@/domains/auth/reset-tokens";
 import { sendPasswordResetLink } from "@/domains/auth/notifications";
 import { mergeGuestCartIntoUserCart } from "@/domains/cart/merge";
 import { readGuestCartId, clearGuestCartId } from "@/domains/cart/session";
@@ -231,13 +227,14 @@ export async function resetPasswordAction(_prevState: ActionResult, formData: Fo
     return { fieldErrors: firstFieldErrors(parsed.error.issues) };
   }
 
-  const verified = await verifyPasswordResetToken(parsed.data.token);
-  if (!verified) {
+  // Claim the token atomically BEFORE changing the password so a replayed or
+  // concurrent request with the same link cannot also succeed.
+  const claimed = await consumePasswordResetToken(parsed.data.token);
+  if (!claimed) {
     return { error: "لینک بازیابی رمز عبور نامعتبر یا منقضی شده است" };
   }
 
-  await updateUserPassword(verified.userId, parsed.data.password);
-  await consumePasswordResetToken(parsed.data.token);
+  await updateUserPassword(claimed.userId, parsed.data.password);
 
   redirect("/login?reset=success");
 }

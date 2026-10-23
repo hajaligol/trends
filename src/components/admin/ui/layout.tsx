@@ -274,8 +274,6 @@ export function StatCard({
 /* ------------------------------------------------------------------ */
 
 export const ADMIN_CONTROL = CONTROL;
-/** Same look without a width, for inline filter controls. */
-export const ADMIN_CONTROL_INLINE = CONTROL_BASE;
 
 /**
  * GET form wrapper for list filters. Submitting reloads the page with the

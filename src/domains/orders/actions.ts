@@ -16,6 +16,7 @@ import {
   OrderNotFoundError,
   type ShippingSnapshotInput,
 } from "@/domains/orders/queries";
+import { checkRateLimit } from "@/lib/security/rate-limit";
 import { CouponInvalidError } from "@/domains/promotions/queries";
 import { getPaymentProvider } from "@/domains/payments/provider";
 import { createPendingPayment } from "@/domains/payments/queries";
@@ -29,6 +30,8 @@ import { createPendingPayment } from "@/domains/payments/queries";
  * the resulting order is computed here, server-side, from the
  * authenticated user's real cart and a real address row they own.
  */
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export type PlaceOrderResult =
   | { ok: true; orderNumber: string; paymentNote: string; redirectUrl: string | null }
@@ -46,6 +49,18 @@ export async function placeOrderAction(
   const session = await auth();
   if (!session?.user) {
     return { ok: false, error: "برای ثبت سفارش ابتدا وارد حساب کاربری خود شوید" };
+  }
+  if (
+    typeof addressId !== "string" ||
+    !UUID_PATTERN.test(addressId) ||
+    typeof shippingMethodCode !== "string" ||
+    typeof customerNote !== "string" ||
+    (couponCode !== null && typeof couponCode !== "string")
+  ) {
+    return { ok: false, error: "اطلاعات سفارش نامعتبر است" };
+  }
+  if (!checkRateLimit(`place-order:${session.user.id}`, 10, 10 * 60_000).allowed) {
+    return { ok: false, error: "تعداد درخواست‌ها بیش از حد مجاز است. لطفاً کمی بعد دوباره تلاش کنید." };
   }
 
   // Ownership-scoped lookup (never a bare `getAddressById`) — see
@@ -181,6 +196,9 @@ export async function cancelOrderAction(orderNumber: string, reason: string): Pr
     return { ok: false, error: "برای لغو سفارش ابتدا وارد حساب کاربری خود شوید" };
   }
 
+  if (typeof orderNumber !== "string" || typeof reason !== "string") {
+    return { ok: false, error: "سفارش یافت نشد" };
+  }
   const trimmedReason = reason.trim().slice(0, 300) || null;
 
   try {

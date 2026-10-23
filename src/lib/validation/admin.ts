@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isHostedAssetPath } from "@/lib/utils/asset-path";
 import { MAX_SPEC_ROWS } from "@/lib/validation/spec-limits";
 import {
   MAX_SIZE_CHART_CELL_LENGTH,
@@ -45,6 +46,29 @@ const nonNegativeIntToman = z.coerce.number().int().min(0, "مقدار نمی‌
 
 const checkbox = z.preprocess((value) => value === "on" || value === "true" || value === true, z.boolean());
 
+/** Images are always files we host (`/assets/...`, from the upload endpoint):
+ * `next/image` has no remote hosts configured, so an arbitrary external URL
+ * would crash every page that renders it, and anything else (`javascript:`,
+ * `data:`) must never be stored. */
+const hostedImagePath = z
+  .string()
+  .trim()
+  .max(500)
+  .refine(isHostedAssetPath, "تصویر باید با دکمه‌ی بارگذاری تصویر انتخاب شود");
+
+/** Button/slide links: a site-relative path or an http(s) URL, never
+ * `javascript:`/`data:` (render sites also pass through `safeHref`). */
+const linkHref = z
+  .string()
+  .trim()
+  .max(300)
+  .refine(
+    (value) => value === "" || (value.startsWith("/") && !value.startsWith("//")) || /^https?:\/\//i.test(value),
+    "لینک باید با / یا http(s):// شروع شود",
+  )
+  .optional()
+  .transform((value) => (value ? value : null));
+
 // ---------------------------------------------------------------------
 // Categories
 // ---------------------------------------------------------------------
@@ -53,7 +77,10 @@ export const categorySchema = z.object({
   name: z.string().trim().min(1, "نام دسته را وارد کنید").max(120),
   slug: slugSchema,
   description: optionalTrimmed(2000),
-  imageUrl: optionalTrimmed(2000),
+  imageUrl: z
+    .union([hostedImagePath, z.literal("")])
+    .optional()
+    .transform((value) => (value ? value : null)),
   parentId: z
     .union([z.string().uuid(), z.literal("")])
     .optional()
@@ -69,11 +96,6 @@ export const categorySchema = z.object({
 /** Logos are always files we host (`/assets/...`, from the upload endpoint):
  * `next/image` has no remote hosts configured, so an arbitrary external URL
  * would crash the product page that renders it. */
-const localAssetPath = z
-  .string()
-  .max(500)
-  .regex(/^\/assets\/[A-Za-z0-9._\-/]+$/, "لوگو باید با دکمه‌ی بارگذاری تصویر انتخاب شود")
-  .refine((value) => !value.includes(".."), "مسیر تصویر نامعتبر است");
 
 export const brandSchema = z.object({
   name: z.string().trim().min(1, "نام برند را وارد کنید").max(120),
@@ -86,7 +108,7 @@ export const brandSchema = z.object({
     .transform((value) => (value ? value : null)),
   description: optionalTrimmed(2000),
   logoUrl: z
-    .union([localAssetPath, z.literal("")])
+    .union([hostedImagePath, z.literal("")])
     .optional()
     .transform((value) => (value ? value : null)),
   countryOfOrigin: optionalTrimmed(80),
@@ -207,7 +229,7 @@ export function parseBulkVariantsField(
 }
 
 export const productImageSchema = z.object({
-  url: z.string().trim().min(1, "آدرس تصویر را وارد کنید").max(2000),
+  url: hostedImagePath,
   altText: z.string().trim().min(1, "متن جایگزین (alt) را وارد کنید").max(300),
   // Colour name this photo belongs to (one of the product's variant colours,
   // checked against the DB in `createImageAction`); empty = shared image.
@@ -225,7 +247,7 @@ export const productImageSchema = z.object({
 export const MAX_CREATE_PRODUCT_IMAGES = 12;
 
 const createImageRow = z.object({
-  url: z.string().trim().min(1, "آدرس تصویر را وارد کنید").max(2000),
+  url: hostedImagePath,
   altText: z.string().trim().min(1, "متن جایگزین (alt) همه‌ی تصاویر را وارد کنید").max(300),
   color: z
     .string()
@@ -442,8 +464,8 @@ export const couponSchema = z
 
 export const heroSlideSchema = z.object({
   alt: z.string().trim().min(1, "متن جایگزین (alt) را وارد کنید").max(300),
-  imageUrl: z.string().trim().min(1, "تصویر اسلاید را انتخاب کنید").max(2000),
-  ctaHref: optionalTrimmed(300),
+  imageUrl: hostedImagePath,
+  ctaHref: linkHref,
   displayOrder: z.coerce.number().int().default(0),
   isActive: checkbox,
 });
@@ -451,10 +473,10 @@ export const heroSlideSchema = z.object({
 export const promoBannerSchema = z.object({
   tone: z.enum(["pink", "blue"]),
   title: z.string().trim().min(1, "عنوان را وارد کنید").max(120),
-  imageUrl: z.string().trim().min(1, "تصویر بنر را انتخاب کنید").max(2000),
+  imageUrl: hostedImagePath,
   description: z.string().trim().min(1, "توضیحات را وارد کنید").max(400),
   ctaLabel: z.string().trim().min(1, "متن دکمه را وارد کنید").max(60),
-  ctaHref: optionalTrimmed(300),
+  ctaHref: linkHref,
   displayOrder: z.coerce.number().int().default(0),
   isActive: checkbox,
 });

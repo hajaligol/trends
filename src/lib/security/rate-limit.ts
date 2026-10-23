@@ -38,6 +38,33 @@ type Bucket = {
 
 const buckets = new Map<string, Bucket>();
 
+/** Longest window ever requested; used to decide when a bucket is stale. */
+let longestWindowMs = 0;
+let lastSweepAt = 0;
+const SWEEP_INTERVAL_MS = 60_000;
+/** Hard ceiling so a flood of distinct keys (e.g. spoofed IPs) can never grow
+ * the map without bound between sweeps. */
+const MAX_BUCKETS = 50_000;
+
+/** Drops buckets whose window has already expired. Without this, a key that is
+ * never seen again would stay in the map forever. */
+function sweepExpiredBuckets(now: number): void {
+  if (now - lastSweepAt < SWEEP_INTERVAL_MS && buckets.size < MAX_BUCKETS) return;
+  lastSweepAt = now;
+  for (const [key, bucket] of buckets) {
+    if (now - bucket.windowStartedAt >= longestWindowMs) buckets.delete(key);
+  }
+  // Still over the ceiling (all entries live): evict oldest-inserted first.
+  if (buckets.size >= MAX_BUCKETS) {
+    const excess = buckets.size - MAX_BUCKETS + 1;
+    let removed = 0;
+    for (const key of buckets.keys()) {
+      buckets.delete(key);
+      if (++removed >= excess) break;
+    }
+  }
+}
+
 export type RateLimitResult =
   | { allowed: true }
   | { allowed: false; retryAfterSeconds: number };
@@ -52,6 +79,8 @@ export type RateLimitResult =
  */
 export function checkRateLimit(key: string, limit: number, windowMs: number): RateLimitResult {
   const now = Date.now();
+  if (windowMs > longestWindowMs) longestWindowMs = windowMs;
+  sweepExpiredBuckets(now);
   const existing = buckets.get(key);
 
   if (!existing || now - existing.windowStartedAt >= windowMs) {
@@ -85,10 +114,18 @@ export async function getClientIp(): Promise<string> {
   const headerList = await headers();
   const forwardedFor = headerList.get("x-forwarded-for");
   if (forwardedFor) {
-    // The header can be a comma-separated list (client, proxy1, proxy2, ...);
-    // the first entry is the original client.
-    const first = forwardedFor.split(",")[0]?.trim();
-    if (first) return first;
+    // Each trusted proxy APPENDS the address it received the request from, so
+    // the leftmost entries are whatever the client claimed (spoofable — an
+    // attacker could rotate them to dodge every rate limit). Only the entry
+    // added by our own outermost proxy can be trusted: the N-th from the right,
+    // where N = TRUSTED_PROXY_HOPS (default 1 = a single reverse proxy/LB).
+    const parts = forwardedFor
+      .split(",")
+      .map((part) => part.trim())
+      .filter(Boolean);
+    const hops = Math.max(1, Number.parseInt(process.env.TRUSTED_PROXY_HOPS ?? "1", 10) || 1);
+    const trusted = parts[Math.max(0, parts.length - hops)];
+    if (trusted) return trusted;
   }
   const realIp = headerList.get("x-real-ip");
   if (realIp) return realIp;

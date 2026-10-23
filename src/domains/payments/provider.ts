@@ -130,7 +130,14 @@ class MockPaymentProvider implements PaymentProvider {
 
 export function getPaymentProvider(): PaymentProvider {
   const configured = process.env.PAYMENT_PROVIDER?.trim().toLowerCase();
-  if (configured === "mock") return new MockPaymentProvider();
+  if (configured === "mock") {
+    // The mock "verifies" any `Status=OK` callback, so anyone holding their own
+    // authority could mark their order paid. Never allow it in a production
+    // build unless an operator explicitly opts in (e.g. a staging demo).
+    const allowed = process.env.NODE_ENV !== "production" || process.env.ALLOW_MOCK_PAYMENT === "true";
+    if (allowed) return new MockPaymentProvider();
+    console.error("[payments] PAYMENT_PROVIDER=mock ignored in production (set ALLOW_MOCK_PAYMENT=true to override)");
+  }
   // Blank, unset, or any other value (rule A.17 — never guess at a real
   // provider name without a real adapter behind it) falls through to the
   // honest stub.

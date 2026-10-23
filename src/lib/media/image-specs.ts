@@ -13,7 +13,7 @@ export const IMAGE_SPECS = {
   banner: { ratio: "11:5", width: 11, height: 5, label: "عریض", example: "۱۶۵۰×۷۵۰" },
   /** `/sale/<slug>` hero when it is an image: fixed `aspect-[3/1]` box, same on every screen. */
   saleHero: { ratio: "3:1", width: 3, height: 1, label: "بسیار عریض", example: "۱۸۰۰×۶۰۰" },
-  /** CategoryTiles / CategoryNav circles. */
+  /** CategoryTiles circles. */
   square: { ratio: "1:1", width: 1, height: 1, label: "مربع", example: "۸۰۰×۸۰۰" },
   /** Brand logo in the header menu. */
   logo: { ratio: "1:1", width: 1, height: 1, label: "مربع", example: "۵۱۲×۵۱۲" },

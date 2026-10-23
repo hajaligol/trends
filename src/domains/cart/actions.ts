@@ -1,6 +1,6 @@
 "use server";
 
-import { getCurrentCartIdReadOnly, resolveCurrentCartId } from "@/domains/cart/resolve";
+import { getCurrentCartIdReadOnly, GuestCartLimitError, resolveCurrentCartId } from "@/domains/cart/resolve";
 import {
   addItemToCart,
   clearCart as clearCartRows,
@@ -28,14 +28,29 @@ import {
  * response directly, without a second round trip.
  */
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** Upper bound for a single request; stock still caps the real quantity. A
+ * missing bound let `1e300` reach SQL and surface as a 500. */
+const MAX_QUANTITY = 999;
+
+function isValidQuantity(quantity: unknown, min: number): quantity is number {
+  return typeof quantity === "number" && Number.isInteger(quantity) && quantity >= min && quantity <= MAX_QUANTITY;
+}
+
 export type CartActionResult = { ok: true; cart: CartSummary } | { ok: false; error: string };
 
 export async function addToCartAction(variantId: string, quantity: number): Promise<CartActionResult> {
-  if (!Number.isInteger(quantity) || quantity < 1) {
+  if (!isValidQuantity(quantity, 1) || typeof variantId !== "string" || !UUID_PATTERN.test(variantId)) {
     return { ok: false, error: "تعداد نامعتبر است" };
   }
 
-  const cartId = await resolveCurrentCartId();
+  let cartId: string;
+  try {
+    cartId = await resolveCurrentCartId();
+  } catch (error) {
+    if (error instanceof GuestCartLimitError) return { ok: false, error: error.message };
+    throw error;
+  }
   try {
     await addItemToCart(cartId, variantId, quantity);
   } catch (error) {
@@ -58,7 +73,7 @@ export async function updateCartItemQuantityAction(
   itemId: string,
   quantity: number,
 ): Promise<CartActionResult> {
-  if (!Number.isInteger(quantity) || quantity < 0) {
+  if (!isValidQuantity(quantity, 0) || typeof itemId !== "string" || !UUID_PATTERN.test(itemId)) {
     return { ok: false, error: "تعداد نامعتبر است" };
   }
 
@@ -70,6 +85,9 @@ export async function updateCartItemQuantityAction(
 }
 
 export async function removeCartItemAction(itemId: string): Promise<CartActionResult> {
+  if (typeof itemId !== "string" || !UUID_PATTERN.test(itemId)) {
+    return { ok: false, error: "این کالا در سبد خرید یافت نشد" };
+  }
   const cartId = await resolveCurrentCartId();
   await removeCartItem(cartId, itemId);
   return { ok: true, cart: await getCartSummary(cartId) };

@@ -1,5 +1,37 @@
 # Trends Progress Report
 
+## Latest change: full-project audit — bugs, duplicates, dead code, vulnerabilities (user-requested)
+Status: COMPLETE WITH FOLLOW-UP. `tsc` ✔, `eslint .` ✔, `vitest tests/unit` 321/321 ✔ (3 new tests in `tests/unit/hardening.test.ts`), `next build` compile + TypeScript ✔ (prerender needs Postgres, absent in sandbox). **Not run:** integration tests (no Postgres), browser checks. **No DB/migration changes.**
+
+### Security fixes
+- **Stale privileges (high):** the JWT froze `role` at sign-in, so a demoted/deleted admin stayed admin for up to 30 days. `lib/auth/config.ts` `jwt` callback now re-reads the role from the DB (30 s per-process cache); a deleted account ends the session. New `findUserRoleById`.
+- **Brute-force bypass (high):** login rate limit lived only in `loginAction`; `POST /api/auth/callback/credentials` skipped it. Limits (30/5 min per IP, 20/15 min per mobile) now live in `authorize()`. Unknown mobile now runs a dummy bcrypt compare (no timing enumeration).
+- **Spoofable client IP (high):** `getClientIp` used the LEFTMOST `X-Forwarded-For` entry (client-controlled) → every rate limit was bypassable by rotating it. Now the Nth-from-right entry, `TRUSTED_PROXY_HOPS` (default 1).
+- **Mock payment in production (high):** `PAYMENT_PROVIDER=mock` let anyone mark their own order paid. Ignored when `NODE_ENV=production` unless `ALLOW_MOCK_PAYMENT=true`.
+- **Reset-token reuse race:** verify-then-consume let concurrent requests reuse one link. `consumePasswordResetToken` is now one atomic conditional UPDATE (also kills the user's other open tokens); `resetPasswordAction` claims first, then changes the password.
+- **Double checkout race:** `createOrderFromCart` now locks the cart row (`FOR UPDATE`) so a double-submit cannot create two orders / double-decrement stock. `placeOrderAction`: input guards + 10 orders / 10 min per user.
+- **Coupon guessing:** `previewCouponAction` rate-limited (20 / 10 min per user) + input guard.
+- **Cart:** UUID + max-quantity (999) validation (huge/invalid input used to 500); read path validates the guest-cart cookie (malformed value broke every page showing the cart; a cookie naming a user's cart would have been shown); guest-cart creation limited to 20/h per IP.
+- **Rate limiter memory:** buckets were never swept (comment claimed they were) → unbounded growth under spoofed keys. Now swept every 60 s, hard cap 50 000.
+- **Admin input:** image URLs (category, product image, hero slide, promo banner, home tile) must be hosted `/assets/...` paths; hero/banner `ctaHref` must be a site path or http(s). Wishlist toggle validates the id. Media upload rejects oversized bodies by `Content-Length` before buffering.
+
+### Duplicates / dead code
+- One shared `lib/utils/asset-path.ts` (`isHostedAssetPath`) replaces three copies of the same regex (admin schema, blog schema, Markdown renderer).
+- Deleted unused files: `home/CategoryNav`, `home/SectionHead`, `home/SectionTitleBand`, `layout/CategoryMegaMenu`, `cart/demo-data`; unused demo fixtures; 21 unreferenced exported functions/constants (e.g. `getVariantForAdmin`, `listLowStockVariants`, `bestCampaignInfoFor`, 5 icons); unused devDeps `@types/bcryptjs`, `@types/pg`, `autoprefixer`.
+- Env: `.env.example` documents `ALLOW_MOCK_PAYMENT`, `TRUSTED_PROXY_HOPS`.
+
+### Known / not changed (needs a decision)
+- Password reset does not invalidate existing sessions (stateless JWT; would need a `password_changed_at` column + check in the `jwt` callback).
+- Unpaid `pending_payment` orders hold stock indefinitely (no expiry job); cancelling does not release a coupon redemption.
+- Two admins demoting each other at the same instant could leave zero admins (no row lock in `updateCustomerRoleAction`).
+- Rate limiter, role cache are per-process (fine for one Node process; need Redis behind a multi-instance LB).
+- Uploads go to local `public/assets` (not served for files added after `next build` in production; needs object storage).
+- CSP still uses `'unsafe-inline'` for scripts (nonce version needs browser testing).
+- Remaining minor duplication: `category|collection/[slug]/loading.tsx`, two similar blocks in `catalog/queries.ts` (~358 and ~770), `isUniqueViolation` helpers repeated per actions file.
+- Unused exported *types* (59) left alone (harmless).
+- Next session: run `npm run test:integration` against a real Postgres, and click through login, cart, checkout, admin media upload.
+
+---
 ## Latest change: category-type list is a one-row slideable strip with arrows (user-requested)
 Status: COMPLETE WITH FOLLOW-UP. `tsc` / `eslint` (touched files) pass. **Not verified in a browser.** No DB changes.
 - `components/catalog/SubcategoryNav.tsx`: the pill list (group page = its types, type page = sibling types) no longer wraps; it renders inside `SwipeRow` as a single row. The audience-page tile grid is unchanged.

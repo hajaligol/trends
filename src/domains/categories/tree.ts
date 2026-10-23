@@ -137,9 +137,6 @@ export function findCategoryPath(roots: CategoryNode[], slug: string): CategoryN
   return null;
 }
 
-export function findNodeBySlug(roots: CategoryNode[], slug: string): CategoryNode | null {
-  return flattenCategoryTree(roots).find((node) => node.slug === slug) ?? null;
-}
 
 export function findNodeById(roots: CategoryNode[], id: string): CategoryNode | null {
   return flattenCategoryTree(roots).find((node) => node.id === id) ?? null;

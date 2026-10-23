@@ -10,7 +10,7 @@ import { productHref } from "@/domains/catalog/slug";
 /**
  * Real catalog product card — mirrors `.product-card` in the prototype,
  * now driven by `CatalogProductSummary` (a real database read model)
- * instead of Phase 2's `DemoProduct` fixture. Used by the homepage's
+ * instead of Phase 2's demo fixture. Used by the homepage's
  * featured-products section and by category listing grids so both stay
  * visually identical.
  *

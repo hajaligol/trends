@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, gt, isNull } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { passwordResetTokens } from "@/lib/db/schema";
 
@@ -46,10 +46,30 @@ export async function verifyPasswordResetToken(rawToken: string): Promise<{ user
   return { userId: row.userId };
 }
 
-export async function consumePasswordResetToken(rawToken: string): Promise<void> {
-  const tokenHash = hashToken(rawToken);
+/**
+ * Atomically claims a token: a single conditional UPDATE marks it used only if
+ * it is still unused AND unexpired, and returns the owning user. Two concurrent
+ * requests with the same token can therefore never both succeed (the old
+ * verify-then-consume sequence allowed that). Returns `null` if the token is
+ * invalid, expired or already used.
+ */
+export async function consumePasswordResetToken(rawToken: string): Promise<{ userId: string } | null> {
+  const [row] = await db
+    .update(passwordResetTokens)
+    .set({ usedAt: new Date() })
+    .where(
+      and(
+        eq(passwordResetTokens.tokenHash, hashToken(rawToken)),
+        isNull(passwordResetTokens.usedAt),
+        gt(passwordResetTokens.expiresAt, new Date()),
+      ),
+    )
+    .returning({ userId: passwordResetTokens.userId });
+  if (!row) return null;
+  // A reset also kills every other outstanding link for this account.
   await db
     .update(passwordResetTokens)
     .set({ usedAt: new Date() })
-    .where(and(eq(passwordResetTokens.tokenHash, tokenHash), isNull(passwordResetTokens.usedAt)));
+    .where(and(eq(passwordResetTokens.userId, row.userId), isNull(passwordResetTokens.usedAt)));
+  return { userId: row.userId };
 }

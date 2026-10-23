@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isHostedAssetPath } from "@/lib/utils/asset-path";
 import { isValidProductSlug } from "@/domains/catalog/slug";
 import { tehranInputToDate } from "@/lib/utils/tehran-time";
 
@@ -19,8 +20,7 @@ const optionalText = (max: number) =>
 const localAssetPath = z
   .string()
   .max(500)
-  .regex(/^\/assets\/[A-Za-z0-9._\-/]+$/, "تصویر باید با دکمه‌ی بارگذاری انتخاب شود")
-  .refine((value) => !value.includes(".."), "مسیر تصویر نامعتبر است");
+  .refine(isHostedAssetPath, "تصویر باید با دکمه‌ی بارگذاری انتخاب شود");
 
 const slugSchema = z
   .string()

@@ -6,6 +6,7 @@ import {
   getOrCreateCartForUser,
 } from "@/domains/cart/queries";
 import { readGuestCartId, setGuestCartId } from "@/domains/cart/session";
+import { checkIpRateLimit } from "@/lib/security/rate-limit";
 
 /**
  * Resolves "the cart this request should mutate" — logged-in users
@@ -19,6 +20,12 @@ import { readGuestCartId, setGuestCartId } from "@/domains/cart/session";
  * (the cart drawer's contents) goes through `getCurrentCartIdReadOnly`
  * below instead, which never creates anything.
  */
+export class GuestCartLimitError extends Error {
+  constructor() {
+    super("تعداد درخواست‌ها بیش از حد مجاز است. لطفاً کمی بعد دوباره تلاش کنید.");
+  }
+}
+
 export async function resolveCurrentCartId(): Promise<string> {
   const session = await auth();
 
@@ -35,6 +42,11 @@ export async function resolveCurrentCartId(): Promise<string> {
     // defensively — actually belongs to a user now) — fall through and
     // issue a fresh one rather than trusting it.
   }
+
+  // Anyone can mint guest carts just by calling an action without a cookie, so
+  // bound how many one client may create (blocks `carts` table spam).
+  const limited = await checkIpRateLimit("guest-cart-create", 20, 60 * 60 * 1000);
+  if (limited) throw new GuestCartLimitError();
 
   const cart = await createCart(null);
   await setGuestCartId(cart.id);
@@ -61,5 +73,11 @@ async function getCartIdForUserReadOnly(userId: string): Promise<string | null> 
 export async function getCurrentCartIdReadOnly(): Promise<string | null> {
   const session = await auth();
   if (session?.user) return getCartIdForUserReadOnly(session.user.id);
-  return readGuestCartId();
+  // The cookie is client-controlled: a malformed value used to reach SQL as a
+  // uuid cast error (500 on every page showing the cart), and a value naming a
+  // user's cart would have been displayed. Only a real guest cart is accepted.
+  const cookieValue = await readGuestCartId();
+  if (!cookieValue || !/^[0-9a-f-]{36}$/i.test(cookieValue)) return null;
+  const guestCart = await getGuestCartById(cookieValue);
+  return guestCart?.id ?? null;
 }

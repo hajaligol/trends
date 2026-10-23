@@ -10,7 +10,6 @@ import { describeDefinition } from "./labels";
 import { toEngineCampaign } from "./queries";
 import { campaignStatus } from "./status";
 
-export const CAMPAIGN_PAGE_SIZE = LISTING_PAGE_SIZE;
 
 export type CampaignLanding =
   | {

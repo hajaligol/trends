@@ -82,7 +82,7 @@ describe("product wizard step validation", () => {
 
 describe("parseCreateImagesField (server side)", () => {
   const colors = ["مشکی", "سفید"];
-  const row = (extra: object = {}) => ({ url: "/u/a.webp", altText: "alt", ...extra });
+  const row = (extra: object = {}) => ({ url: "/assets/products/a.webp", altText: "alt", ...extra });
 
   it("treats blank input as no images", () => {
     expect(parseCreateImagesField(null, colors)).toEqual({ ok: true, value: [] });

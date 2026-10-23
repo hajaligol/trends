@@ -31,15 +31,6 @@ export async function createPendingPayment(
   return payment;
 }
 
-export async function getLatestPaymentForOrder(orderId: string): Promise<Payment | null> {
-  const [payment] = await db
-    .select()
-    .from(payments)
-    .where(eq(payments.orderId, orderId))
-    .orderBy(desc(payments.createdAt))
-    .limit(1);
-  return payment ?? null;
-}
 
 export type FinalizeVerificationOutcome =
   | { status: "not_found" }

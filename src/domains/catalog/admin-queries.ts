@@ -156,22 +156,8 @@ export async function getProductForAdmin(id: string): Promise<AdminProductDetail
   return { ...product.product, categoryName: product.categoryName, variants, images, specifications, sizeChart };
 }
 
-export async function isProductSlugTaken(slug: string, excludeId?: string): Promise<boolean> {
-  const [existing] = await db.select({ id: products.id }).from(products).where(eq(products.slug, slug));
-  if (!existing) return false;
-  return !excludeId || existing.id !== excludeId;
-}
 
-export async function isVariantSkuTaken(sku: string, excludeId?: string): Promise<boolean> {
-  const [existing] = await db.select({ id: productVariants.id }).from(productVariants).where(eq(productVariants.sku, sku));
-  if (!existing) return false;
-  return !excludeId || existing.id !== excludeId;
-}
 
-export async function getVariantForAdmin(id: string): Promise<ProductVariant | null> {
-  const [row] = await db.select().from(productVariants).where(eq(productVariants.id, id)).limit(1);
-  return row ?? null;
-}
 
 /** Every active variant at or below its own low-stock threshold, across
  * every product — the admin "Inventory" page's core read
@@ -188,25 +174,6 @@ export type LowStockRow = {
   lowStockThreshold: number;
 };
 
-export async function listLowStockVariants(): Promise<LowStockRow[]> {
-  const rows = await db
-    .select({
-      variantId: productVariants.id,
-      productId: products.id,
-      productTitle: products.title,
-      productSlug: products.slug,
-      sku: productVariants.sku,
-      size: productVariants.size,
-      color: productVariants.color,
-      stock: productVariants.stock,
-      lowStockThreshold: productVariants.lowStockThreshold,
-    })
-    .from(productVariants)
-    .innerJoin(products, eq(productVariants.productId, products.id))
-    .where(and(eq(productVariants.isActive, true), sql`${productVariants.stock} <= ${productVariants.lowStockThreshold}`))
-    .orderBy(asc(productVariants.stock));
-  return rows;
-}
 
 
 /* ------------------------------------------------------------------ */

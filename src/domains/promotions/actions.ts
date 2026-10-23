@@ -1,6 +1,7 @@
 "use server";
 
 import { auth } from "@/lib/auth/config";
+import { checkRateLimit } from "@/lib/security/rate-limit";
 import { db } from "@/lib/db/client";
 import { getCurrentCartIdReadOnly } from "@/domains/cart/resolve";
 import { getCartSummary } from "@/domains/cart/queries";
@@ -26,6 +27,14 @@ export async function previewCouponAction(rawCode: string): Promise<CouponPrevie
   const session = await auth();
   if (!session?.user) {
     return { ok: false, error: "برای استفاده از کد تخفیف ابتدا وارد حساب کاربری خود شوید" };
+  }
+
+  if (typeof rawCode !== "string" || rawCode.length > 64) {
+    return { ok: false, error: "کد تخفیف معتبر نیست" };
+  }
+  // Stops automated guessing of coupon codes.
+  if (!checkRateLimit(`coupon-preview:${session.user.id}`, 20, 10 * 60_000).allowed) {
+    return { ok: false, error: "تعداد درخواست‌ها بیش از حد مجاز است. لطفاً کمی بعد دوباره تلاش کنید." };
   }
 
   const cartId = await getCurrentCartIdReadOnly();

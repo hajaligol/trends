@@ -94,10 +94,3 @@ export async function getCustomerForAdmin(id: string): Promise<AdminCustomerDeta
   return { ...toPublicUser(user), recentOrders };
 }
 
-export async function countStaffAndAdminUsers(): Promise<number> {
-  const [row] = await db
-    .select({ total: count() })
-    .from(users)
-    .where(or(eq(users.role, "admin"), eq(users.role, "staff")));
-  return row?.total ?? 0;
-}

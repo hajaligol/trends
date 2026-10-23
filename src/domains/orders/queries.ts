@@ -5,6 +5,7 @@ import {
   orderCampaignApplications,
   orderItems,
   orderStatusHistory,
+  carts,
   orders,
   productImages,
   productVariants,
@@ -127,6 +128,12 @@ export async function createOrderFromCart(
   couponCode: string | null = null,
 ): Promise<Order> {
   const order = await db.transaction(async (tx) => {
+    // Serialize concurrent checkouts of the SAME cart (double-click, two tabs,
+    // replayed request): the second waits here, then re-reads the lines below
+    // and finds the cart already emptied -> EmptyCartError. Without this lock
+    // both could pass the stock check and create two orders from one cart.
+    await tx.select({ id: carts.id }).from(carts).where(eq(carts.id, cartId)).for("update");
+
     const lines = await tx
       .select({
         variantId: productVariants.id,

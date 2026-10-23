@@ -31,7 +31,6 @@ export async function getCatalogPricing(): Promise<CatalogPricing> {
   return { campaigns: await getActiveCampaignsForRequest() };
 }
 
-export const NO_CAMPAIGNS: CatalogPricing = { campaigns: [] };
 
 /**
  * The price a customer sees for one variant. When a price-level campaign
@@ -68,16 +67,3 @@ export function campaignInfosFor(pricing: CatalogPricing, ref: ProductRef): Cata
     .sort((a, b) => Number(b.changesPrice) - Number(a.changesPrice));
 }
 
-/**
- * Product page: only the ONE campaign that saves the customer the most
- * (judged on `referencePriceToman`, the product's regular starting price).
- * Returns an array so callers keep the `campaigns` shape; it holds 0 or 1.
- */
-export function bestCampaignInfoFor(
-  pricing: CatalogPricing,
-  ref: ProductRef,
-  referencePriceToman: number,
-): CatalogCampaignInfo[] {
-  const best = bestCampaignForProduct(pricing.campaigns, ref, referencePriceToman);
-  return best ? [toCampaignInfo(best)] : [];
-}
